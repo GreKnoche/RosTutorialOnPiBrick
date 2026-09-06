@@ -1,3 +1,5 @@
+import { Box } from "@/components/box";
+
 export default function HomePage() {
   return (
     <div className="flex flex-col gap-8">
@@ -11,24 +13,18 @@ export default function HomePage() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">
-        <a
-          href="/ros"
-          className="flex min-h-64 flex-col justify-end rounded-2xl border border-border bg-card p-8 text-card-foreground transition hover:border-heading"
-        >
-          <h2 className="text-2xl font-semibold text-heading">ROS Tutorial</h2>
+        <Box href="/ros" className="min-h-64 justify-end">
+          <h2 className="text-2xl font-semibold text-heading">ROS</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             ROS 2 auf dem Companion-PC, BrickPi3 auf dem Raspberry Pi.
           </p>
-        </a>
-        <a
-          href="/nav2"
-          className="flex min-h-64 flex-col justify-end rounded-2xl border border-border bg-card p-8 text-card-foreground transition hover:border-heading"
-        >
-          <h2 className="text-2xl font-semibold text-heading">Nav2 Tutorial</h2>
+        </Box>
+        <Box href="/nav2" className="min-h-64 justify-end">
+          <h2 className="text-2xl font-semibold text-heading">Nav2</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Navigation mit Nav2, Mapping und Gazebo.
           </p>
-        </a>
+        </Box>
       </section>
     </div>
   );
