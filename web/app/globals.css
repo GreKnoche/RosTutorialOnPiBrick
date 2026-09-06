@@ -1,21 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: oklch(0.985 0.008 95);
+  --foreground: oklch(0.33 0.018 260);
+  --heading: oklch(0.42 0.14 255);
+  --card: oklch(1 0.004 95);
+  --card-foreground: oklch(0.33 0.018 260);
+  --popover: oklch(1 0.004 95);
+  --popover-foreground: oklch(0.33 0.018 260);
+  --primary: oklch(0.72 0.16 55);
+  --primary-foreground: oklch(0.28 0.05 55);
+  --secondary: oklch(0.94 0.03 250);
+  --secondary-foreground: oklch(0.38 0.1 255);
+  --muted: oklch(0.955 0.012 95);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.94 0.03 250);
+  --accent-foreground: oklch(0.38 0.1 255);
+  --destructive: oklch(0.55 0.2 25);
+  --border: oklch(0.9 0.015 95);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: oklch(0.18 0.02 260);
+    --foreground: oklch(0.92 0.01 95);
+    --heading: oklch(0.78 0.1 255);
+    --card: oklch(0.22 0.02 260);
+    --card-foreground: oklch(0.92 0.01 95);
+    --popover: oklch(0.22 0.02 260);
+    --popover-foreground: oklch(0.92 0.01 95);
+    --primary: oklch(0.72 0.16 55);
+    --primary-foreground: oklch(0.22 0.04 55);
+    --secondary: oklch(0.28 0.04 255);
+    --secondary-foreground: oklch(0.88 0.04 255);
+    --muted: oklch(0.26 0.02 260);
+    --muted-foreground: oklch(0.72 0.02 260);
+    --accent: oklch(0.28 0.04 255);
+    --accent-foreground: oklch(0.88 0.04 255);
+    --destructive: oklch(0.65 0.18 25);
+    --border: oklch(0.32 0.02 260);
   }
 }
 
