@@ -27,8 +27,6 @@ RUN if [ "$WITH_BRICKPI3" = "1" ]; then \
     && test -f /opt/ros/${ROS_DISTRO}/setup.bash
 
 WORKDIR /ws
-
-SHELL ["/bin/bash", "-c"]
+COPY brick_hw /ws/src/brick_hw
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
-
-CMD ["bash", "-lc", ". /opt/ros/${ROS_DISTRO}/setup.bash && . /ws/install/setup.bash"]
+CMD ["bash", "-lc", ". /opt/ros/${ROS_DISTRO}/setup.bash && . /ws/install/setup.bash && ros2 run brick_hw robot_node"]

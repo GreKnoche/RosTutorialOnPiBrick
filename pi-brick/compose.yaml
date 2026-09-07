@@ -1,0 +1,18 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        WITH_BRICKPI3: "1"
+    image: pibrick:local
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    devices:
+      - /dev/spidev0.1
+      - /dev/gpiomem
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}
+      ROS_STATIC_PEERS: ${ROS_STATIC_PEERS:-}
