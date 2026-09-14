@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BrickWall } from "lucide-react";
+import { BrandLogo } from "@/components/logo-mark";
 
 const links = [
   { href: "/", label: "Start" },
@@ -19,12 +19,10 @@ export function SiteHeader() {
   const pathname = usePathname();
   return (
     <header className="border-b border-border/80 bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-medium">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <BrickWall className="size-4" />
-          </span>
-          <span className="tracking-tight">EV3 Nav2 Lab</span>
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-3 font-medium">
+          <BrandLogo className="size-11" />
+          <span className="text-lg tracking-tight">EV3 Nav2 Lab</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {links.map((link) => (
