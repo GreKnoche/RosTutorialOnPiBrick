@@ -1,9 +1,5 @@
-
+import { TrackLessons } from "@/components/track-lessons";
 
 export default function RosPage() {
-  return (
-    <div>
-      <h1>Placeholder</h1>
-    </div>
-  );
+  return <TrackLessons trackId="ros" kicker="ROS-Einführung" />;
 }

@@ -2,23 +2,11 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const tracks = [
-  {
-    href: "/ros",
-    id: "ros",
-    title: "ROS",
-    description: "ROS 2 auf dem Companion-PC, BrickPi3 auf dem Raspberry Pi.",
-  },
-  {
-    href: "/nav2",
-    id: "nav2",
-    title: "Nav2",
-    description: "Navigation mit Nav2, Mapping und Gazebo.",
-  },
-];
+import { loadCurriculum, trackHref } from "@/lib/curriculum";
 
 export default function HomePage() {
+  const { tracks } = loadCurriculum();
+
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
@@ -33,7 +21,7 @@ export default function HomePage() {
       <ol className="grid gap-3 sm:grid-cols-2">
         {tracks.map((track) => (
           <li key={track.id}>
-            <Link href={track.href} className="block h-full">
+            <Link href={trackHref(track.id)} className="block h-full">
               <Card className="h-full transition-colors hover:bg-muted/40">
                 <CardHeader>
                   <CardTitle className="font-heading text-xl">{track.title}</CardTitle>
