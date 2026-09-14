@@ -40,6 +40,7 @@
   --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
 }
 
 @media (prefers-color-scheme: dark) {

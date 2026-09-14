@@ -1,4 +1,22 @@
-import { Box } from "@/components/box";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+const tracks = [
+  {
+    href: "/ros",
+    id: "ros",
+    title: "ROS",
+    description: "ROS 2 auf dem Companion-PC, BrickPi3 auf dem Raspberry Pi.",
+  },
+  {
+    href: "/nav2",
+    id: "nav2",
+    title: "Nav2",
+    description: "Navigation mit Nav2, Mapping und Gazebo.",
+  },
+];
 
 export default function HomePage() {
   return (
@@ -12,20 +30,24 @@ export default function HomePage() {
         </h1>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-2">
-        <Box href="/ros" className="min-h-64 justify-end">
-          <h2 className="text-2xl font-semibold text-heading">ROS</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            ROS 2 auf dem Companion-PC, BrickPi3 auf dem Raspberry Pi.
-          </p>
-        </Box>
-        <Box href="/nav2" className="min-h-64 justify-end">
-          <h2 className="text-2xl font-semibold text-heading">Nav2</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Navigation mit Nav2, Mapping und Gazebo.
-          </p>
-        </Box>
-      </section>
+      <ol className="grid gap-3 sm:grid-cols-2">
+        {tracks.map((track) => (
+          <li key={track.id}>
+            <Link href={track.href} className="block h-full">
+              <Card className="h-full transition-colors hover:bg-muted/40">
+                <CardHeader>
+                  <CardTitle className="font-heading text-xl">{track.title}</CardTitle>
+                  <CardDescription>{track.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
+                  <Badge variant="outline">{track.id}</Badge>
+                  <ArrowRight className="size-4 shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
