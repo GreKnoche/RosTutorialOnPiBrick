@@ -1,6 +1,6 @@
 import type { Crumb, Curriculum, Lesson, TrackId, TrackMeta } from "@/lib/types";
 
-export type { Crumb, Curriculum, Lesson, LessonStatus, TrackId, TrackMeta } from "@/lib/types";
+export type { Crumb, Curriculum, LabKind, Lesson, LessonStatus, TrackId, TrackMeta } from "@/lib/types";
 
 const curriculum: Curriculum = {
   tracks: [
@@ -23,6 +23,7 @@ const curriculum: Curriculum = {
       status: "stub",
       summary: "Der Robot-Contract in einer Station: Topics, /cmd_vel und /odom.",
       track: "ros",
+      lab: "teleop",
     },
     {
       id: "fahren",
@@ -31,6 +32,7 @@ const curriculum: Curriculum = {
       status: "stub",
       summary: "Mit Tasten und Buttons den EV3 bewegen. Tempo und Drehen stellst du selbst ein.",
       track: "ros",
+      lab: "teleop",
     },
     {
       id: "ziel",
@@ -39,6 +41,7 @@ const curriculum: Curriculum = {
       status: "stub",
       summary: "Ein Ziel setzen und den Roboter hinfahren lassen.",
       track: "ros",
+      lab: "goal",
     },
     {
       id: "raeder",
@@ -47,6 +50,7 @@ const curriculum: Curriculum = {
       status: "stub",
       summary: "Radgröße und Spurweite ändern — der Roboter fährt andere Kurven.",
       track: "ros",
+      lab: "teleop",
     },
     {
       id: "mission",
@@ -55,6 +59,7 @@ const curriculum: Curriculum = {
       status: "stub",
       summary: "Drei Markierungen abfahren, bevor die Zeit um ist.",
       track: "ros",
+      lab: "teleop",
     },
     {
       id: "00",
@@ -64,6 +69,7 @@ const curriculum: Curriculum = {
       nav2_surface: "Robot contract (REP-105)",
       summary: "URDF, encoder unicycle odometry, and the TF tree Nav2 will require.",
       track: "nav2",
+      lab: "teleop",
     },
     {
       id: "01",
@@ -73,6 +79,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_core::Controller (Python stand-in)",
       summary: "Heading-aware P-controller on /goal_pose.",
       track: "nav2",
+      lab: "goal",
     },
     {
       id: "02",
@@ -82,6 +89,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_costmap_2d::Layer",
       summary: "Occupancy grid, inflation, and a Range layer for the ultrasonic.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "03",
@@ -91,6 +99,7 @@ const curriculum: Curriculum = {
       nav2_surface: "robot_localization + nav2_amcl",
       summary: "Fuse encoders and gyro, then publish map → odom.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "04",
@@ -100,6 +109,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_core::GlobalPlanner",
       summary: "Grid planner from start to goal on the global costmap.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "05",
@@ -109,6 +119,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_core::Controller",
       summary: "Replace PosePursuitController with DWB, RPP, or MPPI.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "06",
@@ -118,6 +129,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_bt_navigator",
       summary: "ComputePathToPose → FollowPath as a BT instead of a single node.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "07",
@@ -127,6 +139,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_core::Behavior",
       summary: "Spin, backup, wait when the controller is stuck.",
       track: "nav2",
+      lab: "none",
     },
     {
       id: "08",
@@ -136,6 +149,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_bringup",
       summary: "Drop in navigation_launch.py against the unchanged robot contract.",
       track: "nav2",
+      lab: "none",
     },
   ],
 };

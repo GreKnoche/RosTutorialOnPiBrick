@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 const variants = {
   default: "border-transparent bg-primary text-primary-foreground",
   outline: "border-border text-foreground",
+  secondary: "border-transparent bg-secondary text-secondary-foreground",
 } as const;
 
 export function Badge({

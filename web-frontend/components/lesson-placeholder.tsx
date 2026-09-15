@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { RobotLab } from "@/components/robot-lab";
 import { trackCrumbs, type Lesson } from "@/lib/curriculum";
 
 export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
@@ -23,7 +24,7 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
           {lesson.summary}
         </p>
       </section>
-      <p className="text-sm text-muted-foreground">Placeholder — Inhalt folgt.</p>
+      <RobotLab lab={lesson.lab} lessonId={lesson.id} />
     </div>
   );
 }
