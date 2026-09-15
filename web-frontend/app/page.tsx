@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { CardIconPlaceholder } from "@/components/card-icon-placeholder";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadCurriculum, trackHref } from "@/lib/curriculum";
 
@@ -22,15 +23,18 @@ export default function HomePage() {
         {tracks.map((track) => (
           <li key={track.id}>
             <Link href={trackHref(track.id)} className="block h-full">
-              <Card className="h-full transition-colors hover:bg-muted/40">
-                <CardHeader>
-                  <CardTitle className="font-heading text-xl">{track.title}</CardTitle>
-                  <CardDescription>{track.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between text-xs text-muted-foreground">
-                  <Badge variant="outline">{track.id}</Badge>
-                  <ArrowRight className="size-4 shrink-0" />
-                </CardContent>
+              <Card className="h-full flex-row items-start gap-3 px-(--card-spacing) transition-colors hover:bg-muted/40">
+                <CardIconPlaceholder />
+                <div className="min-w-0 flex-1">
+                  <CardHeader className="px-0">
+                    <CardTitle className="font-heading text-xl">{track.title}</CardTitle>
+                    <CardDescription>{track.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between px-0 text-xs text-muted-foreground">
+                    <Badge variant="outline">{track.id}</Badge>
+                    <ArrowRight className="size-4 shrink-0" />
+                  </CardContent>
+                </div>
               </Card>
             </Link>
           </li>
