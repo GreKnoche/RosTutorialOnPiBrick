@@ -1,8 +1,8 @@
 services:
   agent:
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: pi-brick/docker/Dockerfile
       args:
         WITH_BRICKPI3: "1"
     image: pibrick:local
@@ -16,3 +16,20 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_AUTOMATIC_DISCOVERY_RANGE:-SUBNET}
       ROS_STATIC_PEERS: ${ROS_STATIC_PEERS:-}
+
+  mock:
+    build:
+      context: ..
+      dockerfile: pi-brick/docker/Dockerfile
+      args:
+        WITH_BRICKPI3: "0"
+    image: pibrick:mock
+    network_mode: host
+    ipc: host
+    profiles: ["mock"]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    command: >
+      bash -lc "source /opt/ros/jazzy/setup.bash
+      && source /ws/install/setup.bash
+      && ros2 launch brick_hw brick.launch.py mock:=true"

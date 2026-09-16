@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-sensor-msgs \
     ros-jazzy-tf2-ros \
     ros-jazzy-tf2-ros-py \
+    ros-jazzy-launch-ros \
+    ros-jazzy-ros2launch \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$WITH_BRICKPI3" = "1" ]; then \
@@ -27,6 +29,12 @@ RUN if [ "$WITH_BRICKPI3" = "1" ]; then \
     && test -f /opt/ros/${ROS_DISTRO}/setup.bash
 
 WORKDIR /ws
-COPY brick_hw /ws/src/brick_hw
+COPY shared /ws/shared
+COPY companion/src/brick_core /ws/src/brick_core
+COPY pi-brick/brick_hw /ws/src/brick_hw
+COPY shared/chassis.yaml /ws/src/brick_hw/config/chassis.yaml
+
+SHELL ["/bin/bash", "-c"]
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
-CMD ["bash", "-lc", ". /opt/ros/${ROS_DISTRO}/setup.bash && . /ws/install/setup.bash && ros2 run brick_hw robot_node"]
+
+CMD ["bash", "-lc", ". /opt/ros/${ROS_DISTRO}/setup.bash && . /ws/install/setup.bash && ros2 launch brick_hw brick.launch.py"]
