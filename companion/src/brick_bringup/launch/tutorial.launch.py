@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -13,6 +14,7 @@ from launch.actions import (
     OpaqueFunction,
     SetLaunchConfiguration,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, SetParameter
@@ -51,17 +53,37 @@ def _setup(context, *args, **kwargs):
     )
     lesson_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(lesson_launch),
-        launch_arguments={"chassis_file": chassis_path}.items(),
+        launch_arguments={
+            "chassis_file": chassis_path,
+            "use_sim_time": "true" if use_sim_time else "false",
+        }.items(),
+    )
+    bringup_share = get_package_share_directory("brick_bringup")
+    rviz_template = os.path.join(bringup_share, "rviz", "drive_to_pose.rviz")
+    with open(rviz_template, encoding="utf-8") as handle:
+        rviz_body = handle.read().replace("URDF_PATH_PLACEHOLDER", urdf_path)
+    rviz_config = os.path.join(tempfile.gettempdir(), "brick_drive_to_pose.rviz")
+    with open(rviz_config, "w", encoding="utf-8") as handle:
+        handle.write(rviz_body)
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", rviz_config],
+        parameters=[{"use_sim_time": use_sim_time}],
+        condition=IfCondition(LaunchConfiguration("rviz")),
     )
     actions = [
         LogInfo(msg=f"Pi brick tutorial backend={backend} lesson={lesson}"),
         SetLaunchConfiguration("chassis_file", chassis_path),
+        rsp,
         lesson_include,
+        rviz,
     ]
     if use_sim_time:
         actions.insert(1, SetParameter(name="use_sim_time", value=True))
     if backend == "hardware":
-        actions.insert(1, rsp)
         actions.insert(
             1,
             LogInfo(
@@ -73,13 +95,12 @@ def _setup(context, *args, **kwargs):
         actions.insert(
             1,
             LogInfo(
-                msg="gazebo: start gazebo compose first; this launch only adds the lesson"
+                msg="gazebo: start gazebo compose first; this launch adds RSP + lesson + RViz"
             ),
         )
         return actions
     if backend != "sim":
         return [LogInfo(msg=f"unknown backend {backend!r}; expected sim|hardware|gazebo")]
-    actions.insert(1, rsp)
     actions.insert(
         1,
         Node(
@@ -104,6 +125,11 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument("backend", default_value="sim"),
             DeclareLaunchArgument("lesson", default_value="00"),
+            DeclareLaunchArgument(
+                "rviz",
+                default_value="true",
+                description="Open RViz2 with odom, robot model, and 2D Goal Pose.",
+            ),
             OpaqueFunction(function=_setup),
         ]
     )

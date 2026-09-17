@@ -35,6 +35,8 @@ Start `brick_hw` on the Pi (same Wi-Fi, same `ROS_DOMAIN_ID`), then:
 ros2 launch brick_bringup tutorial.launch.py backend:=hardware lesson:=01
 ```
 
+RViz opens with fixed frame `odom`. Toolbar **2D Goal Pose**, then click-drag to send `/goal_pose`. Lesson 01 starts Nav2 (planner + RPP) in the `odom` frame, not the Python P-controller. `rviz:=false` skips the window.
+
 ## Gazebo
 
 Start the Gazebo overlay (`cd gazebo && docker compose up --build`), then:

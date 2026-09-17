@@ -18,6 +18,9 @@ gazebo/log/
 pi-brick/build/
 pi-brick/install/
 pi-brick/log/
+build/
+install/
+log/
 companion/src/brick_description/config/chassis.yaml
 pi-brick/brick_hw/config/chassis.yaml
 
