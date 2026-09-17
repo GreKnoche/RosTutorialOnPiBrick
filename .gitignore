@@ -27,3 +27,5 @@ pi-brick/brick_hw/config/chassis.yaml
 *.log
 .idea/
 .vscode/
+
+brickpi.sh
