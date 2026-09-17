@@ -74,10 +74,29 @@ def _setup(context, *args, **kwargs):
         parameters=[{"use_sim_time": use_sim_time}],
         condition=IfCondition(LaunchConfiguration("rviz")),
     )
+    domain = os.environ.get("ROS_DOMAIN_ID", "0")
+    wait = Node(
+        package="brick_nav",
+        executable="wait_for_odom",
+        name="wait_for_odom",
+        output="screen",
+        parameters=[
+            {
+                "backend": backend,
+                "use_sim_time": use_sim_time,
+            }
+        ],
+    )
     actions = [
-        LogInfo(msg=f"Pi brick tutorial backend={backend} lesson={lesson}"),
+        LogInfo(
+            msg=(
+                f"Pi brick tutorial backend={backend} lesson={lesson} "
+                f"ROS_DOMAIN_ID={domain}"
+            )
+        ),
         SetLaunchConfiguration("chassis_file", chassis_path),
         rsp,
+        wait,
         lesson_include,
         rviz,
     ]
@@ -87,7 +106,10 @@ def _setup(context, *args, **kwargs):
         actions.insert(
             1,
             LogInfo(
-                msg="hardware: /cmd_vel /odom /imu come from brick_hw over DDS"
+                msg=(
+                    "hardware: /cmd_vel /odom come from brick_hw over DDS "
+                    f"(ROS_DOMAIN_ID={domain})"
+                )
             ),
         )
         return actions
@@ -95,7 +117,10 @@ def _setup(context, *args, **kwargs):
         actions.insert(
             1,
             LogInfo(
-                msg="gazebo: start gazebo compose first; this launch adds RSP + lesson + RViz"
+                msg=(
+                    "gazebo: start gazebo compose first; this launch adds RSP + lesson + RViz "
+                    f"(ROS_DOMAIN_ID={domain})"
+                )
             ),
         )
         return actions

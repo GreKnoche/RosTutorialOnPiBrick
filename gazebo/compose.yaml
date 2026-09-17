@@ -12,6 +12,7 @@ services:
     ipc: host
     env_file:
       - localhost.env
+      - ../shared/ros.env
     environment:
       - DISPLAY=${DISPLAY}
       - XAUTHORITY=${XAUTHORITY}

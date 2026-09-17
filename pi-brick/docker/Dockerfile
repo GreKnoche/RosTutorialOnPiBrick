@@ -3,6 +3,7 @@ FROM ros:jazzy-ros-base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ENV ROS_DISTRO=jazzy
+ENV ROS_DOMAIN_ID=71
 
 SHELL ["/bin/bash", "-c"]
 

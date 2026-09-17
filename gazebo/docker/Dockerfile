@@ -2,6 +2,7 @@ FROM osrf/ros:jazzy-desktop
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GZ_VERSION=harmonic
+ENV ROS_DOMAIN_ID=71
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-ros-gz \

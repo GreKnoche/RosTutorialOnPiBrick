@@ -1,0 +1,27 @@
+services:
+  companion:
+    build:
+      context: ..
+      dockerfile: companion/docker/Dockerfile
+    image: pibrick-companion:local
+    network_mode: host
+    ipc: host
+    env_file:
+      - ../shared/ros.env
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=${XAUTHORITY}
+      - QT_X11_NO_MITSHM=1
+      # sim = kinematic twin in this container. hardware/gazebo need /odom on DDS.
+      - BACKEND=${BACKEND:-sim}
+      - LESSON=${LESSON:-01}
+      - RVIZ=${RVIZ:-true}
+      - ROS_STATIC_PEERS=${ROS_STATIC_PEERS:-}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY}:${XAUTHORITY}:ro
+    devices:
+      - /dev/dri
+    stdin_open: true
+    tty: true
