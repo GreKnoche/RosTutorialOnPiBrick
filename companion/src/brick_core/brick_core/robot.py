@@ -35,12 +35,12 @@ class DiffDriveRobot:
     def spin_once(self, dt: float) -> RobotState:
         self.backend.step(dt)
         left, right = self.backend.read_encoders()
-        pose = self.odom.update(left, right)
+        pose = self.odom.update(left, right, dt)
         return RobotState(
             pose=pose,
             gyro_deg=self.backend.read_gyro_deg(),
             range_m=self.backend.read_range_m(),
             left_rad=left,
             right_rad=right,
-            twist=self._cmd,
+            twist=self.odom.twist,
         )

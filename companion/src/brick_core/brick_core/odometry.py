@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from brick_core.chassis import Chassis
-from brick_core.geometry import Pose2D, wrap_angle
+from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 
 
 class UnicycleOdometry:
@@ -17,23 +17,31 @@ class UnicycleOdometry:
         dψ = (r*dθ_r - r*dθ_l) / L
         x += ds * cos(ψ + dψ/2)
         y += ds * sin(ψ + dψ/2)
+
+    When dt > 0, also stores body-frame twist from the same tick:
+
+        vx = ds / dt
+        ω  = dψ / dt
     """
 
     def __init__(self, chassis: Chassis | None = None) -> None:
         self.chassis = chassis or Chassis()
         self.pose = Pose2D()
+        self.twist = Twist2D()
         self._last_left: float | None = None
         self._last_right: float | None = None
 
     def reset(self, pose: Pose2D | None = None) -> None:
         self.pose = pose or Pose2D()
+        self.twist = Twist2D()
         self._last_left = None
         self._last_right = None
 
-    def update(self, left_rad: float, right_rad: float) -> Pose2D:
+    def update(self, left_rad: float, right_rad: float, dt: float = 0.0) -> Pose2D:
         if self._last_left is None or self._last_right is None:
             self._last_left = left_rad
             self._last_right = right_rad
+            self.twist = Twist2D()
             return self.pose
 
         d_left = (left_rad - self._last_left) * self.chassis.wheel_radius_m
@@ -43,6 +51,10 @@ class UnicycleOdometry:
 
         ds = 0.5 * (d_left + d_right)
         dtheta = (d_right - d_left) / self.chassis.wheel_separation_m
+        if dt > 0.0:
+            self.twist = Twist2D(linear=ds / dt, angular=dtheta / dt)
+        else:
+            self.twist = Twist2D()
         mid = self.pose.theta + 0.5 * dtheta
         self.pose.x += ds * math.cos(mid)
         self.pose.y += ds * math.sin(mid)
