@@ -4,7 +4,12 @@ import math
 
 import pytest
 
-from brick_calibrate.track import heading_delta, suggested_track, yaw_from_quaternion
+from brick_calibrate.track import (
+    heading_delta,
+    suggested_track,
+    summarize_separations,
+    yaw_from_quaternion,
+)
 from brick_core.geometry import yaw_to_quaternion
 
 
@@ -29,6 +34,17 @@ def test_suggested_track_uses_magnitudes_if_signs_flip() -> None:
 def test_suggested_track_rejects_tiny_gyro_move() -> None:
     with pytest.raises(ValueError, match="too small"):
         suggested_track(0.1, math.radians(90.0), 0.0)
+
+
+def test_summarize_separations_mean_and_spread() -> None:
+    mean, std = summarize_separations([0.1131, 0.1164])
+    assert mean == pytest.approx(0.11475)
+    assert std == pytest.approx(0.002333, abs=1e-6)
+
+
+def test_summarize_separations_rejects_empty() -> None:
+    with pytest.raises(ValueError, match="no track-width"):
+        summarize_separations([])
 
 
 def test_yaw_roundtrip_and_wrap() -> None:

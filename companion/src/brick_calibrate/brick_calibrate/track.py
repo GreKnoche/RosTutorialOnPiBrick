@@ -58,3 +58,14 @@ def suggested_track(
         gyro_delta_rad=gyro_delta_rad,
         sign_mismatch=(odom_delta_rad * gyro_delta_rad) < 0.0,
     )
+
+
+def summarize_separations(values: list[float]) -> tuple[float, float]:
+    """Return (mean, sample standard deviation). std is 0.0 for a single sample."""
+    if not values:
+        raise ValueError("no track-width samples")
+    mean = sum(values) / len(values)
+    if len(values) == 1:
+        return mean, 0.0
+    var = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
+    return mean, math.sqrt(var)

@@ -11,7 +11,13 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
 
-from brick_calibrate.track import heading_delta, suggested_track, yaw_from_quaternion
+from brick_calibrate.track import (
+    TrackCalibration,
+    heading_delta,
+    suggested_track,
+    summarize_separations,
+    yaw_from_quaternion,
+)
 from brick_core.chassis import load_chassis
 
 
@@ -25,6 +31,7 @@ class SpinTrackNode(Node):
         self.declare_parameter("timeout_sec", 20.0)
         self.declare_parameter("rate_hz", 20.0)
         self.declare_parameter("current_separation_m", 0.0)
+        self.declare_parameter("trials", 4)
 
         chassis = load_chassis(str(self.get_parameter("chassis_file").value) or None)
         configured = float(self.get_parameter("current_separation_m").value)
@@ -34,11 +41,14 @@ class SpinTrackNode(Node):
         self._angular_speed = min(speed, chassis.max_angular_rad_s)
         self._settle_sec = float(self.get_parameter("settle_sec").value)
         self._timeout_sec = float(self.get_parameter("timeout_sec").value)
+        self._trials = max(1, int(float(self.get_parameter("trials").value)))
 
         self._odom_yaw: Optional[float] = None
         self._gyro_yaw: Optional[float] = None
         self._start_odom: Optional[float] = None
         self._start_gyro: Optional[float] = None
+        self._trial = 0
+        self._samples: list[TrackCalibration] = []
         self._state = "wait"
         self._state_t0 = self.get_clock().now()
         self.finished = False
@@ -49,10 +59,14 @@ class SpinTrackNode(Node):
         rate = float(self.get_parameter("rate_hz").value)
         self.create_timer(1.0 / max(rate, 1.0), self._tick)
         self.get_logger().info(
-            f"spin_track ready target={math.degrees(self._target_rad):.1f}deg "
-            f"L={self._separation_m:.4f}m ω={self._angular_speed:.2f}rad/s "
-            "(gyro is the ruler; clear space around the robot)"
+            f"spin_track ready {self._trials} trials of "
+            f"{math.degrees(self._target_rad):.1f}deg L={self._separation_m:.4f}m "
+            f"ω={self._angular_speed:.2f}rad/s "
+            "(gyro is the ruler; direction alternates; clear space around the robot)"
         )
+
+    def _direction(self) -> float:
+        return 1.0 if self._trial % 2 == 0 else -1.0
 
     def _on_odom(self, msg: Odometry) -> None:
         q = msg.pose.pose.orientation
@@ -96,8 +110,9 @@ class SpinTrackNode(Node):
                 return
             self._start_odom = self._odom_yaw
             self._start_gyro = self._gyro_yaw
+            way = "CCW" if self._direction() > 0.0 else "CW"
             self.get_logger().info(
-                f"spinning in place until gyro turns "
+                f"trial {self._trial + 1}/{self._trials} {way}: spin until gyro turns "
                 f"{math.degrees(self._target_rad):.1f}deg"
             )
             self._enter("spin")
@@ -116,16 +131,21 @@ class SpinTrackNode(Node):
                 self.get_logger().info("gyro target reached, settling")
                 self._enter("settle_end")
                 return
-            self._publish(self._angular_speed)
+            self._publish(self._direction() * self._angular_speed)
             return
         if self._state == "settle_end":
             self._publish(0.0)
             if self._elapsed() < self._settle_sec:
                 return
-            self._report()
+            self._record_trial()
+            self._trial += 1
+            if self._trial < self._trials:
+                self._enter("settle_start")
+                return
+            self._report_mean()
             self.finished = True
 
-    def _report(self) -> None:
+    def _record_trial(self) -> None:
         if (
             self._start_odom is None
             or self._odom_yaw is None
@@ -144,22 +164,30 @@ class SpinTrackNode(Node):
         odom_deg = math.degrees(result.odom_delta_rad)
         gyro_deg = math.degrees(result.gyro_delta_rad)
         self.get_logger().info(
-            f"gyro turned {gyro_deg:+.2f}deg (ruler), "
-            f"wheel odom turned {odom_deg:+.2f}deg"
+            f"trial {self._trial + 1}: gyro {gyro_deg:+.2f}deg, "
+            f"odom {odom_deg:+.2f}deg → L={result.suggested_separation_m:.4f}m"
         )
         if result.sign_mismatch:
             self.get_logger().error(
-                "odom and gyro turned opposite ways; check gyro mounting/sign "
-                "before changing chassis.yaml"
+                "odom and gyro turned opposite ways; skipping this trial"
             )
             return
+        self._samples.append(result)
+
+    def _report_mean(self) -> None:
+        values = [sample.suggested_separation_m for sample in self._samples]
+        try:
+            mean, std = summarize_separations(values)
+        except ValueError as exc:
+            self.get_logger().error(str(exc))
+            return
         self.get_logger().info(
-            f"wheel_separation_m now {result.current_separation_m:.4f} "
+            f"wheel_separation_m now {self._separation_m:.4f} "
             f"(center of left tire to center of right tire, not the inner gap)"
         )
         self.get_logger().info(
-            f"suggested wheel_separation_m {result.suggested_separation_m:.4f} "
-            f"(ratio odom/gyro={result.ratio:.4f}). Put that in shared/chassis.yaml "
+            f"mean wheel_separation_m {mean:.4f} "
+            f"(n={len(values)}, std={std:.4f}). Put that in shared/chassis.yaml "
             "and restart the robot node."
         )
 

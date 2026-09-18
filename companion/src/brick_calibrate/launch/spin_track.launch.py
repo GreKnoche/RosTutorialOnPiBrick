@@ -10,6 +10,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("chassis_file", default_value=""),
             DeclareLaunchArgument("target_yaw_deg", default_value="90.0"),
             DeclareLaunchArgument("angular_speed", default_value="0.4"),
+            DeclareLaunchArgument("trials", default_value="4"),
             Node(
                 package="brick_calibrate",
                 executable="spin_track",
@@ -20,6 +21,7 @@ def generate_launch_description() -> LaunchDescription:
                         "chassis_file": LaunchConfiguration("chassis_file"),
                         "target_yaw_deg": LaunchConfiguration("target_yaw_deg"),
                         "angular_speed": LaunchConfiguration("angular_speed"),
+                        "trials": LaunchConfiguration("trials"),
                     }
                 ],
             ),
