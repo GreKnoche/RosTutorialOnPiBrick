@@ -11,6 +11,11 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("mock", default_value="false"),
             DeclareLaunchArgument("rate_hz", default_value="20.0"),
             DeclareLaunchArgument("chassis_file", default_value=""),
+            DeclareLaunchArgument(
+                "gyro_invert",
+                default_value="true",
+                description="Negate EV3 GYRO-ABS so ROS yaw is counterclockwise-positive.",
+            ),
             Node(
                 package="brick_hw",
                 executable="robot_node",
@@ -23,6 +28,9 @@ def generate_launch_description() -> LaunchDescription:
                             LaunchConfiguration("rate_hz"), value_type=float
                         ),
                         "chassis_file": LaunchConfiguration("chassis_file"),
+                        "gyro_invert": ParameterValue(
+                            LaunchConfiguration("gyro_invert"), value_type=bool
+                        ),
                     }
                 ],
             ),

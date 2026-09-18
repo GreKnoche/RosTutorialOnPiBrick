@@ -1,5 +1,6 @@
 # Educator-style EV3 differential drive on a BrickPi3. Measure these on your build.
 wheel_radius_m: 0.0277
+# Center of left wheel to center of right wheel (not inner sidewall gap).
 wheel_separation_m: 0.1103
 ticks_per_revolution: 360.0
 max_linear_m_s: 0.15

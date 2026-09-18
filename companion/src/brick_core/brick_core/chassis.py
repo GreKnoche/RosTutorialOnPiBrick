@@ -1,7 +1,8 @@
 """Educator-style EV3 differential-drive parameters.
 
 All linear dimensions are metres. Change this YAML on a real robot after you
-measure wheel radius and track width — a 50% radius error will wreck AMCL later.
+measure wheel radius and track width (wheel center to wheel center) — a 50%
+radius error will wreck AMCL later.
 """
 
 from __future__ import annotations

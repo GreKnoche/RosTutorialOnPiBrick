@@ -41,6 +41,8 @@ class RobotNode(Node):
         self.declare_parameter("right_motor", self.chassis.right_motor_port)
         self.declare_parameter("gyro", self.chassis.gyro_port)
         self.declare_parameter("ultrasonic", self.chassis.ultrasonic_port)
+        # EV3 GYRO-ABS is clockwise-positive; ROS yaw is CCW.
+        self.declare_parameter("gyro_invert", True)
 
         self.backend = HalBackend(self._make_hal())
         self.robot = DiffDriveRobot(self.backend, self.chassis)
@@ -54,6 +56,7 @@ class RobotNode(Node):
 
         rate = float(self.get_parameter("rate_hz").value)
         self._dt = 1.0 / max(rate, 1.0)
+        self._gyro_invert = bool(self.get_parameter("gyro_invert").value)
         self._last_gyro_rad: float | None = None
         self._timer = self.create_timer(self._dt, self._tick)
         mock = bool(self.get_parameter("mock").value)
@@ -61,6 +64,7 @@ class RobotNode(Node):
             f"brick_hw up mock={mock} dt={self._dt:.3f}s "
             f"wheel_radius={self.chassis.wheel_radius_m}m "
             f"track={self.chassis.wheel_separation_m}m "
+            f"gyro_invert={self._gyro_invert} "
             f"left={self.get_parameter('left_motor').value} "
             f"right={self.get_parameter('right_motor').value}"
         )
@@ -134,6 +138,8 @@ class RobotNode(Node):
         imu = Imu()
         imu.header = _now_header(self, self.chassis.gyro_frame)
         gyro_rad = math.radians(float(state.gyro_deg))
+        if self._gyro_invert:
+            gyro_rad = -gyro_rad
         gqx, gqy, gqz, gqw = yaw_to_quaternion(gyro_rad)
         imu.orientation.x = gqx
         imu.orientation.y = gqy
