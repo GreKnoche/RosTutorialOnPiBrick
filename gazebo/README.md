@@ -16,6 +16,7 @@ The GUI chase-cam sits 0.70 m behind the EV3 (`follow_pgain` 1.0, no lag). Disab
 | `/ultrasonic` | `scan_to_range` |
 | `/odom/wheel` | DiffDrive encoder unicycle (debug) |
 | `/odom/gyro` | companion Borenstein fuse of `/odom` + `/imu` (no TF) |
+| `/odom/sono` | companion range-flow fuse of `/odom/gyro` + `/ultrasonic` |
 | `/odom/perfect` | Gazebo world pose (debug) |
 
 ## Docker (recommended)

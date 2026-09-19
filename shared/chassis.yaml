@@ -3,8 +3,8 @@ wheel_radius_m: 0.0277
 # Center of left wheel to center of right wheel (not inner sidewall gap).
 wheel_separation_m: 0.1195
 ticks_per_revolution: 360.0
-max_linear_m_s: 0.30
-max_angular_rad_s: 1.8
+max_linear_m_s: 0.60
+max_angular_rad_s: 1.1
 caster_offset_m: -0.055
 
 # BrickPi3 motor ports A–D, sensor ports 1–4.

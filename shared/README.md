@@ -14,6 +14,7 @@ Pi and Gazebo are I/O boxes. Companion integrates encoders and owns `/odom`.
 | `/ultrasonic` | `sensor_msgs/Range` | one beam |
 | `/odom` | `nav_msgs/Odometry` | **companion** encoder integrate |
 | `/odom/gyro` | `nav_msgs/Odometry` | **companion** Borenstein fuse of `/odom` + `/imu` |
+| `/odom/sono` | `nav_msgs/Odometry` | **companion** range-flow fuse of `/odom/gyro` + `/ultrasonic` |
 | TF `odom → base_link` | `odom_tf` from `/odom/gyro` | **companion** |
 
 Gazebo-only debug (empty on hardware): `/odom/perfect`, `/odom/wheel`.
