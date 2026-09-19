@@ -84,14 +84,6 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    gyrodometry = Node(
-        package="brick_gz_bringup",
-        executable="gyrodometry.py",
-        name="gyrodometry",
-        output="screen",
-        parameters=[{"use_sim_time": True}],
-    )
-
     teleop = Node(
         package="teleop_twist_keyboard",
         executable="teleop_twist_keyboard",
@@ -151,7 +143,6 @@ def generate_launch_description() -> LaunchDescription:
             bridge,
             scan_to_range,
             sensor_drift,
-            gyrodometry,
             teleop,
             TimerAction(period=4.5, actions=[follow_camera]),
         ]

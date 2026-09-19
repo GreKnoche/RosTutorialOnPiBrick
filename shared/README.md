@@ -13,7 +13,8 @@ Pi and Gazebo are I/O boxes. Companion integrates encoders and owns `/odom`.
 | `/imu` | `sensor_msgs/Imu` | gyro, frame `gyro_link` |
 | `/ultrasonic` | `sensor_msgs/Range` | one beam |
 | `/odom` | `nav_msgs/Odometry` + TF `odom → base_link` | **companion only** |
+| `/odom/gyro` | `nav_msgs/Odometry` (no TF) | **companion** Borenstein fuse of `/odom` + `/imu` |
 
-Gazebo-only debug (empty on hardware): `/odom/perfect`, optional `/odom/gyro`, `/odom/wheel`.
+Gazebo-only debug (empty on hardware): `/odom/perfect`, `/odom/wheel`.
 
 `map → odom` is not published until the localization lesson.

@@ -6,7 +6,7 @@ Default world `lab` is a flat ground plane with the Education driving base. `sen
 
 The GUI chase-cam sits 0.70 m behind the EV3 (`follow_pgain` 1.0, no lag). Disable with `follow_camera:=false`. DiffDrive clips at 0.35 m/s; the ROS chassis contract is 0.30 m/s.
 
-`world:=relief` is grass with a curvy painted loop around the 3D kerbs. Encoder heading turns at each kerb; gyrodometry (encoder \(v_x\) + IMU yaw) stays closer to truth.
+`world:=relief` is grass with a curvy painted loop around the 3D kerbs. Encoder heading turns at each kerb; companion gyrodometry (Borenstein: encoder yaw except while the gyro disagrees) stays closer to truth.
 
 | Topic | Source |
 | --- | --- |
@@ -15,7 +15,7 @@ The GUI chase-cam sits 0.70 m behind the EV3 (`follow_pgain` 1.0, no lag). Disab
 | `/imu` | `sensor_drift` from `/imu/perfect` |
 | `/ultrasonic` | `scan_to_range` |
 | `/odom/wheel` | DiffDrive encoder unicycle (debug) |
-| `/odom/gyro` | encoder \(v_x\) + IMU yaw (debug, no TF) |
+| `/odom/gyro` | companion Borenstein fuse of `/odom` + `/imu` (no TF) |
 | `/odom/perfect` | Gazebo world pose (debug) |
 
 ## Docker (recommended)

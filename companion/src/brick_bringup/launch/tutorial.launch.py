@@ -99,6 +99,13 @@ def _setup(context, *args, **kwargs):
             }
         ],
     )
+    gyrodometry = Node(
+        package="gyrodometry",
+        executable="gyrodometry",
+        name="gyrodometry",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
     actions = [
         LogInfo(
             msg=(
@@ -109,6 +116,7 @@ def _setup(context, *args, **kwargs):
         SetLaunchConfiguration("chassis_file", chassis_path),
         rsp,
         odom_node,
+        gyrodometry,
         wait,
         lesson_include,
         rviz,
@@ -121,7 +129,7 @@ def _setup(context, *args, **kwargs):
             LogInfo(
                 msg=(
                     "hardware: /cmd_vel /joint_states /imu /ultrasonic from brick_hw; "
-                    f"companion publishes /odom (ROS_DOMAIN_ID={domain})"
+                    f"companion publishes /odom and /odom/gyro (ROS_DOMAIN_ID={domain})"
                 )
             ),
         )
