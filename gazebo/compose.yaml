@@ -1,8 +1,8 @@
 services:
   gazebo:
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: gazebo/docker/Dockerfile
     image: pibrick-gazebo:local
     user: "1000:1000"
     group_add:
@@ -25,6 +25,7 @@ services:
       - /dev/dri
     volumes:
       - ./src:/ws/src
+      - ../shared/brick_math:/ws/src/brick_math
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:${XAUTHORITY}:ro
     stdin_open: true

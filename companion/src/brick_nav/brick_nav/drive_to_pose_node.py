@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Optional
 
 import rclpy
@@ -13,13 +12,7 @@ from std_msgs.msg import Bool
 
 from brick_core.chassis import load_chassis
 from brick_core.controller import PosePursuitController
-from brick_core.geometry import Pose2D, Twist2D
-
-
-def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
-    siny_cosp = 2.0 * (w * z + x * y)
-    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
-    return math.atan2(siny_cosp, cosy_cosp)
+from brick_core.geometry import Pose2D, Twist2D, yaw_from_quaternion
 
 
 class DriveToPoseNode(Node):

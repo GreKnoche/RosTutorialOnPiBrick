@@ -5,6 +5,17 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from brick_math import wrap_angle, yaw_from_quaternion, yaw_to_quaternion
+
+__all__ = [
+    "Pose2D",
+    "Twist2D",
+    "hypot",
+    "wrap_angle",
+    "yaw_from_quaternion",
+    "yaw_to_quaternion",
+]
+
 
 @dataclass
 class Pose2D:
@@ -19,16 +30,5 @@ class Twist2D:
     angular: float = 0.0
 
 
-def wrap_angle(angle: float) -> float:
-    """Wrap radians to (-pi, pi]."""
-    return (angle + math.pi) % (2.0 * math.pi) - math.pi
-
-
 def hypot(dx: float, dy: float) -> float:
     return math.hypot(dx, dy)
-
-
-def yaw_to_quaternion(yaw: float) -> tuple[float, float, float, float]:
-    """Return (x, y, z, w) for a pure yaw rotation."""
-    half = yaw * 0.5
-    return (0.0, 0.0, math.sin(half), math.cos(half))

@@ -4,7 +4,7 @@ ROS 2 Jazzy lab: BrickPi3 on a Raspberry Pi, companion odometry and Nav2 on a la
 
 | Path | Role |
 | --- | --- |
-| [`shared/`](shared/) | Chassis geometry and frame names. Used by companion, Gazebo, and the Pi. |
+| [`shared/`](shared/) | Chassis YAML, `ROS_DOMAIN_ID`, and `brick_math` (yaw/quaternion helpers). Used by companion, Gazebo, and the Pi. |
 | [`companion/`](companion/) | Laptop overlay: odom integrator, drive-to-pose, later Nav2. |
 | [`pi-brick/`](pi-brick/) | Raspberry Pi + BrickPi3 ROS 2 Docker node. |
 | [`gazebo/`](gazebo/) | Gazebo Harmonic overlay + `ros_gz_bridge`. |

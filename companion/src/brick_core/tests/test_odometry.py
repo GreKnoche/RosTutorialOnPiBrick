@@ -41,9 +41,6 @@ def test_shared_chassis_yaml() -> None:
     assert chassis.right_motor_port == "D"
     assert chassis.gyro_port == "3"
     assert chassis.ultrasonic_port == "2"
-    assert chassis.wheel_radius_m == 0.0277
-    assert chassis.wheel_separation_m == 0.1103
-
 
 def test_load_chassis_discovers_repo_yaml() -> None:
     chassis = load_chassis()

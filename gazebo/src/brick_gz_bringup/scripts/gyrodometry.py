@@ -15,25 +15,11 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
 
+from brick_math import wrap_angle, yaw_from_quaternion, yaw_to_quaternion
+
 
 def _stamp_sec(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1e-9
-
-
-def wrap_angle(angle: float) -> float:
-    """Wrap radians to (-pi, pi]."""
-    return (angle + math.pi) % (2.0 * math.pi) - math.pi
-
-
-def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
-    siny_cosp = 2.0 * (w * z + x * y)
-    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
-    return math.atan2(siny_cosp, cosy_cosp)
-
-
-def yaw_to_quaternion(yaw: float) -> tuple[float, float, float, float]:
-    half = yaw * 0.5
-    return (0.0, 0.0, math.sin(half), math.cos(half))
 
 
 class Gyrodometry(Node):

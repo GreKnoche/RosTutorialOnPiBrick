@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from brick_core.geometry import wrap_angle
+from brick_core.geometry import wrap_angle, yaw_from_quaternion
 
 
 @dataclass(frozen=True)
@@ -22,12 +22,6 @@ class TrackCalibration:
     @property
     def ratio(self) -> float:
         return abs(self.odom_delta_rad) / abs(self.gyro_delta_rad)
-
-
-def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
-    siny_cosp = 2.0 * (w * z + x * y)
-    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
-    return math.atan2(siny_cosp, cosy_cosp)
 
 
 def heading_delta(start_rad: float, end_rad: float) -> float:

@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ws
-COPY src /ws/src
+COPY gazebo/src /ws/src
+COPY shared/brick_math /ws/src/brick_math
 
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/ros/jazzy/setup.bash && colcon build --symlink-install

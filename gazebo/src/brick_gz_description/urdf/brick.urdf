@@ -134,7 +134,7 @@
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
       <geometry>
         <cylinder radius="0.028" length="0.026"/>
-      </geometry>
+      </geometry>Encoder
     </collision>
     <inertial>
       <mass value="0.022"/>
