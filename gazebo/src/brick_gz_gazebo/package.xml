@@ -3,7 +3,7 @@
 <package format="3">
   <name>brick_gz_gazebo</name>
   <version>0.1.0</version>
-  <description>Simple Gazebo world for the Pi brick Nav2 contract.</description>
+  <description>Gazebo worlds (flat lab and relief kerb course) for the Pi brick Nav2 contract.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 

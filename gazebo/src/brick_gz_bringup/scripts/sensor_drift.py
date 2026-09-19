@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Republish Gazebo odom/IMU onto the Nav2 contract, with optional drift.
 
-Ground truth stays on /odom/perfect and /imu/perfect. This node publishes
+Encoder odom is /odom/wheel; IMU truth is /imu/perfect. This node publishes
 /odom, /imu, and TF odom -> base_link. With both switches off it is a
-passthrough, so the sim matches today's contract.
+passthrough, so the sim matches today's contract. World pose stays on
+/odom/perfect and is not consumed here.
 """
 
 from __future__ import annotations
@@ -71,7 +72,7 @@ class SensorDrift(Node):
         self._tf = TransformBroadcaster(self)
         self._odom_pub = self.create_publisher(Odometry, "odom", 10)
         self._imu_pub = self.create_publisher(Imu, "imu", 10)
-        self.create_subscription(Odometry, "odom/perfect", self._on_odom, 10)
+        self.create_subscription(Odometry, "odom/wheel", self._on_odom, 10)
         self.create_subscription(Imu, "imu/perfect", self._on_imu, 10)
         self.add_on_set_parameters_callback(self._on_set_params)
         self.get_logger().info(

@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<sdf version="1.11">
+  <model name="park_tree">
+    <static>true</static>
+    <link name="link">
+      <collision name="trunk">
+        <pose>0 0 0.16 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.045</radius>
+            <length>0.32</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="trunk">
+        <pose>0 0 0.16 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.045</radius>
+            <length>0.32</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.32 0.22 0.12 1</ambient>
+          <diffuse>0.42 0.28 0.16 1</diffuse>
+        </material>
+      </visual>
+      <visual name="foliage_lower">
+        <pose>0 0 0.38 0 0 0</pose>
+        <geometry>
+          <cone>
+            <radius>0.22</radius>
+            <length>0.32</length>
+          </cone>
+        </geometry>
+        <material>
+          <ambient>0.12 0.32 0.14 1</ambient>
+          <diffuse>0.18 0.42 0.20 1</diffuse>
+        </material>
+      </visual>
+      <visual name="foliage_upper">
+        <pose>0 0 0.58 0 0 0</pose>
+        <geometry>
+          <cone>
+            <radius>0.15</radius>
+            <length>0.26</length>
+          </cone>
+        </geometry>
+        <material>
+          <ambient>0.10 0.36 0.14 1</ambient>
+          <diffuse>0.16 0.48 0.22 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

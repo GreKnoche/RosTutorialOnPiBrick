@@ -8,12 +8,14 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -35,7 +37,19 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "gz_args": [
                 LaunchConfiguration("gz_args_prefix"),
-                PathJoinSubstitution([pkg_gazebo, "worlds", "brick_lab.sdf"]),
+                PathJoinSubstitution(
+                    [
+                        pkg_gazebo,
+                        "worlds",
+                        PythonExpression(
+                            [
+                                "'brick_' + '",
+                                LaunchConfiguration("world"),
+                                "' + '.sdf'",
+                            ]
+                        ),
+                    ]
+                ),
             ]
         }.items(),
     )
@@ -89,6 +103,14 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    gyrodometry = Node(
+        package="brick_gz_bringup",
+        executable="gyrodometry.py",
+        name="gyrodometry",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
     teleop = Node(
         package="teleop_twist_keyboard",
         executable="teleop_twist_keyboard",
@@ -97,6 +119,16 @@ def generate_launch_description() -> LaunchDescription:
         emulate_tty=True,
         parameters=[{"use_sim_time": True, "stamped": False}],
         condition=IfCondition(LaunchConfiguration("teleop")),
+    )
+
+    follow_camera = ExecuteProcess(
+        cmd=[
+            "bash",
+            os.path.join(pkg_bringup, "launch", "follow_ev3_camera.sh"),
+        ],
+        output="screen",
+        name="follow_ev3_camera",
+        condition=IfCondition(LaunchConfiguration("follow_camera")),
     )
 
     return LaunchDescription(
@@ -108,6 +140,11 @@ def generate_launch_description() -> LaunchDescription:
             SetEnvironmentVariable(
                 "FASTDDS_BUILTIN_TRANSPORTS",
                 os.environ.get("FASTDDS_BUILTIN_TRANSPORTS", "UDPv4"),
+            ),
+            DeclareLaunchArgument(
+                "world",
+                default_value="lab",
+                description="Gazebo world: lab (flat) or relief (one-wheel kerbs).",
             ),
             DeclareLaunchArgument(
                 "gz_args_prefix",
@@ -129,11 +166,18 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description="Constant yaw-rate bias on /imu heading.",
             ),
+            DeclareLaunchArgument(
+                "follow_camera",
+                default_value="true",
+                description="Snap GUI camera behind the EV3 (no laggy follow).",
+            ),
             gz_sim,
             bridge,
             scan_to_range,
             sensor_drift,
+            gyrodometry,
             robot_state_publisher,
             teleop,
+            TimerAction(period=4.5, actions=[follow_camera]),
         ]
     )

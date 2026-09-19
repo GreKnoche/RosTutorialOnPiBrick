@@ -20,6 +20,7 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-ev3
       - QT_X11_NO_MITSHM=1
       - GZ_VERSION=harmonic
+      - WORLD=${WORLD:-relief}
     devices:
       - /dev/dri
     volumes:
@@ -33,4 +34,4 @@ services:
       && source /opt/ros/jazzy/setup.bash
       && colcon --log-base /tmp/log build --symlink-install --build-base /tmp/build --install-base /tmp/install
       && source /tmp/install/setup.bash
-      && ros2 launch brick_gz_bringup sim.launch.py"
+      && ros2 launch brick_gz_bringup sim.launch.py world:=$${WORLD}"

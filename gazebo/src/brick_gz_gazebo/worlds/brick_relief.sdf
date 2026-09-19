@@ -1,0 +1,618 @@
+<?xml version="1.0" ?>
+<!--
+  One-wheel kerbs for encoder vs gyrodometry.
+
+  Drive +X at ~0.08 m/s from the origin over the 3D bumps (infield grass).
+  A curvy painted loop sits around them. Encoder heading turns at each
+  kerb; gyro heading does not.
+-->
+<sdf version="1.11">
+  <world name="brick_relief">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <scene>
+      <ambient>0.8 0.8 0.8 1</ambient>
+      <background>0.58 0.66 0.72 1</background>
+      <grid>false</grid>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.30 0.46 0.22 1</ambient>
+            <diffuse>0.34 0.50 0.24 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Grass + curvy loop. Kerbs stay 3D in the infield. -->
+    <include>
+      <uri>model://track_ground</uri>
+      <name>track_ground</name>
+      <pose>1.15 0 0.0005 0 0 0</pose>
+    </include>
+
+    <!-- Left-wheel kerbs (y = +0.059). Height 11 mm, 15° ramps. -->
+    <model name="kerb_left_0">
+      <static>true</static>
+      <pose>0.40 0.059 0 0 0 0</pose>
+      <link name="link">
+        <collision name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+        <visual name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+        <visual name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="kerb_left_1">
+      <static>true</static>
+      <pose>0.80 0.059 0 0 0 0</pose>
+      <link name="link">
+        <collision name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+        <visual name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+        <visual name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Right-wheel kerbs (y = -0.059). -->
+    <model name="kerb_right_0">
+      <static>true</static>
+      <pose>1.20 -0.059 0 0 0 0</pose>
+      <link name="link">
+        <collision name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+        <visual name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+        <visual name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="kerb_right_1">
+      <static>true</static>
+      <pose>1.60 -0.059 0 0 0 0</pose>
+      <link name="link">
+        <collision name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="approach">
+          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+        <visual name="top">
+          <pose>0 0 0.0055 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.040 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+        <visual name="descent">
+          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
+          <geometry>
+            <box>
+              <size>0.042 0.042 0.011</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.48 0.52 1</ambient>
+            <diffuse>0.14 0.58 0.62 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Both-wheels ridge, ~18 mm, 12° ramps. -->
+    <model name="ridge">
+      <static>true</static>
+      <pose>2.15 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="approach">
+          <pose>-0.094 0 0.009 0 0.2094 0</pose>
+          <geometry>
+            <box>
+              <size>0.096 0.24 0.018</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="top">
+          <pose>0 0 0.009 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.080 0.24 0.018</size>
+            </box>
+          </geometry>
+        </collision>
+        <collision name="descent">
+          <pose>0.094 0 0.009 0 -0.2094 0</pose>
+          <geometry>
+            <box>
+              <size>0.096 0.24 0.018</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="approach">
+          <pose>-0.094 0 0.009 0 0.2094 0</pose>
+          <geometry>
+            <box>
+              <size>0.096 0.24 0.018</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.48 0.38 1</ambient>
+            <diffuse>0.62 0.54 0.42 1</diffuse>
+          </material>
+        </visual>
+        <visual name="top">
+          <pose>0 0 0.009 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.080 0.24 0.018</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.48 0.38 1</ambient>
+            <diffuse>0.62 0.54 0.42 1</diffuse>
+          </material>
+        </visual>
+        <visual name="descent">
+          <pose>0.094 0 0.009 0 -0.2094 0</pose>
+          <geometry>
+            <box>
+              <size>0.096 0.24 0.018</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.48 0.38 1</ambient>
+            <diffuse>0.62 0.54 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Perimeter walls just outside the painted loop. -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>1.175 -2.35 0.10 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>5.82 0.06 0.20</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>5.82 0.06 0.20</size></box></geometry>
+          <material>
+            <ambient>0.35 0.38 0.42 1</ambient>
+            <diffuse>0.48 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_north">
+      <static>true</static>
+      <pose>1.175 2.10 0.10 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>5.82 0.06 0.20</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>5.82 0.06 0.20</size></box></geometry>
+          <material>
+            <ambient>0.35 0.38 0.42 1</ambient>
+            <diffuse>0.48 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-1.70 -0.125 0.10 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 4.51 0.20</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 4.51 0.20</size></box></geometry>
+          <material>
+            <ambient>0.35 0.38 0.42 1</ambient>
+            <diffuse>0.48 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_east">
+      <static>true</static>
+      <pose>4.05 -0.125 0.10 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 4.51 0.20</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 4.51 0.20</size></box></geometry>
+          <material>
+            <ambient>0.35 0.38 0.42 1</ambient>
+            <diffuse>0.48 0.50 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_nw</name>
+      <pose>-1.45 1.90 0 0 0 0.4</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_n</name>
+      <pose>0.35 1.95 0 0 0 -0.3</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_ne</name>
+      <pose>3.70 1.85 0 0 0 0.8</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_e</name>
+      <pose>3.90 0.20 0 0 0 0.2</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_se</name>
+      <pose>3.80 -2.05 0 0 0 -0.5</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_s</name>
+      <pose>1.80 -2.15 0 0 0 0.1</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_sw</name>
+      <pose>-1.40 -2.10 0 0 0 1.1</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_w</name>
+      <pose>-1.55 1.30 0 0 0 -0.7</pose>
+    </include>
+
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_n0</name>
+      <pose>0.15 1.72 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_n1</name>
+      <pose>2.55 1.78 0 0 0 0.6</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_e0</name>
+      <pose>3.88 0.85 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_e1</name>
+      <pose>3.88 -0.95 0 0 0 0.4</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_s0</name>
+      <pose>2.45 -2.12 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_s1</name>
+      <pose>0.05 -2.12 0 0 0 -0.5</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_w0</name>
+      <pose>-1.48 -0.75 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_in_n</name>
+      <pose>1.15 0.70 0 0 0 0.2</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_in_s</name>
+      <pose>1.15 -0.55 0 0 0 -0.3</pose>
+    </include>
+
+    <include>
+      <uri>model://traffic_cone</uri>
+      <name>cone_w</name>
+      <pose>-1.58 0.28 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://traffic_cone</uri>
+      <name>cone_e</name>
+      <pose>3.90 -0.18 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://traffic_cone</uri>
+      <name>cone_n</name>
+      <pose>2.15 1.70 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://traffic_cone</uri>
+      <name>cone_s</name>
+      <pose>0.55 -2.02 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://traffic_cone</uri>
+      <name>cone_kink</name>
+      <pose>2.75 -1.50 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://barrier</uri>
+      <name>barrier_n</name>
+      <pose>1.15 2.00 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://barrier</uri>
+      <name>barrier_s</name>
+      <pose>1.15 -2.25 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://barrier</uri>
+      <name>barrier_e</name>
+      <pose>3.96 -0.20 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <uri>model://barrier</uri>
+      <name>barrier_w</name>
+      <pose>-1.61 0.15 0 0 0 1.5708</pose>
+    </include>
+
+    <include>
+      <uri>package://brick_gz_description/models/ev3</uri>
+      <name>ev3</name>
+      <pose>0 0 0.028 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

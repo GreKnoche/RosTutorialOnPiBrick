@@ -1,6 +1,7 @@
 # Bridge Gazebo Harmonic onto the same Nav2 robot contract as companion/pi-brick.
-# DiffDrive odom/IMU stay on /odom/perfect and /imu/perfect. sensor_drift
-# republishes /odom, /imu, and odom -> base_link (do not bridge DiffDrive TF).
+# DiffDrive encoder odom is /odom/wheel. World pose is /odom/perfect.
+# sensor_drift republishes /odom, /imu, and odom -> base_link (do not
+# bridge DiffDrive or OdometryPublisher TF).
 ---
 - ros_topic_name: "/cmd_vel"
   gz_topic_name: "/model/ev3/cmd_vel"
@@ -12,8 +13,13 @@
   ros_type_name: "rosgraph_msgs/msg/Clock"
   gz_type_name: "gz.msgs.Clock"
   direction: GZ_TO_ROS
-- ros_topic_name: "/odom/perfect"
+- ros_topic_name: "/odom/wheel"
   gz_topic_name: "/model/ev3/odometry"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+- ros_topic_name: "/odom/perfect"
+  gz_topic_name: "/model/ev3/odometry_truth"
   ros_type_name: "nav_msgs/msg/Odometry"
   gz_type_name: "gz.msgs.Odometry"
   direction: GZ_TO_ROS
@@ -28,7 +34,7 @@
   gz_type_name: "gz.msgs.LaserScan"
   direction: GZ_TO_ROS
 - ros_topic_name: "/joint_states"
-  gz_topic_name: "/world/brick_lab/model/ev3/joint_state"
+  gz_topic_name: "/model/ev3/joint_state"
   ros_type_name: "sensor_msgs/msg/JointState"
   gz_type_name: "gz.msgs.Model"
   direction: GZ_TO_ROS

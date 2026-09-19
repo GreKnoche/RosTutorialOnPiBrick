@@ -15,8 +15,8 @@ export type Chassis = {
 export const DEFAULT_CHASSIS: Chassis = {
   wheelRadius: 0.0216,
   wheelSeparation: 0.118,
-  maxLinear: 0.15,
-  maxAngular: 1.2,
+  maxLinear: 0.30,
+  maxAngular: 1.1,
   bodyLength: 0.128,
   bodyWidth: 0.084,
 };

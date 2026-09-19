@@ -79,8 +79,8 @@ Visualization Manager:
           Value: false
         Value: false
       Enabled: true
-      Keep: 50
-      Name: Odometry
+      Keep: 200
+      Name: Wheel odom
       Position Tolerance: 0.02
       Shape:
         Alpha: 1
@@ -96,6 +96,60 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /odom
+      Value: true
+    - Angle Tolerance: 0.05
+      Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Value: false
+        Position:
+          Value: false
+        Value: false
+      Enabled: true
+      Keep: 200
+      Name: Gyrodometry
+      Position Tolerance: 0.02
+      Shape:
+        Alpha: 1
+        Color: 25; 180; 70
+        Head Length: 0.06
+        Head Radius: 0.03
+        Shaft Length: 0.12
+        Shaft Radius: 0.015
+        Value: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /odom/gyro
+      Value: true
+    - Angle Tolerance: 0.05
+      Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Value: false
+        Position:
+          Value: false
+        Value: false
+      Enabled: true
+      Keep: 200
+      Name: Ground truth
+      Position Tolerance: 0.02
+      Shape:
+        Alpha: 1
+        Color: 240; 240; 240
+        Head Length: 0.06
+        Head Radius: 0.03
+        Shaft Length: 0.12
+        Shaft Radius: 0.015
+        Value: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /odom/perfect
       Value: true
     - Alpha: 1
       Buffer Length: 1

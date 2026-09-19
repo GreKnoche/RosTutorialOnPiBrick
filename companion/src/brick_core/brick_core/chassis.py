@@ -18,8 +18,8 @@ class Chassis:
     wheel_radius_m: float = 0.0277
     wheel_separation_m: float = 0.1103
     ticks_per_revolution: float = 360.0
-    max_linear_m_s: float = 0.15
-    max_angular_rad_s: float = 1.2
+    max_linear_m_s: float = 0.30
+    max_angular_rad_s: float = 1.8
     caster_offset_m: float = -0.055
     left_motor_port: str = "A"
     right_motor_port: str = "D"
@@ -39,8 +39,8 @@ class Chassis:
             "wheel_radius_m": float(data.get("wheel_radius_m", 0.0277)),
             "wheel_separation_m": float(data.get("wheel_separation_m", 0.1103)),
             "ticks_per_revolution": float(data.get("ticks_per_revolution", 360.0)),
-            "max_linear_m_s": float(data.get("max_linear_m_s", 0.15)),
-            "max_angular_rad_s": float(data.get("max_angular_rad_s", 1.2)),
+            "max_linear_m_s": float(data.get("max_linear_m_s", 0.30)),
+            "max_angular_rad_s": float(data.get("max_angular_rad_s", 1.8)),
             "caster_offset_m": float(data.get("caster_offset_m", -0.055)),
             "left_motor_port": str(ports.get("left_motor", "A")),
             "right_motor_port": str(ports.get("right_motor", "D")),
