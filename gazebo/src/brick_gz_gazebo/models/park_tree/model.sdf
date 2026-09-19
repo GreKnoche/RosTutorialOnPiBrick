@@ -3,15 +3,6 @@
   <model name="park_tree">
     <static>true</static>
     <link name="link">
-      <collision name="trunk">
-        <pose>0 0 0.16 0 0 0</pose>
-        <geometry>
-          <cylinder>
-            <radius>0.045</radius>
-            <length>0.32</length>
-          </cylinder>
-        </geometry>
-      </collision>
       <visual name="trunk">
         <pose>0 0 0.16 0 0 0</pose>
         <geometry>

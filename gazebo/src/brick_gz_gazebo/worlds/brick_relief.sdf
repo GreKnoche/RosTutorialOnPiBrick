@@ -8,8 +8,8 @@
 -->
 <sdf version="1.11">
   <world name="brick_relief">
-    <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
+    <physics name="2ms" type="ignored">
+      <max_step_size>0.002</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
@@ -28,7 +28,7 @@
       <grid>false</grid>
     </scene>
     <light type="directional" name="sun">
-      <cast_shadows>true</cast_shadows>
+      <cast_shadows>false</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
       <diffuse>0.8 0.8 0.8 1</diffuse>
       <specular>0.2 0.2 0.2 1</specular>
@@ -73,64 +73,24 @@
       <pose>1.15 0 0.0005 0 0 0</pose>
     </include>
 
-    <!-- Left-wheel kerbs (y = +0.059). Height 11 mm, 15° ramps. -->
+    <!-- One-wheel kerbs: 6 mm high, 10 cm long. Caster radius is only 8 mm. -->
     <model name="kerb_left_0">
       <static>true</static>
       <pose>0.40 0.059 0 0 0 0</pose>
       <link name="link">
-        <collision name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+        <collision name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
         </collision>
-        <collision name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
+        <visual name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <collision name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.82 0.38 0.12 1</ambient>
-            <diffuse>0.90 0.45 0.15 1</diffuse>
-          </material>
-        </visual>
-        <visual name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
-          <geometry>
-            <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.82 0.38 0.12 1</ambient>
-            <diffuse>0.90 0.45 0.15 1</diffuse>
-          </material>
-        </visual>
-        <visual name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
           <material>
@@ -144,59 +104,19 @@
       <static>true</static>
       <pose>0.80 0.059 0 0 0 0</pose>
       <link name="link">
-        <collision name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+        <collision name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
         </collision>
-        <collision name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
+        <visual name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <collision name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.82 0.38 0.12 1</ambient>
-            <diffuse>0.90 0.45 0.15 1</diffuse>
-          </material>
-        </visual>
-        <visual name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
-          <geometry>
-            <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.82 0.38 0.12 1</ambient>
-            <diffuse>0.90 0.45 0.15 1</diffuse>
-          </material>
-        </visual>
-        <visual name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
           <material>
@@ -206,65 +126,23 @@
         </visual>
       </link>
     </model>
-
-    <!-- Right-wheel kerbs (y = -0.059). -->
     <model name="kerb_right_0">
       <static>true</static>
       <pose>1.20 -0.059 0 0 0 0</pose>
       <link name="link">
-        <collision name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+        <collision name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
         </collision>
-        <collision name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
+        <visual name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <collision name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
-          </material>
-        </visual>
-        <visual name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
-          <geometry>
-            <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
-          </material>
-        </visual>
-        <visual name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
           <material>
@@ -278,59 +156,19 @@
       <static>true</static>
       <pose>1.60 -0.059 0 0 0 0</pose>
       <link name="link">
-        <collision name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
+        <collision name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
         </collision>
-        <collision name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
+        <visual name="bump">
+          <pose>0 0 0.003 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <collision name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="approach">
-          <pose>-0.041 0 0.0055 0 0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
-          </material>
-        </visual>
-        <visual name="top">
-          <pose>0 0 0.0055 0 0 0</pose>
-          <geometry>
-            <box>
-              <size>0.040 0.042 0.011</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
-          </material>
-        </visual>
-        <visual name="descent">
-          <pose>0.041 0 0.0055 0 -0.2618 0</pose>
-          <geometry>
-            <box>
-              <size>0.042 0.042 0.011</size>
+              <size>0.10 0.042 0.006</size>
             </box>
           </geometry>
           <material>
@@ -341,40 +179,24 @@
       </link>
     </model>
 
-    <!-- Both-wheels ridge, ~18 mm, 12° ramps. -->
+    <!-- Both-wheels ridge: 7 mm, long so the caster rolls over. -->
     <model name="ridge">
       <static>true</static>
       <pose>2.15 0 0 0 0 0</pose>
       <link name="link">
-        <collision name="approach">
-          <pose>-0.094 0 0.009 0 0.2094 0</pose>
+        <collision name="bump">
+          <pose>0 0 0.0035 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.096 0.24 0.018</size>
+              <size>0.28 0.24 0.007</size>
             </box>
           </geometry>
         </collision>
-        <collision name="top">
-          <pose>0 0 0.009 0 0 0</pose>
+        <visual name="bump">
+          <pose>0 0 0.0035 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.080 0.24 0.018</size>
-            </box>
-          </geometry>
-        </collision>
-        <collision name="descent">
-          <pose>0.094 0 0.009 0 -0.2094 0</pose>
-          <geometry>
-            <box>
-              <size>0.096 0.24 0.018</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="approach">
-          <pose>-0.094 0 0.009 0 0.2094 0</pose>
-          <geometry>
-            <box>
-              <size>0.096 0.24 0.018</size>
+              <size>0.28 0.24 0.007</size>
             </box>
           </geometry>
           <material>
@@ -382,28 +204,82 @@
             <diffuse>0.62 0.54 0.42 1</diffuse>
           </material>
         </visual>
-        <visual name="top">
-          <pose>0 0 0.009 0 0 0</pose>
+      </link>
+    </model>
+
+    <!-- Leitmauern left/right of the bump lane (outside the 0.24 m ridge). -->
+    <model name="rail_left">
+      <static>true</static>
+      <pose>1.125 0.20 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <pose>0 0 0.05 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.080 0.24 0.018</size>
+              <size>2.55 0.03 0.10</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="body">
+          <pose>0 0 0.05 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>2.55 0.03 0.10</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.55 0.48 0.38 1</ambient>
-            <diffuse>0.62 0.54 0.42 1</diffuse>
+            <ambient>0.42 0.44 0.46 1</ambient>
+            <diffuse>0.52 0.54 0.56 1</diffuse>
           </material>
         </visual>
-        <visual name="descent">
-          <pose>0.094 0 0.009 0 -0.2094 0</pose>
+        <visual name="cap">
+          <pose>0 0 0.106 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.096 0.24 0.018</size>
+              <size>2.55 0.036 0.012</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.55 0.48 0.38 1</ambient>
-            <diffuse>0.62 0.54 0.42 1</diffuse>
+            <ambient>0.82 0.68 0.10 1</ambient>
+            <diffuse>0.92 0.78 0.14 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="rail_right">
+      <static>true</static>
+      <pose>1.125 -0.20 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <pose>0 0 0.05 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>2.55 0.03 0.10</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="body">
+          <pose>0 0 0.05 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>2.55 0.03 0.10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.42 0.44 0.46 1</ambient>
+            <diffuse>0.52 0.54 0.56 1</diffuse>
+          </material>
+        </visual>
+        <visual name="cap">
+          <pose>0 0 0.106 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>2.55 0.036 0.012</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.82 0.68 0.10 1</ambient>
+            <diffuse>0.92 0.78 0.14 1</diffuse>
           </material>
         </visual>
       </link>

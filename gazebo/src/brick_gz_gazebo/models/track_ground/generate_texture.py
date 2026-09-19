@@ -13,7 +13,7 @@ from scipy.ndimage import distance_transform_edt
 
 SIZE_M = 10.0
 CX, CY = 1.15, 0.0
-RES = 2048
+RES = 1024
 TRACK_W = 0.72
 LINE_W = 0.035
 N_PATH = 480
