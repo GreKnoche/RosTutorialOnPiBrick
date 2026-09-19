@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "gyrodometry = gyrodometry.gyrodometry:main",
+            "odom_tf = gyrodometry.odom_tf_node:main",
         ],
     },
 )

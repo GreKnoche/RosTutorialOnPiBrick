@@ -106,6 +106,18 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
+    odom_tf = Node(
+        package="gyrodometry",
+        executable="odom_tf",
+        name="odom_tf",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "odom_topic": "odom/gyro",
+            }
+        ],
+    )
     actions = [
         LogInfo(
             msg=(
@@ -117,6 +129,7 @@ def _setup(context, *args, **kwargs):
         rsp,
         odom_node,
         gyrodometry,
+        odom_tf,
         wait,
         lesson_include,
         rviz,
@@ -129,7 +142,8 @@ def _setup(context, *args, **kwargs):
             LogInfo(
                 msg=(
                     "hardware: /cmd_vel /joint_states /imu /ultrasonic from brick_hw; "
-                    f"companion publishes /odom and /odom/gyro (ROS_DOMAIN_ID={domain})"
+                    "companion publishes /odom, /odom/gyro, TF from /odom/gyro "
+                    f"(ROS_DOMAIN_ID={domain})"
                 )
             ),
         )

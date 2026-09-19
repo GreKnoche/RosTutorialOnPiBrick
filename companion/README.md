@@ -1,6 +1,6 @@
 # Companion overlay
 
-ROS 2 Jazzy workspace on the laptop. Nav2, RViz, and encoder odometry stay here. Pi and Gazebo only take `/cmd_vel` and publish `/joint_states`, `/imu`, and `/ultrasonic`. `odom_node` integrates wheel angles with `UnicycleOdometry` and publishes `/odom` plus TF `odom → base_link`. `gyrodometry` fuses `/odom` with `/imu` (Borenstein) onto `/odom/gyro` (no TF), including on hardware.
+ROS 2 Jazzy workspace on the laptop. Nav2, RViz, and encoder odometry stay here. Pi and Gazebo only take `/cmd_vel` and publish `/joint_states`, `/imu`, and `/ultrasonic`. `odom_node` integrates wheel angles with `UnicycleOdometry` onto `/odom`. `gyrodometry` fuses `/odom` with `/imu` (Borenstein) onto `/odom/gyro`. `odom_tf` turns `/odom/gyro` into TF `odom → base_link`, so the RViz model follows gyrodometry.
 
 ## Build
 
@@ -15,7 +15,7 @@ Do not `colcon build` from the repo root.
 
 ## Teaching path
 
-`backend:=hardware` or `backend:=gazebo`. The same launch starts `odom_node`, `gyrodometry`, robot_state_publisher, the lesson, and RViz. `backend:=sim` is an offline rest (kinematic twin, no Pi or Gazebo).
+`backend:=hardware` or `backend:=gazebo`. The same launch starts `odom_node`, `gyrodometry`, `odom_tf`, robot_state_publisher, the lesson, and RViz. `backend:=sim` is an offline rest (kinematic twin, no Pi or Gazebo).
 
 ```bash
 ros2 launch brick_bringup tutorial.launch.py backend:=hardware lesson:=01

@@ -1,4 +1,4 @@
-"""Integrate /joint_states into /odom + TF odom → base_link."""
+"""Integrate /joint_states into /odom. TF odom → base_link comes from odom_tf."""
 
 from __future__ import annotations
 
@@ -6,11 +6,9 @@ from pathlib import Path
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from tf2_ros import TransformBroadcaster
 
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
 from brick_core.geometry import yaw_to_quaternion
@@ -35,11 +33,10 @@ class OdomNode(Node):
         self._warned_missing = False
 
         self.odom_pub = self.create_publisher(Odometry, "odom", 10)
-        self.tf = TransformBroadcaster(self)
         self.create_subscription(JointState, "joint_states", self._on_joints, 10)
         self.get_logger().info(
-            "odom_node: /joint_states -> /odom + TF "
-            f"{self.chassis.odom_frame} -> {self.chassis.base_frame}"
+            "odom_node: /joint_states -> /odom "
+            f"{self.chassis.odom_frame} (TF is odom_tf from /odom/gyro)"
         )
 
     def _load_chassis(self, chassis_file: str) -> Chassis:
@@ -98,17 +95,6 @@ class OdomNode(Node):
         odom.pose.covariance[7] = 0.02
         odom.pose.covariance[35] = 0.05
         self.odom_pub.publish(odom)
-
-        tf_msg = TransformStamped()
-        tf_msg.header = odom.header
-        tf_msg.child_frame_id = self.chassis.base_frame
-        tf_msg.transform.translation.x = pose.x
-        tf_msg.transform.translation.y = pose.y
-        tf_msg.transform.rotation.x = qx
-        tf_msg.transform.rotation.y = qy
-        tf_msg.transform.rotation.z = qz
-        tf_msg.transform.rotation.w = qw
-        self.tf.sendTransform(tf_msg)
 
 
 def main(args: Optional[list[str]] = None) -> None:
