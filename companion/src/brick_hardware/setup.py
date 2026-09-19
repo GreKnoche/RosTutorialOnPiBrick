@@ -18,11 +18,12 @@ setup(
     zip_safe=True,
     maintainer="gregor",
     maintainer_email="gregor_knoche@outlook.de",
-    description="Companion ROS 2 backend: kinematic twin. Hardware joins brick_hw over DDS.",
+    description="Companion ROS 2 backend: odom integrator and offline kinematic twin.",
     license="Apache-2.0",
     entry_points={
         "console_scripts": [
             "robot_node = brick_hardware.robot_node:main",
+            "odom_node = brick_hardware.odom_node:main",
         ]
     },
 )

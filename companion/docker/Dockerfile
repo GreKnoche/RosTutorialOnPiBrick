@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-navigation2 \
     ros-jazzy-nav2-bringup \
     ros-jazzy-robot-localization \
+    ros-jazzy-rviz-imu-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ws

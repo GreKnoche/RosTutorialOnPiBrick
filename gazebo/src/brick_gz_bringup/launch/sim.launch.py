@@ -1,4 +1,4 @@
-"""Launch Gazebo Harmonic and bridge it onto the Pi brick Nav2 robot contract."""
+"""Launch Gazebo Harmonic and bridge raw sensors onto the Pi brick contract."""
 
 from __future__ import annotations
 
@@ -23,12 +23,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
     pkg_bringup = get_package_share_directory("brick_gz_bringup")
     pkg_gazebo = get_package_share_directory("brick_gz_gazebo")
-    pkg_description = get_package_share_directory("brick_gz_description")
     pkg_ros_gz_sim = get_package_share_directory("ros_gz_sim")
-
-    urdf_file = os.path.join(pkg_description, "urdf", "brick.urdf")
-    with open(urdf_file, encoding="utf-8") as handle:
-        robot_desc = handle.read()
 
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -52,17 +47,6 @@ def generate_launch_description() -> LaunchDescription:
                 ),
             ]
         }.items(),
-    )
-
-    robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        name="robot_state_publisher",
-        output="screen",
-        parameters=[
-            {"use_sim_time": True},
-            {"robot_description": robot_desc},
-        ],
     )
 
     bridge = Node(
@@ -93,9 +77,6 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[
             {
                 "use_sim_time": True,
-                "odom_drift": ParameterValue(
-                    LaunchConfiguration("odom_drift"), value_type=bool
-                ),
                 "gyro_drift": ParameterValue(
                     LaunchConfiguration("gyro_drift"), value_type=bool
                 ),
@@ -157,11 +138,6 @@ def generate_launch_description() -> LaunchDescription:
                 description="Open teleop_twist_keyboard (default off so Docker compose keeps the TTY).",
             ),
             DeclareLaunchArgument(
-                "odom_drift",
-                default_value="false",
-                description="Scale-error wheel odometry on /odom and odom -> base_link.",
-            ),
-            DeclareLaunchArgument(
                 "gyro_drift",
                 default_value="false",
                 description="Constant yaw-rate bias on /imu heading.",
@@ -176,7 +152,6 @@ def generate_launch_description() -> LaunchDescription:
             scan_to_range,
             sensor_drift,
             gyrodometry,
-            robot_state_publisher,
             teleop,
             TimerAction(period=4.5, actions=[follow_camera]),
         ]

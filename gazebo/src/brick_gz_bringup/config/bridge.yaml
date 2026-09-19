@@ -1,7 +1,7 @@
-# Bridge Gazebo Harmonic onto the same Nav2 robot contract as companion/pi-brick.
-# DiffDrive encoder odom is /odom/wheel. World pose is /odom/perfect.
-# sensor_drift republishes /odom, /imu, and odom -> base_link (do not
-# bridge DiffDrive or OdometryPublisher TF).
+# Bridge Gazebo Harmonic onto the same raw-sensor contract as brick_hw.
+# Public: /cmd_vel in, /joint_states /imu /ultrasonic out (US via scan_to_range).
+# Companion owns /odom and TF odom -> base_link. Debug-only: /odom/wheel,
+# /odom/perfect. Do not bridge DiffDrive or OdometryPublisher TF.
 ---
 - ros_topic_name: "/cmd_vel"
   gz_topic_name: "/model/ev3/cmd_vel"

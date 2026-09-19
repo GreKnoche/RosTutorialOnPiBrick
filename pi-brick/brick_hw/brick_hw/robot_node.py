@@ -1,4 +1,4 @@
-"""ROS 2 node on the BrickPi3. Publishes the Nav2 robot contract over DDS."""
+"""BrickPi3 I/O: /cmd_vel in, raw /imu /ultrasonic /joint_states out. No /odom."""
 
 from __future__ import annotations
 
@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import TransformStamped, Twist
-from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, JointState, Range
 from std_msgs.msg import Header
-from tf2_ros import TransformBroadcaster
 
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
 from brick_core.geometry import Twist2D, wrap_angle, yaw_to_quaternion
@@ -48,11 +46,9 @@ class RobotNode(Node):
         self.robot = DiffDriveRobot(self.backend, self.chassis)
 
         self.cmd_sub = self.create_subscription(Twist, "cmd_vel", self._on_cmd, 10)
-        self.odom_pub = self.create_publisher(Odometry, "odom", 10)
         self.imu_pub = self.create_publisher(Imu, "imu", 10)
         self.range_pub = self.create_publisher(Range, "ultrasonic", 10)
         self.joint_pub = self.create_publisher(JointState, "joint_states", 10)
-        self.tf = TransformBroadcaster(self)
 
         rate = float(self.get_parameter("rate_hz").value)
         self._dt = 1.0 / max(rate, 1.0)
@@ -105,35 +101,6 @@ class RobotNode(Node):
 
     def _tick(self) -> None:
         state = self.robot.spin_once(self._dt)
-        now = _now_header(self, self.chassis.odom_frame)
-        qx, qy, qz, qw = yaw_to_quaternion(state.pose.theta)
-
-        odom = Odometry()
-        odom.header = now
-        odom.child_frame_id = self.chassis.base_frame
-        odom.pose.pose.position.x = state.pose.x
-        odom.pose.pose.position.y = state.pose.y
-        odom.pose.pose.orientation.x = qx
-        odom.pose.pose.orientation.y = qy
-        odom.pose.pose.orientation.z = qz
-        odom.pose.pose.orientation.w = qw
-        odom.twist.twist.linear.x = state.twist.linear
-        odom.twist.twist.angular.z = state.twist.angular
-        odom.pose.covariance[0] = 0.02
-        odom.pose.covariance[7] = 0.02
-        odom.pose.covariance[35] = 0.05
-        self.odom_pub.publish(odom)
-
-        tf_msg = TransformStamped()
-        tf_msg.header = now
-        tf_msg.child_frame_id = self.chassis.base_frame
-        tf_msg.transform.translation.x = state.pose.x
-        tf_msg.transform.translation.y = state.pose.y
-        tf_msg.transform.rotation.x = qx
-        tf_msg.transform.rotation.y = qy
-        tf_msg.transform.rotation.z = qz
-        tf_msg.transform.rotation.w = qw
-        self.tf.sendTransform(tf_msg)
 
         imu = Imu()
         imu.header = _now_header(self, self.chassis.gyro_frame)

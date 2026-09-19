@@ -80,7 +80,7 @@ Visualization Manager:
         Value: false
       Enabled: true
       Keep: 200
-      Name: Wheel odom
+      Name: Odom
       Position Tolerance: 0.02
       Shape:
         Alpha: 1
@@ -193,6 +193,59 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /goal_pose
+      Value: true
+    - Alpha: 0.55
+      Buffer Length: 1
+      Class: rviz_default_plugins/Range
+      Color: 255; 220; 0
+      Enabled: true
+      Name: Ultrasonic
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ultrasonic
+      Value: true
+    - Acceleration:
+        Accel (+z):
+          Accel. vector alpha: 1
+          Accel. vector color: 255; 0; 0
+          Accel. vector scale: 0.05
+          Derotate acceleration: true
+          Enabled: false
+        Angular velocity:
+          Color: 255; 255; 0
+          Derotate angular velocity: true
+          Enabled: false
+          Scale: 0.05
+        Box:
+          Alpha: 1
+          Color: 204; 51; 204
+          Enabled: false
+        Covariance:
+          Color: 204; 51; 204
+          Color style: Unique
+          Enabled: false
+        Orientation:
+          Axes:
+            Alpha: 1
+            Length: 0.08
+            Radius: 0.008
+          Box:
+            Alpha: 0.4
+            Color: 80; 160; 255
+          Enabled: true
+      Class: rviz_imu_plugin/Imu
+      Enabled: true
+      Name: IMU
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /imu
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:

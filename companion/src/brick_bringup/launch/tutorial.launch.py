@@ -87,6 +87,18 @@ def _setup(context, *args, **kwargs):
             }
         ],
     )
+    odom_node = Node(
+        package="brick_hardware",
+        executable="odom_node",
+        name="odom_node",
+        output="screen",
+        parameters=[
+            {
+                "chassis_file": chassis_path,
+                "use_sim_time": use_sim_time,
+            }
+        ],
+    )
     actions = [
         LogInfo(
             msg=(
@@ -96,6 +108,7 @@ def _setup(context, *args, **kwargs):
         ),
         SetLaunchConfiguration("chassis_file", chassis_path),
         rsp,
+        odom_node,
         wait,
         lesson_include,
         rviz,
@@ -107,8 +120,8 @@ def _setup(context, *args, **kwargs):
             1,
             LogInfo(
                 msg=(
-                    "hardware: /cmd_vel /odom come from brick_hw over DDS "
-                    f"(ROS_DOMAIN_ID={domain})"
+                    "hardware: /cmd_vel /joint_states /imu /ultrasonic from brick_hw; "
+                    f"companion publishes /odom (ROS_DOMAIN_ID={domain})"
                 )
             ),
         )
@@ -118,8 +131,8 @@ def _setup(context, *args, **kwargs):
             1,
             LogInfo(
                 msg=(
-                    "gazebo: start gazebo compose first; this launch adds RSP + lesson + RViz "
-                    f"(ROS_DOMAIN_ID={domain})"
+                    "gazebo: start gazebo compose first; this launch adds RSP + odom_node "
+                    f"+ lesson + RViz (ROS_DOMAIN_ID={domain})"
                 )
             ),
         )
@@ -153,7 +166,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "rviz",
                 default_value="true",
-                description="Open RViz2 with odom, robot model, and 2D Goal Pose.",
+                description="Open RViz2 with odom, robot model, Range, IMU, and 2D Goal Pose.",
             ),
             OpaqueFunction(function=_setup),
         ]
