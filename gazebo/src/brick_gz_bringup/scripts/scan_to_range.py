@@ -23,11 +23,8 @@ class ScanToRange(Node):
         self.create_subscription(LaserScan, "ultrasonic/scan", self._on_scan, 10)
 
     def _on_scan(self, scan: LaserScan) -> None:
-        hits = [
-            r
-            for r in scan.ranges
-            if math.isfinite(r) and r >= self.min_range
-        ]
+        finite = [r for r in scan.ranges if math.isfinite(r)]
+        in_band = [r for r in finite if r >= self.min_range]
         rng = Range()
         rng.header = scan.header
         rng.header.frame_id = "ultrasonic_link"
@@ -35,7 +32,17 @@ class ScanToRange(Node):
         rng.field_of_view = self.fov
         rng.min_range = self.min_range
         rng.max_range = self.max_range
-        rng.range = min(hits) if hits else self.max_range
+        if in_band:
+            mid = len(scan.ranges) // 2
+            center = scan.ranges[mid]
+            if math.isfinite(center) and self.min_range <= center <= self.max_range:
+                rng.range = center
+            else:
+                rng.range = min(in_band)
+        elif finite:
+            rng.range = self.min_range
+        else:
+            rng.range = self.max_range
         if rng.range > self.max_range:
             rng.range = self.max_range
         self.pub.publish(rng)

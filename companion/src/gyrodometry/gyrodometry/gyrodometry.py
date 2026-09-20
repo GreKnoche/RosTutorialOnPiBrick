@@ -19,7 +19,11 @@ from rclpy.node import Node
 from sensor_msgs.msg import Imu
 
 from brick_math import wrap_angle, yaw_from_quaternion, yaw_to_quaternion
-from gyrodometry.borenstein import THRESHOLD_DEG_S, heading_increment
+from gyrodometry.borenstein import (
+    THRESHOLD_DEG_S,
+    heading_increment,
+    travel_from_pose_delta,
+)
 
 
 def _stamp_sec(stamp) -> float:
@@ -37,8 +41,12 @@ class Gyrodometry(Node):
         self._x = 0.0
         self._y = 0.0
         self._yaw = 0.0
+        self._enc_x = 0.0
+        self._enc_y = 0.0
+        self._enc_yaw = 0.0
         self._omega_gyro = 0.0
         self._have_gyro = False
+        self._vx_fused = 0.0
         self._omega_fused = 0.0
         self._last_t: float | None = None
         self._warned_no_imu = False
@@ -60,7 +68,12 @@ class Gyrodometry(Node):
         self._x = pose.position.x
         self._y = pose.position.y
         q = pose.orientation
-        self._yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w)
+        yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w)
+        self._yaw = yaw
+        self._enc_x = pose.position.x
+        self._enc_y = pose.position.y
+        self._enc_yaw = yaw
+        self._vx_fused = float(msg.twist.twist.linear.x)
         self._omega_fused = float(msg.twist.twist.angular.z)
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -77,17 +90,30 @@ class Gyrodometry(Node):
                         "no /imu yet; using encoder yaw until the gyro arrives"
                     )
                     self._warned_no_imu = True
-                omega_odo = float(msg.twist.twist.angular.z)
+                pose = msg.pose.pose
+                q = pose.orientation
+                enc_yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w)
+                dtheta_odo = wrap_angle(enc_yaw - self._enc_yaw)
+                ds = travel_from_pose_delta(
+                    pose.position.x - self._enc_x,
+                    pose.position.y - self._enc_y,
+                    self._enc_yaw,
+                    dtheta_odo,
+                )
+                omega_odo = dtheta_odo / dt
                 omega_gyro = self._omega_gyro if self._have_gyro else omega_odo
                 dtheta = heading_increment(
                     omega_gyro, omega_odo, dt, self._threshold
                 )
-                ds = float(msg.twist.twist.linear.x) * dt
                 mid = self._yaw + 0.5 * dtheta
                 self._x += ds * math.cos(mid)
                 self._y += ds * math.sin(mid)
                 self._yaw = wrap_angle(self._yaw + dtheta)
+                self._vx_fused = ds / dt
                 self._omega_fused = dtheta / dt
+                self._enc_x = pose.position.x
+                self._enc_y = pose.position.y
+                self._enc_yaw = enc_yaw
         self._last_t = now
         self._publish(msg)
 
@@ -103,7 +129,7 @@ class Gyrodometry(Node):
         out.pose.pose.orientation.y = qy
         out.pose.pose.orientation.z = qz
         out.pose.pose.orientation.w = qw
-        out.twist.twist.linear.x = seed.twist.twist.linear.x
+        out.twist.twist.linear.x = self._vx_fused
         out.twist.twist.angular.z = self._omega_fused
         self._pub.publish(out)
 

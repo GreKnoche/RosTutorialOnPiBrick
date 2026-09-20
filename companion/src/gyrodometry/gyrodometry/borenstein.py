@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import math
+
 # Paper: 0.125° per 0.1 s sample (≈ 1.25 °/s). Rate form is dt-independent.
 THRESHOLD_DEG_S = 3.0
+
+
+def travel_from_pose_delta(dx: float, dy: float, yaw_prev: float, dtheta: float) -> float:
+    """Signed forward travel of a unicycle pose step (midpoint)."""
+    mid = yaw_prev + 0.5 * dtheta
+    return dx * math.cos(mid) + dy * math.sin(mid)
 
 
 def heading_increment(

@@ -257,8 +257,8 @@ Visualization Manager:
         Orientation:
           Axes:
             Alpha: 1
-            Length: 0.08
-            Radius: 0.008
+            Length: 0.03
+            Radius: 0.003
           Box:
             Alpha: 0.4
             Color: 80; 160; 255
