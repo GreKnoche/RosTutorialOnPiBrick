@@ -6,7 +6,9 @@ Default world `lab` is a flat ground plane with the Education driving base. `sen
 
 The GUI chase-cam sits 0.70 m behind the EV3 (`follow_pgain` 1.0, no lag). Disable with `follow_camera:=false`. DiffDrive clips at 0.35 m/s; the ROS chassis contract is 0.30 m/s.
 
-`world:=relief` is grass with a curvy painted loop around the 3D kerbs. Encoder heading turns at each kerb; companion gyrodometry (Borenstein: encoder yaw except while the gyro disagrees) stays closer to truth.
+`world:=relief` is grass with a curvy painted loop around the 3D kerbs. Encoder heading turns at each kerb; companion gyrodometry (Borenstein: encoder yaw except while the gyro disagrees) stays closer to truth. The one-wheel kerbs are 6 mm **rounded** cylinders so the motor boxes (~8 mm ground clearance) do not snag on a square step.
+
+Lesson 01 on `backend:=gazebo` loads a static occupancy map of this world (`brick_nav/maps/brick_relief.yaml`) into the global costmap. Regenerated with `python3 companion/src/brick_nav/maps/generate_relief_map.py` if the walls or props move. Kerbs stay free: they are drive-over.
 
 | Topic | Source |
 | --- | --- |

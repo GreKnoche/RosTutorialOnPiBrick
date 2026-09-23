@@ -16,6 +16,11 @@ class GoalToNav2(Node):
         super().__init__("goal_to_nav2")
         self._client = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self._goal_handle = None
+        self._default_frame = (
+            self.declare_parameter("default_frame_id", "odom")
+            .get_parameter_value()
+            .string_value
+        )
         self.create_subscription(PoseStamped, "goal_pose", self._on_goal, 10)
         self.get_logger().info("waiting for Nav2 navigate_to_pose, then /goal_pose")
 
@@ -28,7 +33,7 @@ class GoalToNav2(Node):
         goal = NavigateToPose.Goal()
         goal.pose = msg
         if not goal.pose.header.frame_id:
-            goal.pose.header.frame_id = "odom"
+            goal.pose.header.frame_id = self._default_frame
         self.get_logger().info(
             f"Nav2 goal x={msg.pose.position.x:.3f} y={msg.pose.position.y:.3f}"
         )

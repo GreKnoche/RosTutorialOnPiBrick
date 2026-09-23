@@ -40,7 +40,7 @@ ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
 
 Start `brick_hw` on the Pi (same Wi-Fi, same `ROS_DOMAIN_ID` from `shared/ros.env`, currently 71). Without `/joint_states` from the Pi, `wait_for_odom` warns and Nav2 waits on TF `odom → base_link`.
 
-RViz opens with fixed frame `odom`, RobotModel, `/odom`, green `/odom/gyro`, orange `/odom/sono`, Range on `/ultrasonic`, and IMU on `/imu`. `/odom/perfect` stays empty on hardware. The sim twin holds range near max, so sonodometry stays on encoder `ds` until a real wall (hardware or Gazebo). Toolbar **2D Goal Pose**, then click-drag to send `/goal_pose`. Lesson 01 starts Nav2 (planner + RPP) in the `odom` frame. `rviz:=false` skips the window.
+RViz opens with fixed frame `odom`, RobotModel, `/odom`, green `/odom/gyro`, orange `/odom/sono`, Range on `/ultrasonic`, and IMU on `/imu`. `/odom/perfect` stays empty on hardware. The sim twin holds range near max, so sonodometry stays on encoder `ds` until a real wall (hardware or Gazebo). Toolbar **2D Goal Pose**, then click-drag to send `/goal_pose`. Lesson 01 starts Nav2 (planner + RPP) in the `odom` frame. On `backend:=gazebo` it also loads the relief occupancy map (`/map`) into the global costmap and publishes identity TF `map → odom`. `rviz:=false` skips the window.
 
 ## Docker
 

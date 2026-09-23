@@ -73,25 +73,31 @@
       <pose>1.15 0 0.0005 0 0 0</pose>
     </include>
 
-    <!-- One-wheel kerbs: 6 mm high, 10 cm long. Caster radius is only 8 mm. -->
+    <!--
+      One-wheel kerbs: 6 mm rounded cylinders. Motor boxes sit ~8 mm off the
+      ground; the old 6 mm *square* blocks caught their front faces. Same
+      peak, no vertical step, so the 56 mm wheels roll over.
+    -->
     <model name="kerb_left_0">
       <static>true</static>
       <pose>0.40 0.059 0 0 0 0</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.82 0.38 0.12 1</ambient>
@@ -105,19 +111,21 @@
       <pose>0.80 0.059 0 0 0 0</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.82 0.38 0.12 1</ambient>
@@ -131,19 +139,21 @@
       <pose>1.20 -0.059 0 0 0 0</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.10 0.48 0.52 1</ambient>
@@ -157,19 +167,21 @@
       <pose>1.60 -0.059 0 0 0 0</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 0 0 0</pose>
+          <pose>0 0 0.003 1.5708 0 0</pose>
           <geometry>
-            <box>
-              <size>0.10 0.042 0.006</size>
-            </box>
+            <cylinder>
+              <radius>0.003</radius>
+              <length>0.042</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.10 0.48 0.52 1</ambient>
@@ -179,24 +191,24 @@
       </link>
     </model>
 
-    <!-- Both-wheels ridge: 7 mm, long so the caster rolls over. -->
+    <!-- Both-wheels ridge: 4 mm, long so the caster rolls over. -->
     <model name="ridge">
       <static>true</static>
       <pose>2.15 0 0 0 0 0</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.0035 0 0 0</pose>
+          <pose>0 0 0.002 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.28 0.24 0.007</size>
+              <size>0.28 0.24 0.004</size>
             </box>
           </geometry>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.0035 0 0 0</pose>
+          <pose>0 0 0.002 0 0 0</pose>
           <geometry>
             <box>
-              <size>0.28 0.24 0.007</size>
+              <size>0.28 0.24 0.004</size>
             </box>
           </geometry>
           <material>
