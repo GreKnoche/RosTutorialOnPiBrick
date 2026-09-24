@@ -17,7 +17,6 @@ def _truthy(value: str) -> bool:
 
 def _setup(context, *args, **kwargs):
     nav_share = get_package_share_directory("brick_nav")
-    bt_share = get_package_share_directory("nav2_bt_navigator")
     use_sim_time = LaunchConfiguration("use_sim_time")
     gazebo = _truthy(context.perform_substitution(use_sim_time))
     params = os.path.join(
@@ -26,11 +25,7 @@ def _setup(context, *args, **kwargs):
         "nav2_params_gazebo.yaml" if gazebo else "nav2_params.yaml",
     )
     map_yaml = os.path.join(nav_share, "maps", "brick_relief.yaml")
-    bt_xml = os.path.join(
-        bt_share,
-        "behavior_trees",
-        "navigate_w_replanning_only_if_goal_is_updated.xml",
-    )
+    bt_xml = os.path.join(nav_share, "behavior_trees", "navigate_to_pose.xml")
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
     lifecycle_nodes = ["controller_server", "planner_server", "bt_navigator"]
     if gazebo:
