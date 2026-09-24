@@ -6,7 +6,8 @@ import { BrandLogo } from "@/components/logo-mark";
 
 const links = [
   { href: "/", label: "Start" },
-  { href: "/ros", label: "ROS" },
+  { href: "/autonom", label: "Autonom" },
+  { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
 ];
 

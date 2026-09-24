@@ -5,9 +5,14 @@ export type { Crumb, Curriculum, LabKind, Lesson, LessonStatus, TrackId, TrackMe
 const curriculum: Curriculum = {
   tracks: [
     {
+      id: "autonom",
+      title: "Grundlagen des autonomen Fahrens",
+      description: "Fahrzeugmodell, Kinematik, Sensorik und einfache autonome Fahrmanöver.",
+    },
+    {
       id: "ros",
-      title: "ROS",
-      description: "ROS 2 auf dem Begleitrechner und BrickPi3 auf dem Raspberry Pi.",
+      title: "ROS 2",
+      description: "Knoten, Schnittstellen und Roboterbeschreibung mit ROS 2.",
     },
     {
       id: "nav2",
@@ -17,69 +22,159 @@ const curriculum: Curriculum = {
   ],
   lessons: [
     {
-      id: "topics",
-      slug: "topics",
-      title: "Topics: /cmd_vel und /odom",
+      id: "modell",
+      slug: "modell",
+      title: "Fahrzeugmodell und Koordinatensysteme",
       status: "stub",
-      summary: "Die Roboterschnittstelle im Überblick: Topics, /cmd_vel und /odom.",
-      track: "ros",
+      summary: "Das zweirädrige Fahrzeug, seine Bewegungsachsen und seine Lage in der Ebene verstehen.",
+      track: "autonom",
+      lab: "none",
+    },
+    {
+      id: "raeder",
+      slug: "raeder",
+      title: "Räder, Spurweite und Kinematik",
+      status: "stub",
+      summary: "Aus Raddrehzahlen eine Vorwärts- und Drehbewegung des Roboters bestimmen.",
+      track: "autonom",
       lab: "teleop",
     },
     {
       id: "fahren",
       slug: "fahren",
-      title: "Fahren lernen",
+      title: "Geschwindigkeit steuern",
       status: "stub",
-      summary: "Mit Tasten und Schaltflächen den EV3 bewegen. Tempo und Drehung stellst du selbst ein.",
-      track: "ros",
+      summary: "Den EV3 vorwärts, rückwärts und auf Kurven fahren lassen.",
+      track: "autonom",
+      lab: "teleop",
+    },
+    {
+      id: "odometrie",
+      slug: "odometrie",
+      title: "Encoder und Odometrie",
+      status: "stub",
+      summary: "Aus den Radbewegungen die zurückgelegte Strecke und die aktuelle Pose schätzen.",
+      track: "autonom",
+      lab: "teleop",
+    },
+    {
+      id: "sensorik",
+      slug: "sensorik",
+      title: "Gyroskop und Ultraschallsensor einbeziehen",
+      status: "stub",
+      summary: "Odometrie mit Drehrate und Abstandsmessungen ergänzen und Abweichungen erkennen.",
+      track: "autonom",
       lab: "teleop",
     },
     {
       id: "ziel",
       slug: "ziel",
-      title: "Zum Ziel fahren",
+      title: "Zu einer Zielpose fahren",
       status: "stub",
-      summary: "Ein Ziel setzen und den Roboter hinfahren lassen.",
-      track: "ros",
+      summary: "Mit einem einfachen Regler eine gewünschte Position und Ausrichtung anfahren.",
+      track: "autonom",
       lab: "goal",
-    },
-    {
-      id: "raeder",
-      slug: "raeder",
-      title: "Räder und Spur",
-      status: "stub",
-      summary: "Radgröße und Spurweite ändern — der Roboter fährt andere Kurven.",
-      track: "ros",
-      lab: "teleop",
     },
     {
       id: "mission",
       slug: "mission",
-      title: "Mission",
+      title: "Eine autonome Mission ausführen",
       status: "stub",
-      summary: "Drei Markierungen abfahren, bevor die Zeit um ist.",
+      summary: "Mehrere Ziele nacheinander anfahren und auf Hindernisse reagieren.",
+      track: "autonom",
+      lab: "goal",
+    },
+    {
+      id: "knoten",
+      slug: "knoten",
+      title: "Knoten, Pakete und Arbeitsbereiche",
+      status: "stub",
+      summary: "Den Aufbau eines ROS-2-Systems und die Aufgaben seiner Knoten kennenlernen.",
+      track: "ros",
+      lab: "none",
+    },
+    {
+      id: "topics",
+      slug: "topics",
+      title: "Topics, Nachrichten und Dienstgüte",
+      status: "stub",
+      summary: "Sensordaten und Fahrbefehle veröffentlichen, empfangen und zuverlässig übertragen.",
       track: "ros",
       lab: "teleop",
     },
     {
+      id: "parameter",
+      slug: "parameter",
+      title: "Parameter und Konfiguration",
+      status: "stub",
+      summary: "Radmaße, Grenzwerte und weitere Einstellungen außerhalb des Programmcodes verwalten.",
+      track: "ros",
+      lab: "none",
+    },
+    {
+      id: "launch",
+      slug: "launch",
+      title: "Systeme mit Launch-Dateien starten",
+      status: "stub",
+      summary: "Mehrere Knoten gemeinsam und mit passenden Parametern starten.",
+      track: "ros",
+      lab: "none",
+    },
+    {
+      id: "urdf-tf",
+      slug: "urdf-tf",
+      title: "Roboterbeschreibung mit URDF und TF",
+      status: "stub",
+      summary: "Fahrgestell und Sensoren beschreiben und ihre Koordinatensysteme veröffentlichen.",
+      track: "ros",
+      lab: "none",
+    },
+    {
+      id: "schnittstelle",
+      slug: "schnittstelle",
+      title: "Roboterschnittstelle mit /cmd_vel, /odom und /tf",
+      status: "stub",
+      summary: "Fahrbefehle, Odometrie und Koordinatensysteme zu einer stabilen Schnittstelle verbinden.",
+      track: "ros",
+      lab: "teleop",
+    },
+    {
+      id: "hardware-simulation",
+      slug: "hardware-simulation",
+      title: "Hardware und Simulation austauschbar anbinden",
+      status: "stub",
+      summary: "Dieselben ROS-Schnittstellen mit dem Raspberry Pi und mit Gazebo verwenden.",
+      track: "ros",
+      lab: "teleop",
+    },
+    {
+      id: "dienste-aktionen",
+      slug: "dienste-aktionen",
+      title: "Dienste und Aktionen",
+      status: "stub",
+      summary: "Einmalige Anfragen und länger laufende Aufgaben mit Rückmeldung umsetzen.",
+      track: "ros",
+      lab: "none",
+    },
+    {
       id: "00",
       slug: "bringup",
-      title: "Inbetriebnahme, Odometrie und TF",
+      title: "Voraussetzungen und REP-105",
       status: "stub",
       nav2_surface: "Roboterschnittstelle nach REP-105",
-      summary: "URDF, Odometrie aus den Encodern und der von Nav2 benötigte TF-Baum.",
+      summary: "Odometrie, Sensordaten und den von Nav2 benötigten TF-Baum prüfen.",
       track: "nav2",
       lab: "teleop",
     },
     {
       id: "01",
-      slug: "drive-to-pose",
-      title: "Zu einer Zielpose fahren",
+      slug: "architektur",
+      title: "Architektur und Lebenszyklus von Nav2",
       status: "stub",
-      nav2_surface: "nav2_core::Controller als Python-Ersatzimplementierung",
-      summary: "Ein P-Regler fährt den Roboter unter Beachtung seiner Ausrichtung zu /goal_pose.",
+      nav2_surface: "Nav2-Server und verwaltete Knoten",
+      summary: "Planung, Steuerung und Navigation den Nav2-Servern und ihren Zuständen zuordnen.",
       track: "nav2",
-      lab: "goal",
+      lab: "none",
     },
     {
       id: "02",
@@ -114,10 +209,10 @@ const curriculum: Curriculum = {
     {
       id: "05",
       slug: "controller-server",
-      title: "Nav2-Steuerungsserver",
+      title: "Lokale Steuerung",
       status: "stub",
       nav2_surface: "nav2_core::Controller",
-      summary: "Den PosePursuitController durch DWB, RPP oder MPPI ersetzen.",
+      summary: "Mit DWB, RPP oder MPPI einem globalen Pfad folgen und Hindernissen ausweichen.",
       track: "nav2",
       lab: "none",
     },
@@ -189,20 +284,22 @@ export function lessonNeighbors(lesson: Lesson): {
   };
 }
 
-export function getLesson(id: string): Lesson | undefined {
-  return curriculum.lessons.find((lesson) => lesson.id === id);
+export function getLessonById(track: TrackId, id: string): Lesson | undefined {
+  return lessonsForTrack(track).find((lesson) => lesson.id === id);
 }
 
-export function getRosLesson(slug: string): Lesson | undefined {
-  return lessonsForTrack("ros").find((lesson) => lesson.slug === slug);
+export function getLessonBySlug(track: TrackId, slug: string): Lesson | undefined {
+  return lessonsForTrack(track).find((lesson) => lesson.slug === slug);
 }
 
 export function lessonHref(lesson: Lesson): string {
-  return lesson.track === "nav2" ? `/nav2/${lesson.id}` : `/ros/${lesson.slug}`;
+  return lesson.track === "nav2"
+    ? `/nav2/${lesson.id}`
+    : `/${lesson.track}/${lesson.slug}`;
 }
 
 export function trackHref(track: TrackId): string {
-  return track === "nav2" ? "/nav2" : "/ros";
+  return `/${track}`;
 }
 
 const START: Crumb = { href: "/", label: "Start" };
