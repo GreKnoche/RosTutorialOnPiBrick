@@ -16,7 +16,7 @@ export function Button({
         "inline-flex shrink-0 items-center justify-center rounded-lg border font-medium whitespace-nowrap transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
         size === "sm" && "h-7 px-2.5 text-[0.8rem]",
         size === "default" && "h-8 px-2.5 text-sm",
-        variant === "outline" && "border-border bg-background",
+        variant === "outline" && "border-transparent bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
         variant === "default" && "border-transparent bg-primary text-primary-foreground",
         className
       )}

@@ -10,10 +10,12 @@ import { Ev3Twin, type TwinMode } from "@/lib/twin";
 type Props = {
   lab: LabKind;
   lessonId: string;
+  showTopics?: boolean;
 };
 
 const WORLD_W = 1.35;
 const WORLD_H = 0.92;
+const showTf = false;
 
 function modeFor(lab: LabKind): TwinMode {
   if (lab === "teleop") return "teleop";
@@ -28,7 +30,7 @@ type Snapshot = {
   goal: Pose2D | null;
 };
 
-export function RobotLab({ lab, lessonId }: Props) {
+export function RobotLab({ lab, lessonId, showTopics = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const twinRef = useRef(new Ev3Twin());
@@ -53,7 +55,7 @@ export function RobotLab({ lab, lessonId }: Props) {
       if (mode === "teleop") twin.setTeleop(keysRef.current);
       try {
         twin.tick(dt, mode);
-        draw(canvasRef.current, frameRef.current, twin, lab);
+        draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf);
       } catch (err) {
         console.error(err);
         setStatus("Simulationsfehler");
@@ -77,7 +79,7 @@ export function RobotLab({ lab, lessonId }: Props) {
     step();
     const id = window.setInterval(step, 50);
     return () => window.clearInterval(id);
-  }, [lab, lessonId]);
+  }, [lab, lessonId, showTopics]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -178,7 +180,7 @@ export function RobotLab({ lab, lessonId }: Props) {
       </div>
       <div
         ref={frameRef}
-        className="relative w-full overflow-hidden rounded-xl bg-[#1b1f27] ring-1 ring-foreground/15"
+        className="relative w-full overflow-hidden rounded-xl bg-[#12110e] ring-1 ring-foreground/15"
         style={{ height: 420 }}
       >
         <canvas
@@ -195,10 +197,14 @@ export function RobotLab({ lab, lessonId }: Props) {
       </div>
       <p className="text-xs text-muted-foreground">
         {lab === "teleop" && "Mit W A S D oder den Pfeiltasten fahren. R setzt die Simulation zurück. Die Bewegungsberechnung entspricht ev3_core."}
-        {lab === "goal" && "In die Fläche klicken, um /goal_pose zu veröffentlichen. Es wird derselbe PosePursuitController wie im ROS-Knoten verwendet."}
-        {lab === "none" && "Diese Lektion enthält noch keine Steuerung. Am Fahrgestell sind die später wiederverwendeten TF-Koordinatensysteme zu sehen."}
+        {lab === "goal" &&
+          (showTopics
+            ? "In die Fläche klicken, um /goal_pose zu veröffentlichen. Es wird derselbe PosePursuitController wie im ROS-Knoten verwendet."
+            : "In die Fläche klicken, um ein Ziel zu setzen.")}
+        {lab === "none" && "Diese Lektion enthält noch keine Steuerung."}
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      {showTopics && (
+      <div className="grid gap-3">
         <Inspector
           title="Topics"
           rows={[
@@ -217,18 +223,21 @@ export function RobotLab({ lab, lessonId }: Props) {
             ],
           ]}
         />
-        <Inspector
-          title="TF"
-          rows={[
-            ["odom → base_link", "robot_node / Simulation"],
-            ["base_link → wheel_left_link", "URDF"],
-            ["base_link → wheel_right_link", "URDF"],
-            ["base_link → gyro_link", "URDF"],
-            ["base_link → ultrasonic_link", "URDF"],
-            ["map → odom", "Lektion 03 (noch nicht umgesetzt)"],
-          ]}
-        />
+        {showTf && (
+          <Inspector
+            title="TF"
+            rows={[
+              ["odom → base_link", "robot_node / Simulation"],
+              ["base_link → wheel_left_link", "URDF"],
+              ["base_link → wheel_right_link", "URDF"],
+              ["base_link → gyro_link", "URDF"],
+              ["base_link → ultrasonic_link", "URDF"],
+              ["map → odom", "Lektion 03 (noch nicht umgesetzt)"],
+            ]}
+          />
+        )}
       </div>
+      )}
       <p className="font-mono text-[11px] text-muted-foreground">
         r={DEFAULT_CHASSIS.wheelRadius} m · L={DEFAULT_CHASSIS.wheelSeparation} m · v_max=
         {DEFAULT_CHASSIS.maxLinear} m/s
@@ -305,7 +314,9 @@ function draw(
   canvas: HTMLCanvasElement | null,
   frame: HTMLDivElement | null,
   twin: Ev3Twin,
-  lab: LabKind
+  lab: LabKind,
+  showTopics: boolean,
+  showFrames: boolean
 ) {
   if (!canvas) return;
   const size = syncCanvasSize(canvas, frame);
@@ -316,7 +327,7 @@ function draw(
   const ppm = origin.ppm;
   const stroke = Math.max(1.5, ppm * 0.006);
 
-  ctx.fillStyle = "#1b1f27";
+  ctx.fillStyle = "#12110e";
   ctx.fillRect(0, 0, width, height);
 
   ctx.strokeStyle = "rgba(255,255,255,0.07)";
@@ -361,7 +372,9 @@ function draw(
   ctx.font = `${Math.max(12, ppm * 0.035)}px ui-monospace, monospace`;
   ctx.fillText("x", origin.x + 0.24 * ppm, origin.y - 6);
   ctx.fillText("y", origin.x + 8, origin.y - 0.24 * ppm);
-  ctx.fillText("odom", origin.x + 8, origin.y + Math.max(16, ppm * 0.04));
+  if (showFrames) {
+    ctx.fillText("odom", origin.x + 8, origin.y + Math.max(16, ppm * 0.04));
+  }
 
   if (twin.trail.length > 1) {
     ctx.beginPath();
@@ -392,7 +405,7 @@ function draw(
     ctx.stroke();
     ctx.fillStyle = twin.reached ? "#34d399" : "#facc15";
     ctx.font = `${Math.max(12, ppm * 0.032)}px ui-monospace, monospace`;
-    ctx.fillText("/goal_pose", g.x + r * 1.6, g.y - 4);
+    ctx.fillText(showTopics ? "/goal_pose" : "Ziel", g.x + r * 1.6, g.y - 4);
   }
 
   const pose = twin.odom.pose;
@@ -421,9 +434,11 @@ function draw(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = "rgba(255,247,237,0.9)";
-  ctx.font = `${Math.max(11, ppm * 0.03)}px ui-monospace, monospace`;
-  ctx.fillText("base_link", p.x + 10, p.y - Math.max(14, W * 0.6));
+  if (showFrames) {
+    ctx.fillStyle = "rgba(255,247,237,0.9)";
+    ctx.font = `${Math.max(11, ppm * 0.03)}px ui-monospace, monospace`;
+    ctx.fillText("base_link", p.x + 10, p.y - Math.max(14, W * 0.6));
+  }
 
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.font = `${Math.max(11, ppm * 0.028)}px ui-sans-serif, system-ui`;
@@ -431,7 +446,9 @@ function draw(
     lab === "teleop"
       ? "Mit WASD / Pfeiltasten fahren · R setzt zurück"
       : lab === "goal"
-        ? "Klicken, um /goal_pose zu setzen"
+        ? showTopics
+          ? "Klicken, um /goal_pose zu setzen"
+          : "Klicken, um ein Ziel zu setzen"
         : "Nur Roboterschnittstelle — keine Steuerung";
   ctx.fillText(hint, 14, height - 16);
 

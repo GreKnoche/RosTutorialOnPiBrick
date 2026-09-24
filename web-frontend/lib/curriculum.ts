@@ -22,7 +22,7 @@ const curriculum: Curriculum = {
   ],
   lessons: [
     {
-      id: "modell",
+      id: "00",
       slug: "modell",
       title: "Fahrzeugmodell und Koordinatensysteme",
       status: "stub",
@@ -31,7 +31,7 @@ const curriculum: Curriculum = {
       lab: "none",
     },
     {
-      id: "raeder",
+      id: "01",
       slug: "raeder",
       title: "Räder, Spurweite und Kinematik",
       status: "stub",
@@ -40,7 +40,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "fahren",
+      id: "02",
       slug: "fahren",
       title: "Geschwindigkeit steuern",
       status: "stub",
@@ -49,7 +49,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "odometrie",
+      id: "03",
       slug: "odometrie",
       title: "Encoder und Odometrie",
       status: "stub",
@@ -58,7 +58,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "sensorik",
+      id: "04",
       slug: "sensorik",
       title: "Gyroskop und Ultraschallsensor einbeziehen",
       status: "stub",
@@ -67,7 +67,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "ziel",
+      id: "05",
       slug: "ziel",
       title: "Zu einer Zielpose fahren",
       status: "stub",
@@ -76,7 +76,7 @@ const curriculum: Curriculum = {
       lab: "goal",
     },
     {
-      id: "mission",
+      id: "06",
       slug: "mission",
       title: "Eine autonome Mission ausführen",
       status: "stub",
@@ -85,7 +85,7 @@ const curriculum: Curriculum = {
       lab: "goal",
     },
     {
-      id: "knoten",
+      id: "00",
       slug: "knoten",
       title: "Knoten, Pakete und Arbeitsbereiche",
       status: "stub",
@@ -94,7 +94,7 @@ const curriculum: Curriculum = {
       lab: "none",
     },
     {
-      id: "topics",
+      id: "01",
       slug: "topics",
       title: "Topics, Nachrichten und Dienstgüte",
       status: "stub",
@@ -103,7 +103,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "parameter",
+      id: "02",
       slug: "parameter",
       title: "Parameter und Konfiguration",
       status: "stub",
@@ -112,7 +112,7 @@ const curriculum: Curriculum = {
       lab: "none",
     },
     {
-      id: "launch",
+      id: "03",
       slug: "launch",
       title: "Systeme mit Launch-Dateien starten",
       status: "stub",
@@ -121,7 +121,7 @@ const curriculum: Curriculum = {
       lab: "none",
     },
     {
-      id: "urdf-tf",
+      id: "04",
       slug: "urdf-tf",
       title: "Roboterbeschreibung mit URDF und TF",
       status: "stub",
@@ -130,7 +130,7 @@ const curriculum: Curriculum = {
       lab: "none",
     },
     {
-      id: "schnittstelle",
+      id: "05",
       slug: "schnittstelle",
       title: "Roboterschnittstelle mit /cmd_vel, /odom und /tf",
       status: "stub",
@@ -139,7 +139,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "hardware-simulation",
+      id: "06",
       slug: "hardware-simulation",
       title: "Hardware und Simulation austauschbar anbinden",
       status: "stub",
@@ -148,7 +148,7 @@ const curriculum: Curriculum = {
       lab: "teleop",
     },
     {
-      id: "dienste-aktionen",
+      id: "07",
       slug: "dienste-aktionen",
       title: "Dienste und Aktionen",
       status: "stub",
@@ -309,7 +309,7 @@ export function trackCrumbs(track: TrackId, lesson?: Lesson): Crumb[] {
   const items: Crumb[] = [START, { href: trackHref(track), label: meta?.title ?? track }];
   if (lesson) {
     items.push({
-      label: track === "nav2" ? `${lesson.id} · ${lesson.title}` : lesson.title,
+      label: `${lesson.id} · ${lesson.title}`,
     });
   }
   return items;

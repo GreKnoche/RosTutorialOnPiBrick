@@ -25,23 +25,13 @@ export default function HomePage() {
         </h1>
       </section>
 
-      {outline.map(({ track, lessons }, index) => {
+      {outline.map(({ track, lessons }) => {
         const ready = lessons.filter((lesson) => lesson.status === "ready").length;
-        const lead = index === 0;
         return (
-          <section
-            key={track.id}
-            className={lead ? "flex flex-col gap-3 border-l-2 border-heading pl-4" : "flex flex-col gap-3"}
-          >
+          <section key={track.id} className="flex flex-col gap-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="min-w-0">
-                <h2
-                  className={
-                    lead
-                      ? "font-heading text-2xl font-semibold tracking-tight text-heading"
-                      : "font-heading text-xl font-semibold tracking-tight"
-                  }
-                >
+                <h2 className="font-heading text-xl font-semibold tracking-tight">
                   <Link href={trackHref(track.id)} className="hover:underline">
                     {track.title}
                   </Link>

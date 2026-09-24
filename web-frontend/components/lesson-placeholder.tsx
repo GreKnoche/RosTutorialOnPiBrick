@@ -68,7 +68,11 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
             {prev ? <ChapterLink lesson={prev} label="Vorherige" align="start" /> : <span />}
             {next ? <ChapterLink lesson={next} label="Nächste" align="end" /> : <span />}
           </nav>
-          <RobotLab lab={lesson.lab} lessonId={lesson.id} />
+          <RobotLab
+            lab={lesson.lab}
+            lessonId={lesson.id}
+            showTopics={lesson.track !== "autonom"}
+          />
         </div>
         <aside className="flex flex-col gap-2">
           <h2 className="px-2 text-sm font-medium text-heading">

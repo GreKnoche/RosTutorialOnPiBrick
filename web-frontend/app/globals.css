@@ -1,23 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: oklch(0.985 0.008 95);
-  --foreground: oklch(0.33 0.018 260);
-  --heading: oklch(0.42 0.14 255);
-  --card: oklch(1 0.004 95);
-  --card-foreground: oklch(0.33 0.018 260);
-  --popover: oklch(1 0.004 95);
-  --popover-foreground: oklch(0.33 0.018 260);
-  --primary: oklch(0.72 0.16 55);
-  --primary-foreground: oklch(0.28 0.05 55);
-  --secondary: oklch(0.94 0.03 250);
-  --secondary-foreground: oklch(0.38 0.1 255);
-  --muted: oklch(0.955 0.012 95);
-  --muted-foreground: oklch(0.5 0.02 260);
-  --accent: oklch(0.94 0.03 250);
-  --accent-foreground: oklch(0.38 0.1 255);
-  --destructive: oklch(0.55 0.2 25);
-  --border: oklch(0.9 0.015 95);
+  --background: #f2f2f0;
+  --foreground: #504d3d;
+  --heading: #504d3d;
+  --card: #f7f7f5;
+  --card-foreground: #504d3d;
+  --popover: #f7f7f5;
+  --popover-foreground: #504d3d;
+  --primary: #504d3d;
+  --primary-foreground: #f2f2f0;
+  --secondary: #e4e4e2;
+  --secondary-foreground: #504d3d;
+  --muted: #e4e4e2;
+  --muted-foreground: #504d3d;
+  --accent: #e4e4e2;
+  --accent-foreground: #504d3d;
+  --destructive: #8b3a32;
+  --border: #d0d0ce;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -41,28 +42,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.18 0.02 260);
-    --foreground: oklch(0.92 0.01 95);
-    --heading: oklch(0.78 0.1 255);
-    --card: oklch(0.22 0.02 260);
-    --card-foreground: oklch(0.92 0.01 95);
-    --popover: oklch(0.22 0.02 260);
-    --popover-foreground: oklch(0.92 0.01 95);
-    --primary: oklch(0.72 0.16 55);
-    --primary-foreground: oklch(0.22 0.04 55);
-    --secondary: oklch(0.28 0.04 255);
-    --secondary-foreground: oklch(0.88 0.04 255);
-    --muted: oklch(0.26 0.02 260);
-    --muted-foreground: oklch(0.72 0.02 260);
-    --accent: oklch(0.28 0.04 255);
-    --accent-foreground: oklch(0.88 0.04 255);
-    --destructive: oklch(0.65 0.18 25);
-    --border: oklch(0.32 0.02 260);
-  }
 }
 
 body {
