@@ -2,6 +2,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { lessonHref, type Lesson } from "@/lib/curriculum";
 
+function statusLabel(status: Lesson["status"]) {
+  return status === "ready" ? "verfügbar" : "Entwurf";
+}
+
 export function LessonIndex({
   lessons,
   currentId,
@@ -36,7 +40,7 @@ export function LessonIndex({
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">{detail}</span>
               </span>
               <Badge variant={lesson.status === "ready" ? "default" : "outline"}>
-                {lesson.status}
+                {statusLabel(lesson.status)}
               </Badge>
             </Link>
           </li>

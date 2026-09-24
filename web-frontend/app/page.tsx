@@ -4,9 +4,11 @@ import { LessonIndex } from "@/components/lesson-index";
 import { curriculumOutline, trackHref } from "@/lib/curriculum";
 
 function availabilityLabel(ready: number, total: number) {
-  if (ready === 0) return `${total} placeholders`;
-  const stubs = total - ready;
-  return stubs > 0 ? `${ready} ready · ${stubs} placeholders` : `${ready} ready`;
+  if (ready === 0) return `${total} Lektionen in Arbeit`;
+  const drafts = total - ready;
+  return drafts > 0
+    ? `${ready} verfügbar · ${drafts} in Arbeit`
+    : `${ready} verfügbar`;
 }
 
 export default function HomePage() {
@@ -19,7 +21,7 @@ export default function HomePage() {
           ROS 2 Jazzy · BrickPi3 · Gazebo
         </p>
         <h1 className="max-w-3xl text-3xl font-semibold tracking-tight text-heading sm:text-4xl">
-          Tutorials
+          Lernpfade
         </h1>
       </section>
 

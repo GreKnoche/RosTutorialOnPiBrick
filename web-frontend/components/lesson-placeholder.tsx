@@ -46,7 +46,7 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
               <Badge variant={lesson.status === "ready" ? "default" : "outline"}>
-                {lesson.status}
+                {lesson.status === "ready" ? "verfügbar" : "Entwurf"}
               </Badge>
               {index >= 0 && (
                 <span className="text-xs text-muted-foreground">
@@ -72,7 +72,7 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
         </div>
         <aside className="flex flex-col gap-2">
           <h2 className="px-2 text-sm font-medium text-heading">
-            In diesem Track{track ? ` · ${track.title}` : ""}
+            In diesem Lernpfad{track ? ` · ${track.title}` : ""}
           </h2>
           <LessonIndex
             lessons={lessons}

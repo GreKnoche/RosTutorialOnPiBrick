@@ -33,7 +33,7 @@ export function RobotLab({ lab, lessonId }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const twinRef = useRef(new Ev3Twin());
   const keysRef = useRef(new Set<string>());
-  const [status, setStatus] = useState("starting");
+  const [status, setStatus] = useState("wird gestartet");
   const [snapshot, setSnapshot] = useState<Snapshot>({
     pose: { x: 0, y: 0, theta: 0 },
     cmd: { linear: 0, angular: 0 },
@@ -56,7 +56,7 @@ export function RobotLab({ lab, lessonId }: Props) {
         draw(canvasRef.current, frameRef.current, twin, lab);
       } catch (err) {
         console.error(err);
-        setStatus("sim error");
+        setStatus("Simulationsfehler");
         return;
       }
       setSnapshot({
@@ -66,12 +66,12 @@ export function RobotLab({ lab, lessonId }: Props) {
         goal: twin.goal ? { ...twin.goal } : null,
       });
       if (mode === "goal") {
-        setStatus(twin.reached ? "goal reached" : twin.goal ? "tracking" : "awaiting /goal_pose");
+        setStatus(twin.reached ? "Ziel erreicht" : twin.goal ? "fährt zum Ziel" : "wartet auf /goal_pose");
       } else if (mode === "teleop") {
         const moving = Math.abs(twin.cmd.linear) + Math.abs(twin.cmd.angular) > 1e-3;
-        setStatus(moving ? "teleop" : "waiting for WASD");
+        setStatus(moving ? "manuelle Steuerung" : "wartet auf WASD");
       } else {
-        setStatus("stub — robot contract only");
+        setStatus("Entwurf — nur Roboterschnittstelle");
       }
     };
     step();
@@ -120,7 +120,7 @@ export function RobotLab({ lab, lessonId }: Props) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">in-browser twin</Badge>
+          <Badge variant="secondary">Simulation im Browser</Badge>
           <span className="text-xs text-muted-foreground">{status}</span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -137,7 +137,7 @@ export function RobotLab({ lab, lessonId }: Props) {
                 onPointerUp={() => keysRef.current.delete("w")}
                 onPointerLeave={() => keysRef.current.delete("w")}
               >
-                Forward
+                Vorwärts
               </Button>
               <Button
                 size="sm"
@@ -146,7 +146,7 @@ export function RobotLab({ lab, lessonId }: Props) {
                 onPointerUp={() => keysRef.current.delete("a")}
                 onPointerLeave={() => keysRef.current.delete("a")}
               >
-                Left
+                Links
               </Button>
               <Button
                 size="sm"
@@ -155,7 +155,7 @@ export function RobotLab({ lab, lessonId }: Props) {
                 onPointerUp={() => keysRef.current.delete("d")}
                 onPointerLeave={() => keysRef.current.delete("d")}
               >
-                Right
+                Rechts
               </Button>
             </>
           )}
@@ -168,11 +168,11 @@ export function RobotLab({ lab, lessonId }: Props) {
                 twinRef.current.reached = false;
               }}
             >
-              Sample goal
+              Beispielziel
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => twinRef.current.reset()}>
-            Reset
+            Zurücksetzen
           </Button>
         </div>
       </div>
@@ -194,9 +194,9 @@ export function RobotLab({ lab, lessonId }: Props) {
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        {lab === "teleop" && "W A S D or arrows to drive. R resets. Same unicycle update as ev3_core."}
-        {lab === "goal" && "Click the arena to publish /goal_pose. Same PosePursuitController as the ROS node."}
-        {lab === "none" && "No controller in this lesson. The chassis is here so you can see the TF frames you will reuse."}
+        {lab === "teleop" && "Mit W A S D oder den Pfeiltasten fahren. R setzt die Simulation zurück. Die Bewegungsberechnung entspricht ev3_core."}
+        {lab === "goal" && "In die Fläche klicken, um /goal_pose zu veröffentlichen. Es wird derselbe PosePursuitController wie im ROS-Knoten verwendet."}
+        {lab === "none" && "Diese Lektion enthält noch keine Steuerung. Am Fahrgestell sind die später wiederverwendeten TF-Koordinatensysteme zu sehen."}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Inspector
@@ -207,7 +207,7 @@ export function RobotLab({ lab, lessonId }: Props) {
               "/odom",
               `x=${pose.x.toFixed(3)}  y=${pose.y.toFixed(3)}  yaw=${((pose.theta * 180) / Math.PI).toFixed(1)}°`,
             ],
-            ["/imu", `gyro yaw=${((pose.theta * 180) / Math.PI).toFixed(1)}° (not fused)`],
+            ["/imu", `Gierwinkel=${((pose.theta * 180) / Math.PI).toFixed(1)}° (nicht zusammengeführt)`],
             ["/ultrasonic", `${snapshot.rangeM.toFixed(2)} m`],
             [
               "/goal_pose",
@@ -220,12 +220,12 @@ export function RobotLab({ lab, lessonId }: Props) {
         <Inspector
           title="TF"
           rows={[
-            ["odom → base_link", "robot_node / twin"],
+            ["odom → base_link", "robot_node / Simulation"],
             ["base_link → wheel_left_link", "URDF"],
             ["base_link → wheel_right_link", "URDF"],
             ["base_link → gyro_link", "URDF"],
             ["base_link → ultrasonic_link", "URDF"],
-            ["map → odom", "lesson 03 (missing)"],
+            ["map → odom", "Lektion 03 (noch nicht umgesetzt)"],
           ]}
         />
       </div>
@@ -429,10 +429,10 @@ function draw(
   ctx.font = `${Math.max(11, ppm * 0.028)}px ui-sans-serif, system-ui`;
   const hint =
     lab === "teleop"
-      ? "WASD / arrows to drive · R reset"
+      ? "Mit WASD / Pfeiltasten fahren · R setzt zurück"
       : lab === "goal"
-        ? "Click to set /goal_pose"
-        : "Robot contract only — no controller";
+        ? "Klicken, um /goal_pose zu setzen"
+        : "Nur Roboterschnittstelle — keine Steuerung";
   ctx.fillText(hint, 14, height - 16);
 
   if (lab === "none") {
@@ -441,7 +441,7 @@ function draw(
     ctx.fillStyle = "rgba(255,255,255,0.88)";
     ctx.font = `${Math.max(13, ppm * 0.04)}px ui-sans-serif, system-ui`;
     ctx.textAlign = "center";
-    ctx.fillText("Stub lesson — robot contract is unchanged", width / 2, height / 2);
+    ctx.fillText("Lektion in Arbeit — Roboterschnittstelle unverändert", width / 2, height / 2);
     ctx.textAlign = "start";
   }
 }

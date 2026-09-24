@@ -14,15 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EV3 Nav2 Lab",
+  title: "EV3-Nav2-Labor",
   description:
-    "Interactive Nav2 tutorial: ROS 2 on a companion PC, BrickPi3 agent on a Raspberry Pi.",
+    "Interaktiver Nav2-Lernpfad: ROS 2 auf einem Begleitrechner und BrickPi3 auf einem Raspberry Pi.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">

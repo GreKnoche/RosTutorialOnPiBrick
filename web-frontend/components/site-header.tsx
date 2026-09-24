@@ -22,7 +22,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3 font-medium">
           <BrandLogo className="size-11" />
-          <span className="text-lg tracking-tight">EV3 Nav2 Lab</span>
+          <span className="text-lg tracking-tight">EV3-Nav2-Labor</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {links.map((link) => (

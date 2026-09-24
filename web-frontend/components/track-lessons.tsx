@@ -35,11 +35,9 @@ export function TrackLessons({
           {track?.description}
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
-          {ready > 0 && <Badge variant="default">{ready} lessons ready</Badge>}
+          {ready > 0 && <Badge variant="default">{ready} Lektionen verfügbar</Badge>}
           <Badge variant="outline">
-            {ready > 0
-              ? `${lessons.length - ready} stubs to fill in`
-              : `${lessons.length} placeholders`}
+            {lessons.length - ready} Lektionen in Arbeit
           </Badge>
         </div>
       </section>
