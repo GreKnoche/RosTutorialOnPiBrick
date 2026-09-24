@@ -31,6 +31,8 @@ setup(
             "drive_to_pose = brick_nav.drive_to_pose_node:main",
             "goal_to_nav2 = brick_nav.goal_to_nav2:main",
             "wait_for_odom = brick_nav.wait_for_odom:main",
+            "map_match = brick_nav.map_match_node:main",
+            "odom_mux = brick_nav.odom_mux:main",
         ]
     },
 )

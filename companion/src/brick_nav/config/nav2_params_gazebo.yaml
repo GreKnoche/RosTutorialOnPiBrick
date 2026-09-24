@@ -1,5 +1,5 @@
-# Nav2 on the Gazebo relief occupancy grid. Identity TF map → odom (spawn is
-# the world origin). No AMCL: gyrodometry drift will slowly misalign the map.
+# Nav2 on the Gazebo relief occupancy grid. map_match starts at identity
+# map → odom and corrects it after each goal's ultrasonic spin. No AMCL.
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -107,6 +107,25 @@ map_server:
   ros__parameters:
     topic_name: map
     frame_id: map
+
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 0.5
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.4
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 1.0
 
 planner_server:
   ros__parameters:

@@ -25,33 +25,37 @@ def _setup(context, *args, **kwargs):
         "nav2_params_gazebo.yaml" if gazebo else "nav2_params.yaml",
     )
     map_yaml = os.path.join(nav_share, "maps", "brick_relief.yaml")
-    bt_xml = os.path.join(nav_share, "behavior_trees", "navigate_to_pose.xml")
+    bt_name = "navigate_to_pose_localize.xml" if gazebo else "navigate_to_pose.xml"
+    bt_xml = os.path.join(nav_share, "behavior_trees", bt_name)
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
     lifecycle_nodes = ["controller_server", "planner_server", "bt_navigator"]
     if gazebo:
-        lifecycle_nodes = ["map_server", *lifecycle_nodes]
+        lifecycle_nodes = ["map_server", "behavior_server", *lifecycle_nodes]
 
     nodes = []
     if gazebo:
         nodes.extend(
             [
                 Node(
-                    package="tf2_ros",
-                    executable="static_transform_publisher",
-                    name="map_to_odom",
+                    package="brick_nav",
+                    executable="map_match",
+                    name="map_match",
                     output="screen",
-                    arguments=[
-                        "--x",
-                        "0",
-                        "--y",
-                        "0",
-                        "--z",
-                        "0",
-                        "--frame-id",
-                        "map",
-                        "--child-frame-id",
-                        "odom",
+                    parameters=[
+                        {
+                            "use_sim_time": use_sim_time,
+                            "yaml_filename": map_yaml,
+                        }
                     ],
+                    remappings=remappings,
+                ),
+                Node(
+                    package="nav2_behaviors",
+                    executable="behavior_server",
+                    name="behavior_server",
+                    output="screen",
+                    parameters=[params, {"use_sim_time": use_sim_time}],
+                    remappings=remappings,
                 ),
                 Node(
                     package="nav2_map_server",

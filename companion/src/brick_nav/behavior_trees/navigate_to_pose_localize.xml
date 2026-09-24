@@ -1,0 +1,18 @@
+<!--
+  Gazebo lesson 01. Same drive as navigate_to_pose.xml, then one full
+  Nav2 spin so map_match can correct map → odom from the ultrasonic.
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <PipelineSequence name="NavigateThenLocalize">
+      <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
+      <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
+      <GoalUpdatedController>
+        <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}"/>
+      </GoalUpdatedController>
+      <FollowPath path="{path}" controller_id="{selected_controller}" error_code_id="{follow_path_error_code}"/>
+      <!-- 2π at max_rotational_vel 0.4 rad/s needs ~16 s on the sim clock. -->
+      <Spin spin_dist="6.2832" time_allowance="20.0" is_recovery="false"/>
+    </PipelineSequence>
+  </BehaviorTree>
+</root>

@@ -113,6 +113,13 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
+    odom_mux = Node(
+        package="brick_nav",
+        executable="odom_mux",
+        name="odom_mux",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
     odom_tf = Node(
         package="gyrodometry",
         executable="odom_tf",
@@ -121,7 +128,7 @@ def _setup(context, *args, **kwargs):
         parameters=[
             {
                 "use_sim_time": use_sim_time,
-                "odom_topic": "odom/gyro",
+                "odom_topic": "odom/selected",
             }
         ],
     )
@@ -137,6 +144,7 @@ def _setup(context, *args, **kwargs):
         odom_node,
         gyrodometry,
         sonodometry,
+        odom_mux,
         odom_tf,
         wait,
         lesson_include,
@@ -150,7 +158,7 @@ def _setup(context, *args, **kwargs):
             LogInfo(
                 msg=(
                     "hardware: /cmd_vel /joint_states /imu /ultrasonic from brick_hw; "
-                    "companion publishes /odom, /odom/gyro, /odom/sono, TF from /odom/gyro "
+                    "companion publishes /odom, /odom/gyro, /odom/sono; TF follows /odom/selected "
                     f"(ROS_DOMAIN_ID={domain})"
                 )
             ),
