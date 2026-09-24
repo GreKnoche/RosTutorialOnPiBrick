@@ -1,9 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { LessonCards } from "@/components/lesson-cards";
+import { LessonIndex } from "@/components/lesson-index";
 import {
   getTrackMeta,
-  lessonHref,
   lessonsForTrack,
   trackCrumbs,
   type TrackId,
@@ -44,7 +43,7 @@ export function TrackLessons({
           </Badge>
         </div>
       </section>
-      <LessonCards lessons={lessons} hrefFor={lessonHref} showSurface={showSurface} />
+      <LessonIndex lessons={lessons} showSurface={showSurface} />
     </div>
   );
 }

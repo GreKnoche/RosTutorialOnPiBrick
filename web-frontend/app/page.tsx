@@ -1,16 +1,20 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { CardIconPlaceholder } from "@/components/card-icon-placeholder";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { loadCurriculum, trackHref } from "@/lib/curriculum";
+import { LessonIndex } from "@/components/lesson-index";
+import { curriculumOutline, trackHref } from "@/lib/curriculum";
+
+function availabilityLabel(ready: number, total: number) {
+  if (ready === 0) return `${total} placeholders`;
+  const stubs = total - ready;
+  return stubs > 0 ? `${ready} ready · ${stubs} placeholders` : `${ready} ready`;
+}
 
 export default function HomePage() {
-  const { tracks } = loadCurriculum();
+  const outline = curriculumOutline();
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4">
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
           ROS 2 Jazzy · BrickPi3 · Gazebo
         </p>
@@ -19,27 +23,35 @@ export default function HomePage() {
         </h1>
       </section>
 
-      <ol className="grid gap-3 sm:grid-cols-2">
-        {tracks.map((track) => (
-          <li key={track.id}>
-            <Link href={trackHref(track.id)} className="block h-full">
-              <Card className="h-full flex-row items-start gap-3 px-(--card-spacing) transition-colors hover:bg-muted/40">
-                <CardIconPlaceholder />
-                <div className="min-w-0 flex-1">
-                  <CardHeader className="px-0">
-                    <CardTitle className="font-heading text-xl">{track.title}</CardTitle>
-                    <CardDescription>{track.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-between px-0 text-xs text-muted-foreground">
-                    <Badge variant="outline">{track.id}</Badge>
-                    <ArrowRight className="size-4 shrink-0" />
-                  </CardContent>
-                </div>
-              </Card>
-            </Link>
-          </li>
-        ))}
-      </ol>
+      {outline.map(({ track, lessons }, index) => {
+        const ready = lessons.filter((lesson) => lesson.status === "ready").length;
+        const lead = index === 0;
+        return (
+          <section
+            key={track.id}
+            className={lead ? "flex flex-col gap-3 border-l-2 border-heading pl-4" : "flex flex-col gap-3"}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="min-w-0">
+                <h2
+                  className={
+                    lead
+                      ? "font-heading text-2xl font-semibold tracking-tight text-heading"
+                      : "font-heading text-xl font-semibold tracking-tight"
+                  }
+                >
+                  <Link href={trackHref(track.id)} className="hover:underline">
+                    {track.title}
+                  </Link>
+                </h2>
+                <p className="text-sm text-muted-foreground">{track.description}</p>
+              </div>
+              <Badge variant="outline">{availabilityLabel(ready, lessons.length)}</Badge>
+            </div>
+            <LessonIndex lessons={lessons} showSurface={track.id === "nav2"} />
+          </section>
+        );
+      })}
     </div>
   );
 }

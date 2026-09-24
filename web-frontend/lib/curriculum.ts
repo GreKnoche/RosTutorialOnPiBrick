@@ -166,6 +166,29 @@ export function lessonsForTrack(track: TrackId): Lesson[] {
   return curriculum.lessons.filter((lesson) => lesson.track === track);
 }
 
+export function curriculumOutline(): { track: TrackMeta; lessons: Lesson[] }[] {
+  return curriculum.tracks.map((track) => ({
+    track,
+    lessons: lessonsForTrack(track.id),
+  }));
+}
+
+export function lessonNeighbors(lesson: Lesson): {
+  prev?: Lesson;
+  next?: Lesson;
+  index: number;
+  total: number;
+} {
+  const lessons = lessonsForTrack(lesson.track);
+  const index = lessons.findIndex((item) => item.id === lesson.id);
+  return {
+    prev: index > 0 ? lessons[index - 1] : undefined,
+    next: index >= 0 && index < lessons.length - 1 ? lessons[index + 1] : undefined,
+    index,
+    total: lessons.length,
+  };
+}
+
 export function getLesson(id: string): Lesson | undefined {
   return curriculum.lessons.find((lesson) => lesson.id === id);
 }

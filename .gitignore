@@ -29,3 +29,5 @@ pi-brick/brick_hw/config/chassis.yaml
 .vscode/
 
 brickpi.sh
+
+.ideas/
