@@ -1,3 +1,4 @@
+import { PathIcon } from "@/components/path-icon";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonIndex } from "@/components/lesson-index";
@@ -28,7 +29,8 @@ export function TrackLessons({
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
           {kicker}
         </p>
-        <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1 className="font-heading flex max-w-3xl items-center gap-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+          <PathIcon id={trackId} className="size-10" />
           {track?.title ?? trackId}
         </h1>
         <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">

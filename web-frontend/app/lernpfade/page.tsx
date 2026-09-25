@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { LessonIndex } from "@/components/lesson-index";
+import { PathIcon } from "@/components/path-icon";
 import { curriculumOutline, trackHref } from "@/lib/curriculum";
 
 function availabilityLabel(ready: number, total: number) {
@@ -25,7 +26,8 @@ export default function LearningPathsPage() {
           <section key={track.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="min-w-0">
-                <h2 className="font-heading text-xl font-semibold tracking-tight">
+                <h2 className="font-heading flex items-center gap-2 text-xl font-semibold tracking-tight">
+                  <PathIcon id={track.id} className="size-7" />
                   <Link href={trackHref(track.id)} className="hover:underline">
                     {track.title}
                   </Link>

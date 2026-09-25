@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/logo-mark";
 
 const links = [
-  { href: "/", label: "Start" },
+  { href: "/lernpfade", label: "Start" },
   { href: "/autonom", label: "Autonom" },
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
@@ -22,7 +22,7 @@ export function SiteHeader() {
   return (
     <header className="border-b border-border/80 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-3 font-medium">
+        <Link href="/lernpfade" className="flex items-center gap-3 font-medium">
           <BrandLogo className="size-11" />
           <span className="text-lg tracking-tight">EV3-Nav2-Labor</span>
         </Link>
