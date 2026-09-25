@@ -16,7 +16,7 @@ function LessonRow({
   detail: string;
 }) {
   return (
-    <li className="min-w-0">
+    <li className="min-w-0 border-b border-border">
       <Link
         href={lessonHref(lesson)}
         aria-current={current ? "page" : undefined}

@@ -18,6 +18,7 @@ function linkActive(href: string, pathname: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  if (pathname === "/") return null;
   return (
     <header className="border-b border-border/80 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
