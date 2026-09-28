@@ -5,6 +5,8 @@ import { LessonIndex } from "@/components/lesson-index";
 import { RobotLab } from "@/components/robot-lab";
 import { WheelCircumferenceAnimation } from "@/components/wheel-circumference-animation";
 import { WheelCircumferenceDrive } from "@/components/wheel-circumference-drive";
+import { WheelSeparationAnimation } from "@/components/wheel-separation-animation";
+import { WheelSeparationDrive } from "@/components/wheel-separation-drive";
 import {
   getTrackMeta,
   lessonHref,
@@ -14,29 +16,9 @@ import {
   type Lesson,
 } from "@/lib/curriculum";
 
-function ChapterLink({
-  lesson,
-  label,
-  align,
-}: {
-  lesson: Lesson;
-  label: string;
-  align: "start" | "end";
-}) {
-  return (
-    <Link
-      href={lessonHref(lesson)}
-      className={`min-w-0 hover:text-heading ${align === "end" ? "text-right" : ""}`}
-    >
-      <span className="block text-xs text-muted-foreground">{label}</span>
-      <span className="block truncate font-medium">{lesson.title}</span>
-    </Link>
-  );
-}
-
 export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
   const track = getTrackMeta(lesson.track);
-  const { prev, next, index, total } = lessonNeighbors(lesson);
+  const { next, index, total } = lessonNeighbors(lesson);
   const lessons = lessonsForTrack(lesson.track);
 
   return (
@@ -66,14 +48,26 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
               {lesson.summary}
             </p>
           </section>
-          <nav aria-label="Kapitel" className="grid grid-cols-2 gap-4 text-sm">
-            {prev ? <ChapterLink lesson={prev} label="Vorherige" align="start" /> : <span />}
-            {next ? <ChapterLink lesson={next} label="Nächste" align="end" /> : <span />}
-          </nav>
           {lesson.track === "autonom" && lesson.slug === "radumfang" ? (
             <>
+              <p className="max-w-3xl text-sm leading-7 sm:text-base">
+                In diesem ersten Kapitel lernst du, wie der Roboter aus der Drehung seiner Räder
+                eine gefahrene Strecke schätzt. Du leitest den Radumfang aus dem gemessenen
+                Durchmesser ab und prüfst ihn anschließend mit einer 1-m-Fahrt. Damit legst du die
+                Grundlage für die Odometrie und alle späteren Fahrbewegungen.
+              </p>
               <WheelCircumferenceAnimation />
               <WheelCircumferenceDrive />
+            </>
+          ) : lesson.track === "autonom" && lesson.slug === "radabstand" ? (
+            <>
+              <p className="max-w-3xl text-sm leading-7 sm:text-base">
+                Eine Strecke braucht den Umfang. Eine Drehung braucht den Abstand der
+                Aufstandspunkte. Derselbe Twin, andere Frage: Du misst den Radabstand und prüfst
+                ihn mit einer 90°-Drehung.
+              </p>
+              <WheelSeparationAnimation />
+              <WheelSeparationDrive />
             </>
           ) : (
             <RobotLab
@@ -95,6 +89,14 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
           />
         </aside>
       </div>
+      {next && (
+        <footer className="border-t border-border pt-4">
+          <Link href={lessonHref(next)} className="text-sm hover:text-heading">
+            <span className="block text-xs text-muted-foreground">Nächstes Kapitel</span>
+            <span className="block font-medium">{next.title}</span>
+          </Link>
+        </footer>
+      )}
     </div>
   );
 }

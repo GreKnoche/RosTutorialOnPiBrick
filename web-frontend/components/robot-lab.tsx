@@ -16,11 +16,22 @@ export type RulerDrive = {
   onDone: (meters: number) => void;
 };
 
+export type TurnDrive = {
+  separationCm: number;
+  leftPathCm: number;
+  rightPathCm: number;
+  runId: number;
+  resetId: number;
+  onHeading: (radians: number) => void;
+  onDone: (radians: number) => void;
+};
+
 type Props = {
   lab: LabKind;
   lessonId: string;
   showTopics?: boolean;
   ruler?: RulerDrive;
+  turn?: TurnDrive;
 };
 
 const WORLD_W = 1.35;
@@ -48,15 +59,39 @@ function drivenMeters(twin: Ev3Twin) {
   return twin.odom.pose.x - RULER_START_X;
 }
 
-function advanceWheels(twin: Ev3Twin, angle: number) {
-  twin.leftRad = angle;
-  twin.rightRad = angle;
-  twin.odom.update(angle, angle);
+function stepToward(current: number, target: number, maxStep: number) {
+  const remaining = target - current;
+  if (Math.abs(remaining) <= 1e-9) return target;
+  return current + Math.sign(remaining) * Math.min(Math.abs(remaining), maxStep);
+}
+
+function pathCmToRad(cm: number, wheelRadius: number) {
+  return cm / 100 / wheelRadius;
+}
+
+function advanceWheels(twin: Ev3Twin, leftRad: number, rightRad: number) {
+  twin.leftRad = leftRad;
+  twin.rightRad = rightRad;
+  twin.odom.update(leftRad, rightRad);
   const pose = twin.odom.pose;
   const last = twin.trail[twin.trail.length - 1];
   if (!last || Math.hypot(last.x - pose.x, last.y - pose.y) > 0.008) {
     twin.trail.push({ ...pose });
   }
+}
+
+function armTurn(twin: Ev3Twin, separationCm: number) {
+  const wheelSeparation = separationCm / 100;
+  twin.chassis = { ...DEFAULT_CHASSIS, wheelSeparation, bodyWidth: wheelSeparation };
+  twin.odom = new UnicycleOdometry(twin.chassis);
+  twin.odom.reset({ x: 0, y: 0, theta: 0 });
+  twin.cmd = { linear: 0, angular: 0 };
+  twin.goal = null;
+  twin.leftRad = 0;
+  twin.rightRad = 0;
+  twin.trail = [{ x: 0, y: 0, theta: 0 }];
+  twin.reached = false;
+  twin.odom.update(0, 0);
 }
 
 function modeFor(lab: LabKind): TwinMode {
@@ -72,14 +107,22 @@ type Snapshot = {
   goal: Pose2D | null;
 };
 
-export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
+export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const twinRef = useRef(new Ev3Twin());
   const keysRef = useRef(new Set<string>());
   const rulerRef = useRef(ruler);
-  const driveRef = useRef({ active: false, target: 0, jump: false });
+  const turnRef = useRef(turn);
+  const driveRef = useRef({
+    active: false,
+    target: 0,
+    leftTarget: 0,
+    rightTarget: 0,
+    jump: false,
+  });
   const rulerEnabled = ruler !== undefined;
+  const turnEnabled = turn !== undefined;
   const [status, setStatus] = useState("wird gestartet");
   const [snapshot, setSnapshot] = useState<Snapshot>({
     pose: { x: 0, y: 0, theta: 0 },
@@ -93,44 +136,50 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
   }, [ruler]);
 
   useEffect(() => {
+    turnRef.current = turn;
+  }, [turn]);
+
+  useEffect(() => {
     const twin = twinRef.current;
     if (rulerEnabled && rulerRef.current) armRuler(twin, rulerRef.current.circumferenceCm);
+    else if (turnEnabled && turnRef.current) armTurn(twin, turnRef.current.separationCm);
     else twin.reset();
     let last = performance.now();
     const step = () => {
       const now = performance.now();
       const dt = Math.min(0.08, Math.max(0.001, (now - last) / 1000));
       last = now;
-      const spec = rulerRef.current;
-      if (spec) {
+      const rulerSpec = rulerRef.current;
+      const turnSpec = turnRef.current;
+      if (rulerSpec) {
         const drive = driveRef.current;
         try {
           if (drive.active) {
             if (drive.jump) {
-              advanceWheels(twin, drive.target);
+              advanceWheels(twin, drive.target, drive.target);
               drive.active = false;
-              spec.onDone(drivenMeters(twin));
+              rulerSpec.onDone(drivenMeters(twin));
             } else {
               const remaining = drive.target - twin.leftRad;
               const omega = DRIVE_MPS / twin.chassis.wheelRadius;
               const stepAngle = Math.min(Math.max(0, remaining), omega * dt);
               twin.cmd = { linear: DRIVE_MPS, angular: 0 };
-              advanceWheels(twin, twin.leftRad + stepAngle);
+              advanceWheels(twin, twin.leftRad + stepAngle, twin.leftRad + stepAngle);
               if (twin.leftRad >= drive.target - 1e-6) {
                 drive.active = false;
                 twin.cmd = { linear: 0, angular: 0 };
-                spec.onDone(drivenMeters(twin));
+                rulerSpec.onDone(drivenMeters(twin));
               }
             }
           }
-          draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf, true);
+          draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf, true, false);
         } catch (err) {
           console.error(err);
           setStatus("Simulationsfehler");
           return;
         }
         const meters = drivenMeters(twin);
-        spec.onDistance(meters);
+        rulerSpec.onDistance(meters);
         setSnapshot({
           pose: { ...twin.odom.pose },
           cmd: { ...twin.cmd },
@@ -140,11 +189,57 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
         setStatus(drive.active ? "fährt am Lineal" : meters > 0.005 ? "Fahrt beendet" : "am Start");
         return;
       }
+      if (turnSpec) {
+        const drive = driveRef.current;
+        try {
+          if (drive.active) {
+            if (drive.jump) {
+              advanceWheels(twin, drive.leftTarget, drive.rightTarget);
+              drive.active = false;
+              turnSpec.onDone(twin.odom.pose.theta);
+            } else {
+              const maxStep = (DRIVE_MPS / twin.chassis.wheelRadius) * dt;
+              const left = stepToward(twin.leftRad, drive.leftTarget, maxStep);
+              const right = stepToward(twin.rightRad, drive.rightTarget, maxStep);
+              const dsLeft = (left - twin.leftRad) * twin.chassis.wheelRadius;
+              const dsRight = (right - twin.rightRad) * twin.chassis.wheelRadius;
+              twin.cmd = {
+                linear: (0.5 * (dsLeft + dsRight)) / dt,
+                angular: (dsRight - dsLeft) / twin.chassis.wheelSeparation / dt,
+              };
+              advanceWheels(twin, left, right);
+              if (
+                Math.abs(left - drive.leftTarget) < 1e-6 &&
+                Math.abs(right - drive.rightTarget) < 1e-6
+              ) {
+                drive.active = false;
+                twin.cmd = { linear: 0, angular: 0 };
+                turnSpec.onDone(twin.odom.pose.theta);
+              }
+            }
+          }
+          draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf, false, true);
+        } catch (err) {
+          console.error(err);
+          setStatus("Simulationsfehler");
+          return;
+        }
+        const heading = twin.odom.pose.theta;
+        turnSpec.onHeading(heading);
+        setSnapshot({
+          pose: { ...twin.odom.pose },
+          cmd: { ...twin.cmd },
+          rangeM: twin.rangeM,
+          goal: null,
+        });
+        setStatus(drive.active ? "dreht am Winkelmesser" : Math.abs(heading) > 0.01 ? "Drehung beendet" : "am Start");
+        return;
+      }
       const mode = modeFor(lab);
       if (mode === "teleop") twin.setTeleop(keysRef.current);
       try {
         twin.tick(dt, mode);
-        draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf, false);
+        draw(canvasRef.current, frameRef.current, twin, lab, showTopics, showTf, false, false);
       } catch (err) {
         console.error(err);
         setStatus("Simulationsfehler");
@@ -168,7 +263,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
     step();
     const id = window.setInterval(step, 50);
     return () => window.clearInterval(id);
-  }, [lab, lessonId, showTopics, rulerEnabled]);
+  }, [lab, lessonId, showTopics, rulerEnabled, turnEnabled]);
 
   useEffect(() => {
     const spec = rulerRef.current;
@@ -178,6 +273,8 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
     driveRef.current = {
       active: true,
       target: spec.revolutions * 2 * Math.PI,
+      leftTarget: 0,
+      rightTarget: 0,
       jump: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     };
   }, [rulerEnabled, ruler?.runId]);
@@ -190,13 +287,34 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
   }, [rulerEnabled, ruler?.resetId]);
 
   useEffect(() => {
+    const spec = turnRef.current;
+    if (!turnEnabled || !spec || spec.runId === 0) return;
+    const twin = twinRef.current;
+    armTurn(twin, spec.separationCm);
+    driveRef.current = {
+      active: true,
+      target: 0,
+      leftTarget: pathCmToRad(spec.leftPathCm, twin.chassis.wheelRadius),
+      rightTarget: pathCmToRad(spec.rightPathCm, twin.chassis.wheelRadius),
+      jump: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    };
+  }, [turnEnabled, turn?.runId]);
+
+  useEffect(() => {
+    const spec = turnRef.current;
+    if (!turnEnabled || !spec || spec.resetId === 0) return;
+    driveRef.current.active = false;
+    armTurn(twinRef.current, spec.separationCm);
+  }, [turnEnabled, turn?.resetId]);
+
+  useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
         e.preventDefault();
         keysRef.current.add(k);
       }
-      if (k === "r" && !rulerRef.current) twinRef.current.reset();
+      if (k === "r" && !rulerRef.current && !turnRef.current) twinRef.current.reset();
     };
     const up = (e: KeyboardEvent) => {
       keysRef.current.delete(e.key.toLowerCase());
@@ -233,7 +351,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
           <Badge variant="secondary">Simulation im Browser</Badge>
           <span className="text-xs text-muted-foreground">{status}</span>
         </div>
-        {!ruler && (
+        {!ruler && !turn && (
         <div className="flex flex-wrap gap-2">
           {lab === "teleop" && (
             <>
@@ -302,12 +420,14 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
             e.currentTarget.focus();
             onClick(e);
           }}
-          className={`block h-full w-full outline-none ${ruler ? "cursor-default" : "cursor-crosshair"}`}
+          className={`block h-full w-full outline-none ${ruler || turn ? "cursor-default" : "cursor-crosshair"}`}
         />
       </div>
       <p className="text-xs text-muted-foreground">
         {ruler
           ? "Dieselbe Simulationsfläche. Der Twin fährt geradeaus; die Strecke kommt aus der Odometrie."
+          : turn
+            ? "Dieselbe Simulationsfläche. Die Räder fahren die eingestellten Wege; der Winkel kommt aus der Odometrie."
           : lab === "teleop"
             ? "Mit W A S D oder den Pfeiltasten fahren. R setzt die Simulation zurück. Die Bewegungsberechnung entspricht ev3_core."
             : lab === "goal"
@@ -351,7 +471,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler }: Props) {
         )}
       </div>
       )}
-      {!ruler && (
+      {!ruler && !turn && (
       <p className="font-mono text-[11px] text-muted-foreground">
         r={DEFAULT_CHASSIS.wheelRadius} m · L={DEFAULT_CHASSIS.wheelSeparation} m · v_max=
         {DEFAULT_CHASSIS.maxLinear} m/s
@@ -432,7 +552,8 @@ function draw(
   lab: LabKind,
   showTopics: boolean,
   showFrames: boolean,
-  rulerMode: boolean
+  rulerMode: boolean,
+  turnMode: boolean
 ) {
   if (!canvas) return;
   const size = syncCanvasSize(canvas, frame);
@@ -480,6 +601,7 @@ function draw(
   }
 
   if (rulerMode) drawRuler(ctx, width, height, ppm, stroke);
+  if (turnMode) drawProtractor(ctx, width, height, ppm, stroke);
 
   if (twin.trail.length > 1) {
     ctx.beginPath();
@@ -527,9 +649,13 @@ function draw(
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#111318";
+  ctx.strokeStyle = "#fff7ed";
+  ctx.lineWidth = Math.max(1, stroke * 0.7);
   const wr = Math.max(twin.chassis.wheelRadius * ppm * 1.4, 6);
   ctx.fillRect(-wr, -W / 2 - wr * 0.7, wr * 2, wr * 0.7);
+  ctx.strokeRect(-wr, -W / 2 - wr * 0.7, wr * 2, wr * 0.7);
   ctx.fillRect(-wr, W / 2, wr * 2, wr * 0.7);
+  ctx.strokeRect(-wr, W / 2, wr * 2, wr * 0.7);
   ctx.fillStyle = "#fff7ed";
   ctx.beginPath();
   ctx.moveTo(L / 2 + 6, 0);
@@ -549,6 +675,8 @@ function draw(
   ctx.font = `${Math.max(11, ppm * 0.028)}px ui-sans-serif, system-ui`;
   const hint = rulerMode
     ? "Geradeaus bis zur orangen 1-m-Marke"
+    : turnMode
+      ? "Der Kreis zeigt den Drehwinkel"
     : lab === "teleop"
       ? "Mit WASD / Pfeiltasten fahren · R setzt zurück"
       : lab === "goal"
@@ -558,7 +686,7 @@ function draw(
         : "Nur Roboterschnittstelle — keine Steuerung";
   ctx.fillText(hint, 14, height - 16);
 
-  if (lab === "none" && !rulerMode) {
+  if (lab === "none" && !rulerMode && !turnMode) {
     ctx.fillStyle = "rgba(8,10,14,0.45)";
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = "rgba(255,255,255,0.88)";
@@ -619,6 +747,57 @@ function drawRuler(
   ctx.fillStyle = "#fdba74";
   ctx.textAlign = "center";
   ctx.fillText("1 m", markTop.x, markTop.y - 8);
+  ctx.textAlign = "start";
+}
+
+function drawProtractor(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  ppm: number,
+  stroke: number
+) {
+  const origin = worldToScreen(0, 0, width, height);
+  const radiusM = 0.3;
+  const r = radiusM * ppm;
+
+  ctx.strokeStyle = "#d6d3d1";
+  ctx.lineWidth = Math.max(2, stroke * 1.4);
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = `${Math.max(11, ppm * 0.028)}px ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let deg = 0; deg < 360; deg += 15) {
+    const rad = (deg * Math.PI) / 180;
+    const inner = worldToScreen(
+      Math.cos(rad) * (radiusM - 0.02),
+      Math.sin(rad) * (radiusM - 0.02),
+      width,
+      height
+    );
+    const outer = worldToScreen(Math.cos(rad) * radiusM, Math.sin(rad) * radiusM, width, height);
+    const major = deg % 90 === 0;
+    ctx.strokeStyle = "#d6d3d1";
+    ctx.lineWidth = major ? Math.max(2, stroke * 1.4) : stroke;
+    ctx.beginPath();
+    ctx.moveTo(inner.x, inner.y);
+    ctx.lineTo(outer.x, outer.y);
+    ctx.stroke();
+    if (deg % 45 === 0) {
+      const label = worldToScreen(
+        Math.cos(rad) * (radiusM + 0.045),
+        Math.sin(rad) * (radiusM + 0.045),
+        width,
+        height
+      );
+      ctx.fillStyle = "#d6d3d1";
+      ctx.fillText(`${deg}°`, label.x, label.y);
+    }
+  }
+  ctx.textBaseline = "alphabetic";
   ctx.textAlign = "start";
 }
 

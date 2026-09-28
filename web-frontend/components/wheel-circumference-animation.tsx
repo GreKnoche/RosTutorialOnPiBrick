@@ -171,7 +171,8 @@ export function WheelCircumferenceAnimation() {
       <div className="grid gap-2 px-4 py-3 text-sm leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
         <p>
           Die orange Außenkante löst sich beim Drehen vom Rad und bleibt auf dem Boden liegen.
-          Ohne Rutschen ist sie nach einer Umdrehung genauso lang wie der Radumfang.
+          Ohne Rutschen ist sie nach einer Umdrehung genauso lang wie der Radumfang. Die Kante
+          bleibt nur dann liegen, wenn der Reifen am Boden greift.
         </p>
         <p className="font-mono text-xs text-muted-foreground">U = π · d = 2 · π · r</p>
       </div>

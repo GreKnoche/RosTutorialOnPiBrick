@@ -36,7 +36,7 @@ const curriculum: Curriculum = {
       title: "Vom Rad zur Strecke – Radumfang verstehen",
       status: "stub",
       summary:
-        "Verstehen, wie aus Radumdrehungen eine Strecke entsteht und warum der Radumfang stimmen muss.",
+        "Der Radumfang entsteht aus dem Durchmesser, und ohne Rutschen ergibt die Zahl der Umdrehungen die richtige Strecke.",
       track: "autonom",
       lab: "none",
     },
@@ -46,7 +46,7 @@ const curriculum: Curriculum = {
       title: "Von zwei Rädern zur Drehung – Radabstand verstehen",
       status: "stub",
       summary:
-        "Untersuchen, wie linker und rechter Radweg zusammen mit dem Radabstand die Drehung bestimmen.",
+        "Der Radabstand liegt zwischen den Aufstandspunkten, und ohne Rutschen ergibt die Wegdifferenz geteilt durch den Abstand den Drehwinkel.",
       track: "autonom",
       lab: "none",
     },
