@@ -56,7 +56,7 @@ const curriculum: Curriculum = {
       title: "Odometrie – Wo glaubt der Roboter zu sein?",
       status: "stub",
       summary:
-        "Radumfang und Radabstand zu einer fortlaufenden Schätzung von Position und Orientierung verbinden.",
+        "Feste Punkte mit Umdrehungen anfahren: im Code setzt du Umfang, Abstand und wie oft links und rechts drehen.",
       track: "autonom",
       lab: "none",
     },

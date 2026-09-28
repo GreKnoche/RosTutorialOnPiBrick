@@ -7,6 +7,8 @@ import { WheelCircumferenceAnimation } from "@/components/wheel-circumference-an
 import { WheelCircumferenceDrive } from "@/components/wheel-circumference-drive";
 import { WheelSeparationAnimation } from "@/components/wheel-separation-animation";
 import { WheelSeparationDrive } from "@/components/wheel-separation-drive";
+import { OdometryPathAnimation } from "@/components/odometry-path-animation";
+import { OdometryPathDrive } from "@/components/odometry-path-drive";
 import {
   getTrackMeta,
   lessonHref,
@@ -29,9 +31,7 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
-              <Badge variant={lesson.status === "ready" ? "default" : "outline"}>
-                {lesson.status === "ready" ? "verfügbar" : "Entwurf"}
-              </Badge>
+              {lesson.status === "ready" ? <Badge variant="default">verfügbar</Badge> : null}
               {index >= 0 && (
                 <span className="text-xs text-muted-foreground">
                   {index + 1} / {total}
@@ -68,6 +68,17 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
               </p>
               <WheelSeparationAnimation />
               <WheelSeparationDrive />
+            </>
+          ) : lesson.track === "autonom" && lesson.slug === "odometrie" ? (
+            <>
+              <p className="max-w-3xl text-sm leading-7 sm:text-base">
+                Die Punkte liegen schon in der Fläche. Im Code setzt du zuerst Radumfang und
+                Radabstand, dann die Umdrehungen jedes Rads. Gleiche Umdrehungen halten gerade,
+                ungleiche drehen — für 90° mit einem stehenden Rad ist n = (L · π / 2) / U. Die
+                Pose zeigt, wo der Twin zu sein glaubt.
+              </p>
+              <OdometryPathAnimation />
+              <OdometryPathDrive />
             </>
           ) : (
             <RobotLab

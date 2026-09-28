@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ReplayFigure } from "@/components/replay-figure";
 
 const LEFT_X = 260;
 const LEFT_Y = 300;
@@ -10,30 +9,10 @@ const WHEEL_R = 28;
 const ARC_LENGTH = Math.round((SEPARATION * Math.PI) / 2);
 
 export function WheelSeparationAnimation() {
-  const [run, setRun] = useState(0);
-
   return (
-    <section
-      aria-labelledby="separation-animation-title"
-      className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Animation
-          </p>
-          <h2
-            id="separation-animation-title"
-            className="font-heading mt-1 text-lg font-semibold text-heading"
-          >
-            Ungleicher Radweg wird zur Drehung
-          </h2>
-        </div>
-        <Button type="button" onClick={() => setRun((value) => value + 1)}>
-          Noch einmal
-        </Button>
-      </div>
-
+    <ReplayFigure id="separation-animation-title" title="Ungleicher Radweg wird zur Drehung">
+      {(run) => (
+        <>
       <div className="bg-[#12110e] p-3 sm:p-5">
         <svg
           key={run}
@@ -285,6 +264,8 @@ export function WheelSeparationAnimation() {
           }
         }
       `}</style>
-    </section>
+        </>
+      )}
+    </ReplayFigure>
   );
 }

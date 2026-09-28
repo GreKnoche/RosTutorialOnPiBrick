@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
 import { PROGRESS_EVENT, readCompleted } from "@/lib/progress";
 
 export function useCompletedKeys() {
@@ -19,9 +18,4 @@ export function useCompletedKeys() {
   }, []);
 
   return keys;
-}
-
-export function CompletedMark({ done }: { done: boolean }) {
-  if (!done) return null;
-  return <Check aria-label="abgeschlossen" className="size-4 shrink-0 text-heading" />;
 }

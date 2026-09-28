@@ -1,36 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ReplayFigure } from "@/components/replay-figure";
 
 const RADIUS = 60;
 const CIRCUMFERENCE = Math.round(2 * Math.PI * RADIUS);
 
 export function WheelCircumferenceAnimation() {
-  const [run, setRun] = useState(0);
-
   return (
-    <section
-      aria-labelledby="wheel-animation-title"
-      className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Animation
-          </p>
-          <h2
-            id="wheel-animation-title"
-            className="font-heading mt-1 text-lg font-semibold text-heading"
-          >
-            Eine Umdrehung wird zur Strecke
-          </h2>
-        </div>
-        <Button type="button" onClick={() => setRun((value) => value + 1)}>
-          Noch einmal
-        </Button>
-      </div>
-
+    <ReplayFigure id="wheel-animation-title" title="Eine Umdrehung wird zur Strecke">
+      {(run) => (
+        <>
       <div className="bg-[#12110e] p-3 sm:p-5">
         <svg
           key={run}
@@ -287,6 +266,8 @@ export function WheelCircumferenceAnimation() {
           }
         }
       `}</style>
-    </section>
+        </>
+      )}
+    </ReplayFigure>
   );
 }

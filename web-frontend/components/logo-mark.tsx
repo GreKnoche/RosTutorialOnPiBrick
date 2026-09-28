@@ -19,6 +19,37 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
+const twinScale = 1.4;
+
+export function TwinStamp() {
+  return (
+    <span
+      aria-label="erledigt"
+      title="erledigt"
+      className="inline-flex size-12 shrink-0 -rotate-12 items-center justify-center"
+    >
+      <svg viewBox="0 0 64 64" className="size-12" aria-hidden>
+        <circle cx="32" cy="32" r="29" fill="#e5f6eb" stroke="#1c8c46" strokeWidth="2.25" />
+        <circle cx="32" cy="32" r="25" fill="none" stroke="#1c8c46" strokeWidth="1.15" opacity="0.55" />
+        <path
+          d="M15 33.5 26 45 50 18"
+          fill="none"
+          stroke="#1c8c46"
+          strokeWidth="5.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <g transform={`translate(32 32) scale(${twinScale})`}>
+          <rect x="-3.2" y="-8.6" width="6.6" height="2.5" rx="0.5" fill="#111318" />
+          <rect x="-3.2" y="6.1" width="6.6" height="2.5" rx="0.5" fill="#111318" />
+          <rect x="-6.4" y="-5.6" width="11.4" height="11.2" rx="1.5" fill="#e11d2e" stroke="#fff7ed" strokeWidth="0.7" />
+          <path d="M7.6 0 3.4 -3.4v6.8z" fill="#fff7ed" />
+        </g>
+      </svg>
+    </span>
+  );
+}
+
 export function BrandLogo({ className }: { className?: string }) {
   return (
     <span
