@@ -4,7 +4,7 @@ export default function AutonomPage() {
   return (
     <TrackLessons
       trackId="autonom"
-      kicker="Grundlagenkurs · Fahrzeug, Sensorik und Regelung"
+      kicker="Themenkonzept · vom Rad zur autonomen Reaktion"
     />
   );
 }

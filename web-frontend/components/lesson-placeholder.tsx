@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonIndex } from "@/components/lesson-index";
 import { RobotLab } from "@/components/robot-lab";
+import { WheelCircumferenceAnimation } from "@/components/wheel-circumference-animation";
+import { WheelCircumferenceDrive } from "@/components/wheel-circumference-drive";
 import {
   getTrackMeta,
   lessonHref,
@@ -68,11 +70,18 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
             {prev ? <ChapterLink lesson={prev} label="Vorherige" align="start" /> : <span />}
             {next ? <ChapterLink lesson={next} label="Nächste" align="end" /> : <span />}
           </nav>
-          <RobotLab
-            lab={lesson.lab}
-            lessonId={lesson.id}
-            showTopics={lesson.track !== "autonom"}
-          />
+          {lesson.track === "autonom" && lesson.slug === "radumfang" ? (
+            <>
+              <WheelCircumferenceAnimation />
+              <WheelCircumferenceDrive />
+            </>
+          ) : (
+            <RobotLab
+              lab={lesson.lab}
+              lessonId={lesson.id}
+              showTopics={lesson.track !== "autonom"}
+            />
+          )}
         </div>
         <aside className="flex flex-col gap-2">
           <h2 className="px-2 text-sm font-medium text-heading">

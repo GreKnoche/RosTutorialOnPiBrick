@@ -1,13 +1,22 @@
 import type { Crumb, Curriculum, Lesson, TrackId, TrackMeta } from "@/lib/types";
 
-export type { Crumb, Curriculum, LabKind, Lesson, LessonStatus, TrackId, TrackMeta } from "@/lib/types";
+export type {
+  Crumb,
+  Curriculum,
+  LabKind,
+  Lesson,
+  LessonStatus,
+  TrackId,
+  TrackMeta,
+} from "@/lib/types";
 
 const curriculum: Curriculum = {
   tracks: [
     {
       id: "autonom",
       title: "Grundlagen des autonomen Fahrens",
-      description: "Fahrzeugmodell, Kinematik, Sensorik und einfache autonome Fahrmanöver.",
+      description:
+        "Vom Radumfang über Odometrie und Sensorik bis zum einfachen autonomen Verhalten.",
     },
     {
       id: "ros",
@@ -22,67 +31,84 @@ const curriculum: Curriculum = {
   ],
   lessons: [
     {
-      id: "00",
-      slug: "modell",
-      title: "Fahrzeugmodell und Koordinatensysteme",
+      id: "01",
+      slug: "radumfang",
+      title: "Vom Rad zur Strecke – Radumfang verstehen",
       status: "stub",
-      summary: "Das zweirädrige Fahrzeug, seine Bewegungsachsen und seine Lage in der Ebene verstehen.",
+      summary:
+        "Verstehen, wie aus Radumdrehungen eine Strecke entsteht und warum der Radumfang stimmen muss.",
       track: "autonom",
       lab: "none",
     },
     {
-      id: "01",
-      slug: "raeder",
-      title: "Räder, Spurweite und Kinematik",
-      status: "stub",
-      summary: "Aus Raddrehzahlen eine Vorwärts- und Drehbewegung des Roboters bestimmen.",
-      track: "autonom",
-      lab: "teleop",
-    },
-    {
       id: "02",
-      slug: "fahren",
-      title: "Geschwindigkeit steuern",
+      slug: "radabstand",
+      title: "Von zwei Rädern zur Drehung – Radabstand verstehen",
       status: "stub",
-      summary: "Den EV3 vorwärts, rückwärts und auf Kurven fahren lassen.",
+      summary:
+        "Untersuchen, wie linker und rechter Radweg zusammen mit dem Radabstand die Drehung bestimmen.",
       track: "autonom",
-      lab: "teleop",
+      lab: "none",
     },
     {
       id: "03",
       slug: "odometrie",
-      title: "Encoder und Odometrie",
+      title: "Odometrie – Wo glaubt der Roboter zu sein?",
       status: "stub",
-      summary: "Aus den Radbewegungen die zurückgelegte Strecke und die aktuelle Pose schätzen.",
+      summary:
+        "Radumfang und Radabstand zu einer fortlaufenden Schätzung von Position und Orientierung verbinden.",
       track: "autonom",
-      lab: "teleop",
+      lab: "none",
     },
     {
       id: "04",
-      slug: "sensorik",
-      title: "Gyroskop und Ultraschallsensor einbeziehen",
+      slug: "kalibrierung-drift",
+      title: "Kalibrierung und Drift – Warum stimmt die Pose nicht?",
       status: "stub",
-      summary: "Odometrie mit Drehrate und Abstandsmessungen ergänzen und Abweichungen erkennen.",
+      summary:
+        "Systematische Parameterfehler von zufälligem Schlupf unterscheiden und durch Testfahrten sichtbar machen.",
       track: "autonom",
-      lab: "teleop",
+      lab: "none",
     },
     {
       id: "05",
-      slug: "ziel",
-      title: "Zu einer Zielpose fahren",
+      slug: "gyroskop",
+      title: "Gyroskop – Orientierung zusätzlich beobachten",
       status: "stub",
-      summary: "Mit einem einfachen Regler eine gewünschte Position und Ausrichtung anfahren.",
+      summary:
+        "Die Orientierungsänderung unabhängig von den Rädern beobachten und mit der Odometrie vergleichen.",
       track: "autonom",
-      lab: "goal",
+      lab: "none",
     },
     {
       id: "06",
-      slug: "mission",
-      title: "Eine autonome Mission ausführen",
+      slug: "zielregelung",
+      title: "Zielregelung – Mit der geschätzten Pose ein Ziel anfahren",
       status: "stub",
-      summary: "Mehrere Ziele nacheinander anfahren und auf Hindernisse reagieren.",
+      summary:
+        "Aus aktueller Pose, Ziel und Richtungsfehler fortlaufend passende Fahrbefehle erzeugen.",
       track: "autonom",
-      lab: "goal",
+      lab: "none",
+    },
+    {
+      id: "07",
+      slug: "ultraschall",
+      title: "Ultraschall – Hindernisse in Fahrtrichtung erkennen",
+      status: "stub",
+      summary:
+        "Reichweite, Blickrichtung und Grenzen einer einfachen Abstandsmessung untersuchen.",
+      track: "autonom",
+      lab: "none",
+    },
+    {
+      id: "08",
+      slug: "schaetzen-regeln-reagieren",
+      title: "Abschluss – Schätzen, Regeln, Reagieren",
+      status: "stub",
+      summary:
+        "Odometrie, Gyroskop, Zielregelung und Ultraschall zu einer einfachen Autonomie-Schleife verbinden.",
+      track: "autonom",
+      lab: "none",
     },
     {
       id: "00",
