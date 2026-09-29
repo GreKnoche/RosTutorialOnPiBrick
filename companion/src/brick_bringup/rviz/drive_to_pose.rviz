@@ -33,7 +33,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: true
-      Enabled: true
+      Enabled: MAP_DISPLAY_ENABLED
       Name: Map
       Topic:
         Depth: 1
@@ -370,7 +370,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: FIXED_FRAME_PLACEHOLDER
     Frame Rate: 30
   Name: root
   Tools:

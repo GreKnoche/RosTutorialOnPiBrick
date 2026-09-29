@@ -60,8 +60,16 @@ def _setup(context, *args, **kwargs):
     )
     bringup_share = get_package_share_directory("brick_bringup")
     rviz_template = os.path.join(bringup_share, "rviz", "drive_to_pose.rviz")
+    # Gazebo has map → odom. Hardware and the sim twin only have odom → base_link.
+    fixed_frame = "map" if backend == "gazebo" else "odom"
+    map_enabled = "true" if backend == "gazebo" else "false"
     with open(rviz_template, encoding="utf-8") as handle:
-        rviz_body = handle.read().replace("URDF_PATH_PLACEHOLDER", urdf_path)
+        rviz_body = (
+            handle.read()
+            .replace("URDF_PATH_PLACEHOLDER", urdf_path)
+            .replace("FIXED_FRAME_PLACEHOLDER", fixed_frame)
+            .replace("MAP_DISPLAY_ENABLED", map_enabled)
+        )
     rviz_config = os.path.join(tempfile.gettempdir(), "brick_drive_to_pose.rviz")
     with open(rviz_config, "w", encoding="utf-8") as handle:
         handle.write(rviz_body)
@@ -113,12 +121,19 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
+    # map_match (and /odom/matched) only runs with the Gazebo relief map.
+    selected_source = "odom/matched" if backend == "gazebo" else "odom/gyro"
     odom_mux = Node(
         package="brick_nav",
         executable="odom_mux",
         name="odom_mux",
         output="screen",
-        parameters=[{"use_sim_time": use_sim_time}],
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "selected_source": selected_source,
+            }
+        ],
     )
     odom_tf = Node(
         package="gyrodometry",

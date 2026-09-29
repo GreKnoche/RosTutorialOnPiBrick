@@ -34,7 +34,7 @@ class OdomMux(Node):
     def __init__(self) -> None:
         super().__init__("odom_mux")
         sources = list(self.declare_parameter("source_topics", DEFAULT_SOURCES).value)
-        selected = str(self.declare_parameter("selected_source", "odom/matched").value)
+        selected = str(self.declare_parameter("selected_source", "odom/gyro").value)
         publish_topic = str(self.declare_parameter("publish_topic", "odom/selected").value)
 
         self._sources = [topic_key(source) for source in sources if topic_key(source)]
