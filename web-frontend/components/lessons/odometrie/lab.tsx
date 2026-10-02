@@ -130,6 +130,12 @@ export function OdometrieLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
             run.setBanner("hidden");
           }
         }}
+        onRestart={() => {
+          setLabIndex(0);
+          setCleared(false);
+          setTrail([ORIGIN]);
+          run.restart();
+        }}
         running={run.session.running}
         driveDisabled={run.bannerUp || Boolean(program.error) || program.segments.length === 0}
         onDrive={() => {

@@ -12,6 +12,9 @@ export function useMissionChecklist(ids: readonly string[]) {
   const mark = useCallback((id: string) => {
     setDone((current) => ({ ...current, [id]: true }));
   }, []);
+  const reset = useCallback(() => {
+    setDone({});
+  }, []);
 
   return {
     done,
@@ -19,6 +22,7 @@ export function useMissionChecklist(ids: readonly string[]) {
     index: allDone ? ids.length : openIndex + 1,
     allDone,
     mark,
+    reset,
   };
 }
 
@@ -32,6 +36,11 @@ export function useMissionRun(options: { track: TrackId; lessonId: string; allDo
     setDoneTitle(title);
     setBanner("success");
   }, []);
+  const restart = useCallback(() => {
+    setDoneTitle(null);
+    setBanner("task");
+    session.reset();
+  }, [session.reset]);
 
-  return { session, banner, setBanner, doneTitle, succeed, bannerUp };
+  return { session, banner, setBanner, doneTitle, succeed, restart, bannerUp };
 }

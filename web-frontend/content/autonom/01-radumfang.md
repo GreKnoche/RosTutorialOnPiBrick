@@ -18,7 +18,7 @@ Den Durchmesser kann man am Rad messen. U = π · d, das ist dasselbe wie 2 · �
 eyebrow: Kalibrierung
 title: Von der Rechnung zur 1-m-Fahrt
 
-Der berechnete Radumfang ist ein theoretischer Wert. Später lässt du den echten Roboter die berechnete Anzahl Umdrehungen auf einem Maßband fahren und misst die wirkliche Strecke. Aus dem Vergleich mit der geschätzten Strecke erhältst du einen Korrekturwert für die Kalibrierung des Umfangs. Ein Meter eignet sich dafür gut: Kleine Fehler werden messbar, und die Strecke passt auf einen Tisch oder in einen Flur. Über mehrere Meter summiert sich derselbe Fehler, und ein kalibrierter Umfang macht jede Strecke und Drehung genauer. Darum übst du denselben 1-m-Test zuerst hier im Twin: einmal mit dem berechneten Umfang, einmal mit einem anderen.
+Der berechnete Radumfang ist ein theoretischer Wert. Später lässt du den echten Roboter die berechnete Anzahl Umdrehungen auf einem Maßband fahren und misst die wirkliche Strecke. Aus dem Vergleich mit der geschätzten Strecke erhältst du einen Korrekturwert für die Kalibrierung des Umfangs. Ein Meter eignet sich dafür gut: Kleine Fehler werden messbar, und die Strecke passt auf einen Tisch oder in einen Flur. Über mehrere Meter summiert sich derselbe Fehler, und ein kalibrierter Umfang macht jede Strecke und Drehung genauer. Darum übst du denselben 1-m-Test zuerst hier im Twin: einmal mit 17,4 cm Umfang, einmal mit möglichst wenig Umdrehungen.
 
 ## ruler-drive
 
@@ -32,17 +32,17 @@ title: Umdrehungen für 1 m
 
 ## missions
 
-intro: Zwei Wege, dieselbe Strecke.
+intro: Zwei Vorgaben, dieselbe Strecke.
 
 ### theory
-title: Berechneter Umfang
-hint: Fahre 1 m mit dem Umfang aus der Rechnung π · d.
-task: Fahre 1 m
+title: 17,4 cm Umfang
+hint: Fahre 1 m. Der Radumfang bleibt bei 17,4 cm.
+task: Fahre 1 m mit 17,4 cm Umfang
 
 ### other
-title: Anderer Umfang
-hint: Fahre 1 m mit einem anderen Umfang. Die Umdrehungen gleichen das aus.
-task: Fahre 1 m mit anderem Umfang
+title: Wenig Umdrehungen
+hint: Fahre 1 m mit möglichst wenig Umdrehungen.
+task: Fahre 1 m mit möglichst wenig Umdrehungen.
 
 ## feedback
 
@@ -50,5 +50,5 @@ idle: Stelle Radumfang und Umdrehungen ein, dann fahre bis zur 1-m-Marke.
 short: Noch zu kurz. Verändere Radumfang oder Umdrehungen.
 long: Noch zu weit. Verändere Radumfang oder Umdrehungen.
 hit: Getroffen — Mission „{title}“.
-theory-needed: 1 m stimmen. Für die erste Mission den Umfang aus π · d nehmen. Berechnen setzt ihn.
-other-needed: 1 m stimmen, aber das ist noch der berechnete Umfang. Für die zweite Mission nimm einen anderen.
+theory-needed: 1 m stimmen. Für die erste Mission den Radumfang auf 17,4 cm setzen.
+other-needed: 1 m stimmen. Für die zweite Mission möglichst wenig Umdrehungen.

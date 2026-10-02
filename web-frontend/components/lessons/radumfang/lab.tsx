@@ -17,7 +17,11 @@ const DIAMETER_MAX = 12;
 const CIRCUMFERENCE_MIN = 8;
 const CIRCUMFERENCE_MAX = 40;
 const START_DIAMETER_CM = 5.54;
-const THEORY_MATCH_CM = 1;
+const FORMULA_SYNC_CM = 1;
+const THEORY_CIRCUMFERENCE_CM = 17.4;
+const THEORY_MATCH_CM = 0.05;
+const MIN_REVOLUTIONS = 2.5;
+const REVOLUTION_MATCH = 0.05;
 
 export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: string }) {
   const missionIds = copy.missions.items.map((item) => item.id);
@@ -36,8 +40,8 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
   const hit = Math.abs(distanceM - TARGET_M) <= TOLERANCE_M;
   const open = copy.missions.items.find((item) => item.id === checklist.openId) ?? null;
   const missionKind = classifyMission(
-    diameterCm,
     circumferenceCm,
+    revolutions,
     Boolean(checklist.done.theory),
   );
   const drive = copy.sections["ruler-drive"];
@@ -77,7 +81,7 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
                   );
                   const previous = circumferenceFromDiameter(diameterCm);
                   setDiameterCm(nextDiameter);
-                  if (Math.abs(circumferenceCm - previous) <= THEORY_MATCH_CM) {
+                  if (Math.abs(circumferenceCm - previous) <= FORMULA_SYNC_CM) {
                     setCircumferenceCm(circumferenceFromDiameter(nextDiameter));
                   }
                   setResultCm(null);
@@ -135,8 +139,8 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
             if (Math.abs(meters - TARGET_M) > TOLERANCE_M) return;
             const next = copy.missions.items.find((item) => item.id === checklist.openId);
             const kind = classifyMission(
-              diameterCm,
               circumferenceCm,
+              revolutions,
               Boolean(checklist.done.theory),
             );
             if (!next || kind !== next.id) return;
@@ -152,6 +156,11 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
         task={open?.task ?? ""}
         successTitle={run.doneTitle}
         onBannerNext={() => run.setBanner(run.banner === "success" ? "task" : "hidden")}
+        onRestart={() => {
+          setDistanceM(0);
+          checklist.reset();
+          run.restart();
+        }}
         running={run.session.running}
         driveDisabled={run.bannerUp}
         onDrive={() => {
@@ -210,13 +219,14 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
 }
 
 function classifyMission(
-  diameterCm: number,
   circumferenceCm: number,
+  revolutions: number,
   theoryDone: boolean,
 ): string | null {
-  const delta = Math.abs(circumferenceCm - diameterCm * Math.PI);
-  if (delta <= THEORY_MATCH_CM) return theoryDone ? null : "theory";
-  return theoryDone ? "other" : null;
+  const theory = Math.abs(circumferenceCm - THEORY_CIRCUMFERENCE_CM) <= THEORY_MATCH_CM;
+  const few = Math.abs(revolutions - MIN_REVOLUTIONS) <= REVOLUTION_MATCH;
+  if (!theoryDone) return theory ? "theory" : null;
+  return few ? "other" : null;
 }
 
 function circumferenceFromDiameter(diameterCm: number) {

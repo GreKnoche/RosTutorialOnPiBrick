@@ -25,6 +25,7 @@ export function LessonStudio({
   task,
   successTitle,
   onBannerNext,
+  onRestart,
   running,
   driveDisabled,
   onDrive,
@@ -52,6 +53,7 @@ export function LessonStudio({
   task: string;
   successTitle: string | null;
   onBannerNext: () => void;
+  onRestart?: () => void;
   running: boolean;
   driveDisabled?: boolean;
   onDrive: () => void;
@@ -75,7 +77,7 @@ export function LessonStudio({
         path={path}
         overlay={
           allDone ? (
-            <MissionStamp href={stampHref} />
+            <MissionStamp href={stampHref} onRestart={onRestart} />
           ) : banner === "hidden" ? null : (
             <MissionBanner
               index={missionIndex}

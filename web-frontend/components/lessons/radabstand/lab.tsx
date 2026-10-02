@@ -145,6 +145,11 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
         task={open?.task ?? ""}
         successTitle={run.doneTitle}
         onBannerNext={() => run.setBanner(run.banner === "success" ? "task" : "hidden")}
+        onRestart={() => {
+          setHeadingRad(0);
+          checklist.reset();
+          run.restart();
+        }}
         running={run.session.running}
         driveDisabled={run.bannerUp}
         onDrive={() => {
