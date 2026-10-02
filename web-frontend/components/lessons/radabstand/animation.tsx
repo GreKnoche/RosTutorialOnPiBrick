@@ -8,9 +8,9 @@ const SEPARATION = 170;
 const WHEEL_R = 28;
 const ARC_LENGTH = Math.round((SEPARATION * Math.PI) / 2);
 
-export function WheelSeparationAnimation() {
+export function RadabstandAnimation({ title }: { title: string }) {
   return (
-    <ReplayFigure id="separation-animation-title" title="Ungleicher Radweg wird zur Drehung">
+    <ReplayFigure id="separation-animation-title" title={title}>
       {(run) => (
         <>
       <div className="bg-[#12110e] p-3 sm:p-5">

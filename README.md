@@ -8,7 +8,7 @@ ROS 2 Jazzy lab: BrickPi3 on a Raspberry Pi, companion odometry and Nav2 on a la
 | [`companion/`](companion/) | Laptop overlay: odom integrator, drive-to-pose, later Nav2. |
 | [`pi-brick/`](pi-brick/) | Raspberry Pi + BrickPi3 ROS 2 Docker node. |
 | [`gazebo/`](gazebo/) | Gazebo Harmonic overlay + `ros_gz_bridge`. |
-| [`web-frontend/`](web-frontend/) | Next.js lesson UI. |
+| [`web-frontend/`](web-frontend/) | Next.js lesson UI. [How to add a lesson](web-frontend/README.md). |
 
 Drive-to-pose (odom only):
 

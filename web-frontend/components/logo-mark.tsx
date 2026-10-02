@@ -21,14 +21,14 @@ export function LogoMark({ className }: { className?: string }) {
 
 const twinScale = 1.4;
 
-export function TwinStamp() {
+export function TwinStamp({ className = "size-12" }: { className?: string }) {
   return (
     <span
       aria-label="erledigt"
       title="erledigt"
-      className="inline-flex size-12 shrink-0 -rotate-12 items-center justify-center"
+      className={`inline-flex shrink-0 -rotate-12 items-center justify-center ${className}`}
     >
-      <svg viewBox="0 0 64 64" className="size-12" aria-hidden>
+      <svg viewBox="0 0 64 64" className="size-full" aria-hidden>
         <circle cx="32" cy="32" r="29" fill="#e5f6eb" stroke="#1c8c46" strokeWidth="2.25" />
         <circle cx="32" cy="32" r="25" fill="none" stroke="#1c8c46" strokeWidth="1.15" opacity="0.55" />
         <path

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { LessonPlaceholder } from "@/components/lesson-placeholder";
+import { LessonPage } from "@/components/lessons/lesson-page";
 import { getLessonBySlug, lessonsForTrack } from "@/lib/curriculum";
 
 export function generateStaticParams() {
@@ -14,5 +14,5 @@ export default async function RosLessonPage({
   const { slug } = await params;
   const lesson = getLessonBySlug("ros", slug);
   if (!lesson) notFound();
-  return <LessonPlaceholder lesson={lesson} />;
+  return <LessonPage lesson={lesson} />;
 }

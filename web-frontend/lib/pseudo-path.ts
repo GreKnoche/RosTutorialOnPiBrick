@@ -39,7 +39,47 @@ export type WheelProgram = {
   error: string | null;
 };
 
-export type MissionId = "first" | "all";
+export type GoalCm = { x: number; y: number };
+
+export type OdomLabId = "left" | "return" | "square" | "star";
+
+export type OdomLab = {
+  id: OdomLabId;
+  goalsCm: GoalCm[];
+};
+
+export const ODOM_LABS: OdomLab[] = [
+  {
+    id: "left",
+    goalsCm: [{ x: 0, y: 24 }],
+  },
+  {
+    id: "return",
+    goalsCm: [
+      { x: 24, y: 0 },
+      { x: -24, y: 0 },
+    ],
+  },
+  {
+    id: "square",
+    goalsCm: [
+      { x: 24, y: 0 },
+      { x: 24, y: 24 },
+      { x: 0, y: 24 },
+      { x: 0, y: 0 },
+    ],
+  },
+  {
+    id: "star",
+    goalsCm: [
+      { x: 0, y: -22 },
+      { x: 13, y: 18 },
+      { x: -21, y: -7 },
+      { x: 21, y: -7 },
+      { x: -13, y: 18 },
+    ],
+  },
+];
 
 export function parseWheelProgram(source: string): WheelProgram {
   let circumferenceCm: number | null = null;
@@ -152,11 +192,52 @@ export function orderedGoalHits(trail: Pose2D[], goalsCm = LESSON_GOALS_CM, hitM
   return next;
 }
 
-export function classifyHits(trail: Pose2D[], goalsCm = LESSON_GOALS_CM): MissionId | null {
-  const count = orderedGoalHits(trail, goalsCm);
-  if (count >= goalsCm.length) return "all";
-  if (count >= 1) return "first";
-  return null;
+export function orderedGoalFlags(trail: Pose2D[], goalsCm: GoalCm[], hitM = GOAL_HIT_M): boolean[] {
+  const count = orderedGoalHits(trail, goalsCm, hitM);
+  return goalsCm.map((_, index) => index < count);
+}
+
+export type HeadingStep = {
+  from: string;
+  to: string;
+  degrees: number;
+};
+
+export function headingSteps(goalsCm: GoalCm[]): HeadingStep[] {
+  const points: GoalCm[] = [{ x: 0, y: 0 }, ...goalsCm];
+  let heading = 0;
+  const steps: HeadingStep[] = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const from = points[index];
+    const to = points[index + 1];
+    if (!from || !to) continue;
+    const bearing = (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
+    let delta = bearing - heading;
+    while (delta > 180) delta -= 360;
+    while (delta <= -180) delta += 360;
+    if (Math.abs(Math.abs(delta) - 180) < 1e-6) delta = 180;
+    steps.push({
+      from: index === 0 ? "Start" : String(index),
+      to: String(index + 1),
+      degrees: delta,
+    });
+    heading = bearing;
+  }
+  return steps;
+}
+
+export function goalsToPoses(goalsCm: GoalCm[]): Pose2D[] {
+  return goalsCm.map((point) => ({
+    x: point.x / 100,
+    y: point.y / 100,
+    theta: 0,
+  }));
+}
+
+export function labDone(lab: OdomLabId, trail: Pose2D[]): boolean {
+  const spec = ODOM_LABS.find((item) => item.id === lab);
+  if (!spec) return false;
+  return orderedGoalHits(trail, spec.goalsCm) >= spec.goalsCm.length;
 }
 
 export function goalHitsAlongTrail(trail: Pose2D[], goalsCm = LESSON_GOALS_CM, hitM = GOAL_HIT_M): boolean[] {

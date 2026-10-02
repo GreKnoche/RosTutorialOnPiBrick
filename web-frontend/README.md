@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lektionen im Web-Frontend
 
-## Getting Started
-
-First, run the development server:
+Die Oberfläche ist eine Next.js-App. Jede Lektion hat einen Eintrag im Verzeichnis und, sobald sie Text hat, eine Markdown-Datei. Die Twin-Steuerung bleibt TypeScript und kommt nur dazu, wenn die Lektion anders fährt als die bisherigen.
 
 ```bash
+cd web-frontend
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lektionen sind unter `/autonom/<slug>` erreichbar, ROS 2 unter `/ros/<slug>`, Nav2 unter `/nav2/<id>`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Was woher kommt
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Titel, Kurztext und Reihenfolge stehen in [`lib/curriculum.ts`](lib/curriculum.ts). Das ist das Verzeichnis. Der Fließtext in der Lektion steht in `content/<track>/<id>-<slug>.md`. Die Seite [`components/lessons/lesson-page.tsx`](components/lessons/lesson-page.tsx) liest beides und zeichnet Kopf, Seitenleiste und den Link zum nächsten Kapitel.
 
-## Learn More
+Gibt es für den Slug ein Modul in [`components/lessons/registry.ts`](components/lessons/registry.ts), kommen Animation und Lab aus diesem Modul. Sonst zeigt die Seite den Markdown-Text und darunter den leeren Twin. So ist Lektion 4 heute: Eintrag im Verzeichnis, noch keine Markdown-Datei und kein Lab.
 
-To learn more about Next.js, take a look at the following resources:
+## Nur Text
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Damit reicht es, wenn das Kapitel noch keine eigene Fahrt hat.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. In `lessons` von `lib/curriculum.ts` einen Eintrag anlegen. `id` und `slug` bestimmen Dateiname und Adresse. `title` ist die Überschrift, `summary` der Satz direkt darunter. `track` ist `autonom`, `ros` oder `nav2`. `lab` bleibt `"none"`, solange der Twin nicht selbst ein Ziel ansteuert.
 
-## Deploy on Vercel
+```ts
+{
+  id: "04",
+  slug: "kalibrierung-drift",
+  title: "Kalibrierung und Drift – Warum stimmt die Pose nicht?",
+  status: "stub",
+  summary: "Systematische Parameterfehler von zufälligem Schlupf unterscheiden.",
+  track: "autonom",
+  lab: "none",
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`status: "ready"` setzt das Kennzeichen „verfügbar“. `"stub"` lässt es weg. Die Reihenfolge im Array ist die Reihenfolge im Lernpfad.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Die Datei `content/autonom/04-kalibrierung-drift.md` anlegen. Der Name ist immer `<id>-<slug>.md`, der Ordner ist der Track.
+
+```md
+## intro
+
+Hier steht der Absatz unter der Überschrift. Er erklärt, was in diesem Kapitel passiert.
+
+## drift
+
+eyebrow: Beobachtung
+title: Dieselbe Strecke, zwei Ergebnisse
+
+Der berechnete Weg und der gemessene Weg weichen voneinander ab. Der Unterschied ist die Drift.
+```
+
+`## intro` ist der Einleitungstext. Jeder weitere `##`-Abschnitt mit `eyebrow:` und `title:` wird eine Zwischenüberschrift, der Text darunter der Absatz. Ohne Lab rendert die Seite diese Abschnitte in der Reihenfolge der Datei.
+
+Danach die Seite neu laden: `/autonom/kalibrierung-drift`.
+
+## Text und eigene Fahrt
+
+Sobald der Twin eine eigene Aufgabe bekommt, kommen zwei Dateien und eine Zeile im Register dazu. Als Vorlage eignen sich [`components/lessons/radumfang/`](components/lessons/radumfang/) für eine Fahrt mit Missionen und [`components/lessons/odometrie/`](components/lessons/odometrie/) für eine Fahrt, die Lab für Lab weiterschaltet.
+
+1. `components/lessons/kalibrierung-drift/animation.tsx` exportiert eine Komponente `{ title: string }`. Den Titel liefert die Markdown-Datei, die Zeichnung bleibt in der Komponente. [`ReplayFigure`](components/replay-figure.tsx) ist der Rahmen mit „Noch einmal“.
+
+2. `components/lessons/kalibrierung-drift/lab.tsx` exportiert eine Komponente `{ copy: LessonCopy; nextHref?: string }`. `copy` ist der geparste Markdown-Text. `nextHref` ist der Link der Abschluss-Marke zum nächsten Kapitel.
+
+3. In `registry.ts` das Paar eintragen. Der Schlüssel ist `track:slug`.
+
+```ts
+"autonom:kalibrierung-drift": {
+  Animation: KalibrierungAnimation,
+  Lab: KalibrierungLab,
+},
+```
+
+Mit einem Register-Eintrag entscheidet das Lab, welche Abschnitte wo stehen. Es holt sie über `CopySection` und setzt die Fahrt in `LessonStudio`. Die Seite hängt die Markdown-Abschnitte dann nicht mehr von allein untereinander.
+
+`LessonStudio` zeichnet die Missionsliste, den Twin, Fahren, Zurücksetzen und die Statuszeile. Die drei Twin-Arten sind die Props `ruler`, `turn` und `path` von `RobotLab`. `useMissionChecklist` merkt sich, welche Mission offen ist. `useMissionRun` merkt sich Banner, Fahrt und ob die Lektion im Lernpfad abgehakt wird. Dafür die `id` aus dem Verzeichnis übergeben, zum Beispiel `"04"`.
+
+Formeln, die von den eingestellten Zahlen abhängen, bleiben im Lab. Reine Sätze stehen im Markdown.
+
+## Die Markdown-Datei
+
+Die fertigen Kapitel `content/autonom/01-radumfang.md`, `02-radabstand.md` und `03-odometrie.md` sind die Beispiele. Es gibt kein Frontmatter. Abschnitte beginnen mit `## `, Missionen darunter mit `### `.
+
+| Abschnitt | Inhalt |
+| --- | --- |
+| `## intro` | Absatz unter Titel und Kurztext. |
+| `## animation` | Nur `title:`. Das ist die Überschrift der Animation. |
+| `## <abschnitts-id>` | `eyebrow:` und `title:`, danach der Absatz. Das Lab spricht den Abschnitt über diese Id an. |
+| `## missions` | `intro:` für den Satz über der Liste. Darunter je Mission `### <id>` mit `title:`, `hint:` und optional `task:`. Ein `task:` direkt unter `## missions` gilt für alle Missionen, die keins haben. |
+| `## feedback` | Kurze Sätze als `schlüssel: Text`. Das Lab liest sie über `copy.texts`. |
+
+In Feedback-Sätzen sind Platzhalter wie `{title}` erlaubt. Das Lab setzt sie mit `fillCopy`. Tiefgestellte Zeichen bleiben HTML, zum Beispiel `s<sub>r</sub>`.
+
+Die Ids unter `## missions` sind der Vertrag mit dem Lab. In Lektion 1 heißen sie `theory` und `other`, weil `classifyMission` genau diese Ids zurückgibt. Wer eine Id umbenennt, muss die Prüfung im Lab mitziehen. Koordinaten und Parser bleiben im TypeScript, bei der Odometrie in [`lib/pseudo-path.ts`](lib/pseudo-path.ts). In der Markdown-Datei stehen dazu nur Titel und Hinweise, mit denselben Ids wie `left`, `return`, `square` und `star`.
+
+## Prüfen
+
+`npm run dev` neu laden und die neue Adresse öffnen. Sichtbar sein sollen Überschrift und Kurztext aus `curriculum.ts`, die Einleitung aus der Markdown-Datei, und falls ein Modul registriert ist Animation, Rechnung und Missionen. Der Link „Nächstes Kapitel“ folgt dem nächsten Eintrag im Verzeichnis. Eine Lektion ohne Markdown-Datei und ohne Register-Zeile zeigt nur den leeren Twin.

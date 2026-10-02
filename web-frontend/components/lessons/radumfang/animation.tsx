@@ -5,9 +5,9 @@ import { ReplayFigure } from "@/components/replay-figure";
 const RADIUS = 60;
 const CIRCUMFERENCE = Math.round(2 * Math.PI * RADIUS);
 
-export function WheelCircumferenceAnimation() {
+export function RadumfangAnimation({ title }: { title: string }) {
   return (
-    <ReplayFigure id="wheel-animation-title" title="Eine Umdrehung wird zur Strecke">
+    <ReplayFigure id="wheel-animation-title" title={title}>
       {(run) => (
         <>
       <div className="bg-[#12110e] p-3 sm:p-5">

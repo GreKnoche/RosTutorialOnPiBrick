@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { LabKind } from "@/lib/types";
 import { DEFAULT_CHASSIS, UnicycleOdometry, type Pose2D, type Twist2D } from "@/lib/ev3-core";
+import { formatDe } from "@/lib/format";
 import { Ev3Twin, type TwinMode } from "@/lib/twin";
 
 export type RulerDrive = {
@@ -47,6 +48,7 @@ type Props = {
   ruler?: RulerDrive;
   turn?: TurnDrive;
   path?: PathDrive;
+  overlay?: ReactNode;
 };
 
 const WORLD_W = 1.35;
@@ -66,12 +68,26 @@ function armRuler(twin: Ev3Twin, circumferenceCm: number) {
   twin.leftRad = 0;
   twin.rightRad = 0;
   twin.trail = [{ x: RULER_START_X, y: 0, theta: 0 }];
+  trailHeading.set(twin, 0);
   twin.reached = false;
   twin.odom.update(0, 0);
 }
 
 function drivenMeters(twin: Ev3Twin) {
   return twin.odom.pose.x - RULER_START_X;
+}
+
+function drivenMetersFromPose(pose: Pose2D) {
+  return pose.x - RULER_START_X;
+}
+
+function hudLabel(pose: Pose2D, rulerMode: boolean, turnMode: boolean, pathMode: boolean) {
+  if (rulerMode) return `${formatDe(drivenMetersFromPose(pose) * 100, 1)} cm`;
+  if (turnMode) return `${formatDe((pose.theta * 180) / Math.PI, 1)}°`;
+  if (pathMode) {
+    return `x ${formatDe(pose.x * 100, 1)} cm · y ${formatDe(pose.y * 100, 1)} cm · θ ${formatDe((pose.theta * 180) / Math.PI, 1)}°`;
+  }
+  return null;
 }
 
 function stepToward(current: number, target: number, maxStep: number) {
@@ -84,14 +100,43 @@ function pathCmToRad(cm: number, wheelRadius: number) {
   return cm / 100 / wheelRadius;
 }
 
+const trailHeading = new WeakMap<Ev3Twin, number>();
+
+function wheelHeadingDelta(twin: Ev3Twin, leftRad: number, rightRad: number) {
+  const separation = twin.chassis.wheelSeparation;
+  if (separation <= 1e-9) return 0;
+  const radius = twin.chassis.wheelRadius;
+  const dLeft = (leftRad - twin.leftRad) * radius;
+  const dRight = (rightRad - twin.rightRad) * radius;
+  return (dRight - dLeft) / separation;
+}
+
 function advanceWheels(twin: Ev3Twin, leftRad: number, rightRad: number) {
+  const dtheta = wheelHeadingDelta(twin, leftRad, rightRad);
   twin.leftRad = leftRad;
   twin.rightRad = rightRad;
   twin.odom.update(leftRad, rightRad);
+  const unwrapped = (trailHeading.get(twin) ?? 0) + dtheta;
+  trailHeading.set(twin, unwrapped);
   const pose = twin.odom.pose;
   const last = twin.trail[twin.trail.length - 1];
-  if (!last || Math.hypot(last.x - pose.x, last.y - pose.y) > 0.008) {
-    twin.trail.push({ ...pose });
+  const moved = !last || Math.hypot(last.x - pose.x, last.y - pose.y) > 0.008;
+  const turned = !last || Math.abs(unwrapped - last.theta) > 0.08;
+  if (!last || moved || turned) {
+    twin.trail.push({ x: pose.x, y: pose.y, theta: unwrapped });
+  }
+}
+
+function stampTrail(twin: Ev3Twin) {
+  const pose = twin.odom.pose;
+  const unwrapped = trailHeading.get(twin) ?? 0;
+  const last = twin.trail[twin.trail.length - 1];
+  if (
+    !last ||
+    Math.hypot(last.x - pose.x, last.y - pose.y) > 1e-6 ||
+    Math.abs(last.theta - unwrapped) > 1e-6
+  ) {
+    twin.trail.push({ x: pose.x, y: pose.y, theta: unwrapped });
   }
 }
 
@@ -105,6 +150,7 @@ function armTurn(twin: Ev3Twin, separationCm: number) {
   twin.leftRad = 0;
   twin.rightRad = 0;
   twin.trail = [{ x: 0, y: 0, theta: 0 }];
+  trailHeading.set(twin, 0);
   twin.reached = false;
   twin.odom.update(0, 0);
 }
@@ -125,6 +171,7 @@ function armPath(twin: Ev3Twin, circumferenceCm: number, separationCm: number) {
   twin.leftRad = 0;
   twin.rightRad = 0;
   twin.trail = [{ x: 0, y: 0, theta: 0 }];
+  trailHeading.set(twin, 0);
   twin.reached = false;
   twin.odom.update(0, 0);
 }
@@ -154,7 +201,7 @@ type Snapshot = {
   goal: Pose2D | null;
 };
 
-export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path }: Props) {
+export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const twinRef = useRef(new Ev3Twin());
@@ -304,6 +351,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path }
               }
               drive.active = false;
               twin.cmd = { linear: 0, angular: 0 };
+              stampTrail(twin);
               pathSpec.onDone({ ...twin.odom.pose }, twin.trail.map((point) => ({ ...point })));
             } else {
               const maxStep = (DRIVE_MPS / twin.chassis.wheelRadius) * dt;
@@ -327,6 +375,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path }
                 } else {
                   drive.active = false;
                   twin.cmd = { linear: 0, angular: 0 };
+                  stampTrail(twin);
                   pathSpec.onDone({ ...twin.odom.pose }, twin.trail.map((point) => ({ ...point })));
                 }
               }
@@ -509,6 +558,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path }
 
   const pose = snapshot.pose;
   const cmd = snapshot.cmd;
+  const readout = hudLabel(pose, Boolean(ruler), Boolean(turn), Boolean(path));
 
   return (
     <div className="flex flex-col gap-3">
@@ -588,6 +638,15 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path }
           }}
           className={`block h-full w-full outline-none ${ruler || turn || path ? "cursor-default" : "cursor-crosshair"}`}
         />
+        {readout ? (
+          <div className="pointer-events-none absolute top-3 left-3 z-20 rounded-lg bg-[#1c1915]/90 px-3 py-2 ring-1 ring-[#fb923c]/55">
+            <p className="font-display text-[0.65rem] uppercase tracking-[0.22em] text-[#fb923c]">
+              Odometrie
+            </p>
+            <p className="mt-0.5 font-mono text-sm text-[#fff7ed]">{readout}</p>
+          </div>
+        ) : null}
+        {overlay ? <div className="pointer-events-none absolute inset-0 z-10">{overlay}</div> : null}
       </div>
       <p className="text-xs text-muted-foreground">
         {ruler

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { LessonPlaceholder } from "@/components/lesson-placeholder";
+import { LessonPage } from "@/components/lessons/lesson-page";
 import { getLessonById, lessonsForTrack } from "@/lib/curriculum";
 
 export function generateStaticParams() {
@@ -14,5 +14,5 @@ export default async function Nav2LessonPage({
   const { id } = await params;
   const lesson = getLessonById("nav2", id);
   if (!lesson) notFound();
-  return <LessonPlaceholder lesson={lesson} />;
+  return <LessonPage lesson={lesson} />;
 }

@@ -2,13 +2,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonIndex } from "@/components/lesson-index";
+import { CopySection } from "@/components/lessons/copy-section";
+import { lessonModule, type LessonModule } from "@/components/lessons/registry";
+import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { RobotLab } from "@/components/robot-lab";
-import { WheelCircumferenceAnimation } from "@/components/wheel-circumference-animation";
-import { WheelCircumferenceDrive } from "@/components/wheel-circumference-drive";
-import { WheelSeparationAnimation } from "@/components/wheel-separation-animation";
-import { WheelSeparationDrive } from "@/components/wheel-separation-drive";
-import { OdometryPathAnimation } from "@/components/odometry-path-animation";
-import { OdometryPathDrive } from "@/components/odometry-path-drive";
 import {
   getTrackMeta,
   lessonHref,
@@ -17,11 +14,16 @@ import {
   trackCrumbs,
   type Lesson,
 } from "@/lib/curriculum";
+import type { LessonCopy } from "@/lib/lesson-copy";
+import { loadLessonCopy } from "@/lib/load-lesson-copy";
 
-export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
+export function LessonPage({ lesson }: { lesson: Lesson }) {
   const track = getTrackMeta(lesson.track);
   const { next, index, total } = lessonNeighbors(lesson);
   const lessons = lessonsForTrack(lesson.track);
+  const active = lessonModule(lesson.track, lesson.slug);
+  const copy = loadLessonCopy(lesson.track, lesson.id, lesson.slug);
+  const nextHref = next ? lessonHref(next) : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,44 +50,20 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
               {lesson.summary}
             </p>
           </section>
-          {lesson.track === "autonom" && lesson.slug === "radumfang" ? (
-            <>
-              <p className="max-w-3xl text-sm leading-7 sm:text-base">
-                In diesem ersten Kapitel lernst du, wie der Roboter aus der Drehung seiner Räder
-                eine gefahrene Strecke schätzt. Du leitest den Radumfang aus dem gemessenen
-                Durchmesser ab und prüfst ihn anschließend mit einer 1-m-Fahrt. Damit legst du die
-                Grundlage für die Odometrie und alle späteren Fahrbewegungen.
-              </p>
-              <WheelCircumferenceAnimation />
-              <WheelCircumferenceDrive />
-            </>
-          ) : lesson.track === "autonom" && lesson.slug === "radabstand" ? (
-            <>
-              <p className="max-w-3xl text-sm leading-7 sm:text-base">
-                Eine Strecke braucht den Umfang. Eine Drehung braucht den Abstand der
-                Aufstandspunkte. Derselbe Twin, andere Frage: Du misst den Radabstand und prüfst
-                ihn mit einer 90°-Drehung.
-              </p>
-              <WheelSeparationAnimation />
-              <WheelSeparationDrive />
-            </>
-          ) : lesson.track === "autonom" && lesson.slug === "odometrie" ? (
-            <>
-              <p className="max-w-3xl text-sm leading-7 sm:text-base">
-                Die Punkte liegen schon in der Fläche. Im Code setzt du zuerst Radumfang und
-                Radabstand, dann die Umdrehungen jedes Rads. Gleiche Umdrehungen halten gerade,
-                ungleiche drehen — für 90° mit einem stehenden Rad ist n = (L · π / 2) / U. Die
-                Pose zeigt, wo der Twin zu sein glaubt.
-              </p>
-              <OdometryPathAnimation />
-              <OdometryPathDrive />
-            </>
+          {active && copy ? (
+            <LessonBody active={active} copy={copy} nextHref={nextHref} />
           ) : (
-            <RobotLab
-              lab={lesson.lab}
-              lessonId={lesson.id}
-              showTopics={lesson.track !== "autonom"}
-            />
+            <>
+              {copy?.intro ? <MarkdownBlock source={copy.intro} variant="intro" /> : null}
+              {copy
+                ? copy.sectionOrder.map((id) => <CopySection key={id} copy={copy} id={id} />)
+                : null}
+              <RobotLab
+                lab={lesson.lab}
+                lessonId={lesson.id}
+                showTopics={lesson.track !== "autonom"}
+              />
+            </>
           )}
         </div>
         <aside className="flex flex-col gap-2">
@@ -109,5 +87,25 @@ export function LessonPlaceholder({ lesson }: { lesson: Lesson }) {
         </footer>
       )}
     </div>
+  );
+}
+
+function LessonBody({
+  active,
+  copy,
+  nextHref,
+}: {
+  active: LessonModule;
+  copy: LessonCopy;
+  nextHref?: string;
+}) {
+  const Animation = active.Animation;
+  const Lab = active.Lab;
+  return (
+    <>
+      {copy.intro ? <MarkdownBlock source={copy.intro} variant="intro" /> : null}
+      <Animation title={copy.animationTitle} />
+      <Lab copy={copy} nextHref={nextHref} />
+    </>
   );
 }
