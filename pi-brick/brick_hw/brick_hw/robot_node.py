@@ -1,13 +1,17 @@
-"""BrickPi3 I/O: /cmd_vel in, raw /imu /ultrasonic /joint_states out. No /odom."""
+"""BrickPi3 I/O: /cmd_vel in, /drive_wheels, raw /imu /ultrasonic /joint_states out. No /odom."""
 
 from __future__ import annotations
 
 import math
+import threading
 from pathlib import Path
 from typing import Optional
 
 import rclpy
+from brick_interfaces.srv import DriveWheels
 from geometry_msgs.msg import Twist
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, JointState, Range
 from std_msgs.msg import Header
@@ -15,6 +19,13 @@ from std_msgs.msg import Header
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
 from brick_core.geometry import Twist2D, wrap_angle, yaw_to_quaternion
 from brick_core.robot import DiffDriveRobot
+from brick_core.wheel_command import (
+    DriveParams,
+    cap_wheel_speed,
+    encoder_targets,
+    poll_wheel_drive,
+    reject_revolutions,
+)
 from brick_hw.backend import HalBackend
 from brick_hw.hal import BrickPi3Hal, MockHal
 
@@ -32,6 +43,11 @@ class RobotNode(Node):
         self.declare_parameter("mock", False)
         self.declare_parameter("rate_hz", 20.0)
         self.declare_parameter("chassis_file", "")
+        self.declare_parameter("wheel_speed_rad_s", 2.0)
+        self.declare_parameter("tolerance_rad", 0.05)
+        self.declare_parameter("timeout_sec", 90.0)
+        self.declare_parameter("max_revolutions", 20.0)
+        self.declare_parameter("brake_sec", 0.4)
 
         chassis_file = str(self.get_parameter("chassis_file").value)
         self.chassis = self._load_chassis(chassis_file)
@@ -44,17 +60,35 @@ class RobotNode(Node):
 
         self.backend = HalBackend(self._make_hal())
         self.robot = DiffDriveRobot(self.backend, self.chassis)
+        self._io = threading.Lock()
+        self._busy = False
+        rate = max(float(self.get_parameter("rate_hz").value), 1.0)
+        self._params = DriveParams(
+            wheel_speed_rad_s=cap_wheel_speed(
+                self.chassis, float(self.get_parameter("wheel_speed_rad_s").value)
+            ),
+            tolerance_rad=float(self.get_parameter("tolerance_rad").value),
+            timeout_sec=float(self.get_parameter("timeout_sec").value),
+            max_revolutions=float(self.get_parameter("max_revolutions").value),
+            dt_sec=1.0 / rate,
+            brake_sec=max(0.0, float(self.get_parameter("brake_sec").value)),
+        )
 
-        self.cmd_sub = self.create_subscription(Twist, "cmd_vel", self._on_cmd, 10)
+        group = ReentrantCallbackGroup()
+        self.cmd_sub = self.create_subscription(
+            Twist, "cmd_vel", self._on_cmd, 10, callback_group=group
+        )
         self.imu_pub = self.create_publisher(Imu, "imu", 10)
         self.range_pub = self.create_publisher(Range, "ultrasonic", 10)
         self.joint_pub = self.create_publisher(JointState, "joint_states", 10)
+        self.create_service(
+            DriveWheels, "drive_wheels", self._on_drive, callback_group=group
+        )
 
-        rate = float(self.get_parameter("rate_hz").value)
-        self._dt = 1.0 / max(rate, 1.0)
+        self._dt = self._params.dt_sec
         self._gyro_invert = bool(self.get_parameter("gyro_invert").value)
         self._last_gyro_rad: float | None = None
-        self._timer = self.create_timer(self._dt, self._tick)
+        self._timer = self.create_timer(self._dt, self._tick, callback_group=group)
         mock = bool(self.get_parameter("mock").value)
         self.get_logger().info(
             f"brick_hw up mock={mock} dt={self._dt:.3f}s "
@@ -62,7 +96,8 @@ class RobotNode(Node):
             f"track={self.chassis.wheel_separation_m}m "
             f"gyro_invert={self._gyro_invert} "
             f"left={self.get_parameter('left_motor').value} "
-            f"right={self.get_parameter('right_motor').value}"
+            f"right={self.get_parameter('right_motor').value} "
+            f"drive_wheels speed={self._params.wheel_speed_rad_s:.2f}rad/s"
         )
 
     def _load_chassis(self, chassis_file: str) -> Chassis:
@@ -97,10 +132,55 @@ class RobotNode(Node):
             ) from exc
 
     def _on_cmd(self, msg: Twist) -> None:
-        self.robot.set_cmd_vel(Twist2D(linear=msg.linear.x, angular=msg.angular.z))
+        with self._io:
+            if self._busy:
+                return
+            self.robot.set_cmd_vel(Twist2D(linear=msg.linear.x, angular=msg.angular.z))
+
+    def _on_drive(self, request: DriveWheels.Request, response: DriveWheels.Response):
+        left = float(request.left)
+        right = float(request.right)
+        reason = reject_revolutions(left, right, self._params.max_revolutions)
+        if reason:
+            response.success = False
+            response.message = reason
+            return response
+        with self._io:
+            if self._busy:
+                response.success = False
+                response.message = "beschäftigt"
+                return response
+            self._busy = True
+            encoders = self.backend.read_encoders()
+            targets = encoder_targets(left, right, encoders)
+            self.backend.set_wheel_targets(
+                targets[0], targets[1], self._params.wheel_speed_rad_s
+            )
+        try:
+            ok, message = poll_wheel_drive(
+                self._read_encoders,
+                self._hold_wheels,
+                targets,
+                self._params,
+            )
+        finally:
+            with self._io:
+                self._busy = False
+        response.success = ok
+        response.message = message
+        return response
+
+    def _read_encoders(self) -> tuple[float, float]:
+        with self._io:
+            return self.backend.read_encoders()
+
+    def _hold_wheels(self) -> None:
+        with self._io:
+            self.backend.hold_wheels()
 
     def _tick(self) -> None:
-        state = self.robot.spin_once(self._dt)
+        with self._io:
+            state = self.robot.spin_once(self._dt)
 
         imu = Imu()
         imu.header = _now_header(self, self.chassis.gyro_frame)
@@ -149,8 +229,10 @@ class RobotNode(Node):
 def main(args: Optional[list[str]] = None) -> None:
     rclpy.init(args=args)
     node = RobotNode()
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

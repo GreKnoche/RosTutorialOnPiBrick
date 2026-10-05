@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopySection } from "@/components/lessons/copy-section";
 import { LessonStudio } from "@/components/lessons/lesson-studio";
@@ -9,6 +9,7 @@ import { NumberControl } from "@/components/number-control";
 import { ScratchPad } from "@/components/scratch-pad";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
 import { clamp, formatDe } from "@/lib/format";
+import { driveWheels, hardwareNotice } from "@/lib/robot-drive";
 
 const TARGET_M = 1;
 const TOLERANCE_M = 0.02;
@@ -35,6 +36,8 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
   );
   const [revolutions, setRevolutions] = useState(1);
   const [distanceM, setDistanceM] = useState(0);
+  const [hardwareNote, setHardwareNote] = useState<string | null>(null);
+  const driveToken = useRef(0);
 
   const radiusCm = diameterCm / 2;
   const hit = Math.abs(distanceM - TARGET_M) <= TOLERANCE_M;
@@ -157,6 +160,8 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
         successTitle={run.doneTitle}
         onBannerNext={() => run.setBanner(run.banner === "success" ? "task" : "hidden")}
         onRestart={() => {
+          driveToken.current += 1;
+          setHardwareNote(null);
           setDistanceM(0);
           checklist.reset();
           run.restart();
@@ -164,15 +169,25 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
         running={run.session.running}
         driveDisabled={run.bannerUp}
         onDrive={() => {
+          const token = driveToken.current + 1;
+          driveToken.current = token;
+          setHardwareNote(null);
           setDistanceM(0);
           run.session.drive();
+          void driveWheels(revolutions, revolutions).then((result) => {
+            if (driveToken.current !== token) return;
+            if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+          });
         }}
         onReset={() => {
+          driveToken.current += 1;
+          setHardwareNote(null);
           setDistanceM(0);
           run.session.reset();
         }}
         feedback={feedback}
         feedbackOk={run.session.finished && hit}
+        notice={hardwareNote}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberControl

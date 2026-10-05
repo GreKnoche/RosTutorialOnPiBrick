@@ -26,6 +26,8 @@ services:
     volumes:
       - ./src:/ws/src
       - ../shared/brick_math:/ws/src/brick_math
+      - ../companion/src/brick_core:/ws/src/brick_core
+      - ../companion/src/brick_interfaces:/ws/src/brick_interfaces
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:${XAUTHORITY}:ro
     stdin_open: true

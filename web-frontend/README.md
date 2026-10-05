@@ -86,7 +86,7 @@ Die fertigen Kapitel `content/autonom/01-radumfang.md`, `02-radabstand.md` und `
 | `## intro` | Absatz unter Titel und Kurztext. |
 | `## animation` | Nur `title:`. Das ist die Überschrift der Animation. |
 | `## <abschnitts-id>` | `eyebrow:` und `title:`, danach der Absatz. Das Lab spricht den Abschnitt über diese Id an. |
-| `## missions` | `intro:` für den Satz über der Liste. Darunter je Mission `### <id>` mit `title:`, `hint:` und optional `task:`. Ein `task:` direkt unter `## missions` gilt für alle Missionen, die keins haben. |
+| `## missions` | `intro:` für den Satz über der Liste. Darunter je Mission `### <id>` mit `title:`, `hint:` und optional `task:`. Das Banner nimmt das eigene `task:`, sonst den `hint:`. Ein `task:` direkt unter `## missions` gilt nur, wenn beides fehlt. |
 | `## feedback` | Kurze Sätze als `schlüssel: Text`. Das Lab liest sie über `copy.texts`. |
 
 In Feedback-Sätzen sind Platzhalter wie `{title}` erlaubt. Das Lab setzt sie mit `fillCopy`. Tiefgestellte Zeichen bleiben HTML, zum Beispiel `s<sub>r</sub>`.

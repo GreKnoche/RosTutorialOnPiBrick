@@ -39,7 +39,7 @@ setup(
     zip_safe=True,
     maintainer="gregor",
     maintainer_email="gregor_knoche@outlook.de",
-    description="BrickPi3 I/O: /cmd_vel in, raw /imu /ultrasonic /joint_states out.",
+    description="BrickPi3 I/O: /cmd_vel in, /drive_wheels, raw /imu /ultrasonic /joint_states out.",
     license="Apache-2.0",
     extras_require={
         "test": [

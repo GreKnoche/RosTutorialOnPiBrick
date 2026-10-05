@@ -48,14 +48,6 @@ export function MissionStamp({ href, onRestart }: { href?: string; onRestart?: (
     >
       <TwinStamp className="size-36" />
       <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2">
-        {href ? (
-          <Link
-            href={href}
-            className="inline-flex h-8 items-center justify-center rounded-lg bg-white px-2.5 text-sm font-medium text-[#2f6b4f] hover:bg-white/90"
-          >
-            Nächste Lektion
-          </Link>
-        ) : null}
         {onRestart ? (
           <Button
             type="button"
@@ -64,6 +56,14 @@ export function MissionStamp({ href, onRestart }: { href?: string; onRestart?: (
           >
             Neustart
           </Button>
+        ) : null}
+        {href ? (
+          <Link
+            href={href}
+            className="inline-flex h-8 items-center justify-center rounded-lg bg-white px-2.5 text-sm font-medium text-[#2f6b4f] hover:bg-white/90"
+          >
+            Nächste Lektion
+          </Link>
         ) : null}
       </div>
     </div>

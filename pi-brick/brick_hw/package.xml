@@ -3,11 +3,12 @@
 <package format="3">
   <name>brick_hw</name>
   <version>0.1.0</version>
-  <description>BrickPi3 I/O: /cmd_vel in, raw /imu /ultrasonic /joint_states out.</description>
+  <description>BrickPi3 I/O: /cmd_vel in, /drive_wheels, raw /imu /ultrasonic /joint_states out.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 
   <depend>brick_core</depend>
+  <depend>brick_interfaces</depend>
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>

@@ -32,6 +32,7 @@ export function LessonStudio({
   onReset,
   feedback,
   feedbackOk = false,
+  notice,
   showFeedback = true,
   before,
   children,
@@ -60,6 +61,7 @@ export function LessonStudio({
   onReset: () => void;
   feedback: string;
   feedbackOk?: boolean;
+  notice?: string | null;
   showFeedback?: boolean;
   before?: ReactNode;
   children?: ReactNode;
@@ -103,6 +105,7 @@ export function LessonStudio({
           {feedback}
         </p>
       ) : null}
+      {notice ? <p className="text-sm leading-6">{notice}</p> : null}
     </LessonSection>
   );
 }

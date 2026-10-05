@@ -1,6 +1,6 @@
 # Companion overlay
 
-ROS 2 Jazzy workspace on the laptop. Nav2, RViz, and encoder odometry stay here. Pi and Gazebo only take `/cmd_vel` and publish `/joint_states`, `/imu`, and `/ultrasonic`. `odom_node` integrates wheel angles with `UnicycleOdometry` onto `/odom`. `gyrodometry` fuses `/odom` with `/imu` (Borenstein) onto `/odom/gyro`. `sonodometry` fuses `/odom/gyro` with `/ultrasonic` (range-flow `Δr ≈ −v_x Δt`) onto `/odom/sono`. `odom_tf` turns `/odom/gyro` into TF `odom → base_link`, so the RViz model follows gyrodometry.
+ROS 2 Jazzy workspace on the laptop. Nav2, RViz, and encoder odometry stay here. Pi and Gazebo take `/cmd_vel` and `/drive_wheels` and publish `/joint_states`, `/imu`, and `/ultrasonic`. `odom_node` integrates wheel angles with `UnicycleOdometry` onto `/odom`. `gyrodometry` fuses `/odom` with `/imu` (Borenstein) onto `/odom/gyro`. `sonodometry` fuses `/odom/gyro` with `/ultrasonic` (range-flow `Δr ≈ −v_x Δt`) onto `/odom/sono`. `odom_tf` turns `/odom/gyro` into TF `odom → base_link`, so the RViz model follows gyrodometry.
 
 ## Build
 

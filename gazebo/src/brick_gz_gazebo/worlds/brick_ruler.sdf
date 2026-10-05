@@ -1,0 +1,131 @@
+<?xml version="1.0" ?>
+<!--
+  1 m ruler for wheel-circumference calibration (radumfang).
+
+  World origin is the EV3 axle midpoint and the 0 cm tick. Drive +X;
+  the orange mark is 1.00 m. Tape is visual-only (right of the wheels)
+  so it does not snag the chassis or the ultrasonic.
+-->
+<sdf version="1.11">
+  <world name="brick_ruler">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <scene>
+      <ambient>0.8 0.8 0.8 1</ambient>
+      <background>0.65 0.68 0.74 1</background>
+      <grid>true</grid>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>8 8</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>8 8</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.82 0.82 0.80 1</ambient>
+            <diffuse>0.86 0.86 0.84 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Left edge of the 1.2 m tape is world x = 0 (0 cm). -->
+    <include>
+      <uri>model://ruler_tape</uri>
+      <name>ruler_tape</name>
+      <pose>0.6 -0.16 0.0005 0 0 0</pose>
+    </include>
+
+    <!-- Start hash under the axles: world (0, 0). Visual only. -->
+    <model name="mark_0">
+      <static>true</static>
+      <pose>0 0 0.0006 0 0 0</pose>
+      <link name="link">
+        <visual name="across">
+          <geometry>
+            <box>
+              <size>0.008 0.20 0.0004</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.48 0.12 1</ambient>
+            <diffuse>0.98 0.55 0.16 1</diffuse>
+          </material>
+        </visual>
+        <visual name="along">
+          <geometry>
+            <box>
+              <size>0.06 0.006 0.0004</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.48 0.12 1</ambient>
+            <diffuse>0.98 0.55 0.16 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 1 m finish on the driving line. Visual only, flush with the floor. -->
+    <model name="mark_1m">
+      <static>true</static>
+      <pose>1.0 0 0.0006 0 0 0</pose>
+      <link name="link">
+        <visual name="line">
+          <geometry>
+            <box>
+              <size>0.016 0.22 0.0004</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.92 0.42 0.10 1</ambient>
+            <diffuse>0.98 0.50 0.14 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>package://brick_gz_description/models/ev3</uri>
+      <name>ev3</name>
+      <pose>0 0 0.028 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

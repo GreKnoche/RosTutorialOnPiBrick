@@ -12,6 +12,7 @@ install(
     scripts/scan_to_range.py
     scripts/sensor_drift.py
     scripts/gyrodometry.py
+    scripts/drive_wheels.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

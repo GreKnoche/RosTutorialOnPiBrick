@@ -10,6 +10,12 @@ from typing import Protocol, Tuple
 class Hal(Protocol):
     def set_wheel_speeds(self, left_rad_s: float, right_rad_s: float) -> None: ...
 
+    def set_wheel_targets(
+        self, left_rad: float, right_rad: float, speed_rad_s: float
+    ) -> None: ...
+
+    def hold_wheels(self) -> None: ...
+
     def encoders(self) -> Tuple[float, float]: ...
 
     def gyro_deg(self) -> float: ...
@@ -27,17 +33,48 @@ class MockHal:
         self.right_rad = 0.0
         self.left_speed = 0.0
         self.right_speed = 0.0
+        self._left_target: float | None = None
+        self._right_target: float | None = None
+        self._approach_speed = 0.0
         self._last = time.monotonic()
 
     def set_wheel_speeds(self, left_rad_s: float, right_rad_s: float) -> None:
         self._integrate()
+        self._left_target = None
+        self._right_target = None
         self.left_speed = left_rad_s
         self.right_speed = right_rad_s
+
+    def set_wheel_targets(
+        self, left_rad: float, right_rad: float, speed_rad_s: float
+    ) -> None:
+        self._integrate()
+        self._left_target = left_rad
+        self._right_target = right_rad
+        self._approach_speed = abs(speed_rad_s)
+        self._update_speeds_toward_targets()
+
+    def hold_wheels(self) -> None:
+        self.set_wheel_speeds(0.0, 0.0)
+
+    def _toward(self, current: float, target: float) -> float:
+        err = target - current
+        if abs(err) < 1e-9:
+            return 0.0
+        return math.copysign(min(self._approach_speed, abs(err) / 0.05), err)
+
+    def _update_speeds_toward_targets(self) -> None:
+        if self._left_target is None or self._right_target is None:
+            return
+        self.left_speed = self._toward(self.left_rad, self._left_target)
+        self.right_speed = self._toward(self.right_rad, self._right_target)
 
     def _integrate(self) -> None:
         now = time.monotonic()
         dt = now - self._last
         self._last = now
+        if self._left_target is not None:
+            self._update_speeds_toward_targets()
         self.left_rad += self.left_speed * dt
         self.right_rad += self.right_speed * dt
 
@@ -104,6 +141,19 @@ class BrickPi3Hal:
     def set_wheel_speeds(self, left_rad_s: float, right_rad_s: float) -> None:
         self._bp.set_motor_dps(self._left, math.degrees(left_rad_s))
         self._bp.set_motor_dps(self._right, math.degrees(right_rad_s))
+
+    def set_wheel_targets(
+        self, left_rad: float, right_rad: float, speed_rad_s: float
+    ) -> None:
+        dps = max(abs(math.degrees(speed_rad_s)), 1.0)
+        self._bp.set_motor_limits(self._left, 80, dps)
+        self._bp.set_motor_limits(self._right, 80, dps)
+        self._bp.set_motor_position(self._left, math.degrees(left_rad))
+        self._bp.set_motor_position(self._right, math.degrees(right_rad))
+
+    def hold_wheels(self) -> None:
+        left, right = self.encoders()
+        self.set_wheel_targets(left, right, 0.5)
 
     def encoders(self) -> Tuple[float, float]:
         left = math.radians(float(self._bp.get_motor_encoder(self._left)))

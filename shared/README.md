@@ -4,11 +4,12 @@
 
 `ros.env` sets `ROS_DOMAIN_ID` (here **71**) so this robot does not share DDS with other cars on domain 0. Laptop shell, companion, Gazebo, and the Pi must use the same value.
 
-Pi and Gazebo are I/O boxes. Companion integrates encoders and owns `/odom`.
+Pi and Gazebo are I/O boxes. Companion integrates encoders and owns `/odom`. Wheel revolutions (`/drive_wheels`) stay on the I/O box so the encoder loop is local.
 
 | Name | Type | Owner |
 | --- | --- | --- |
 | `/cmd_vel` | `geometry_msgs/Twist` | into Pi or Gazebo |
+| `/drive_wheels` | `brick_interfaces/DriveWheels` | **Pi or Gazebo** (revolutions, not metres) |
 | `/joint_states` | `sensor_msgs/JointState` | `wheel_left_joint`, `wheel_right_joint` (rad) |
 | `/imu` | `sensor_msgs/Imu` | gyro, frame `gyro_link` |
 | `/ultrasonic` | `sensor_msgs/Range` | one beam |

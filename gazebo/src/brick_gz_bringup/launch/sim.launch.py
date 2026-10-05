@@ -69,6 +69,14 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{"use_sim_time": True}],
     )
 
+    drive_wheels = Node(
+        package="brick_gz_bringup",
+        executable="drive_wheels.py",
+        name="drive_wheels",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
     sensor_drift = Node(
         package="brick_gz_bringup",
         executable="sensor_drift.py",
@@ -117,7 +125,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "world",
                 default_value="lab",
-                description="Gazebo world: lab (flat) or relief (one-wheel kerbs).",
+                description="Gazebo world: lab (flat), ruler (1 m tape from origin), or relief (kerbs).",
             ),
             DeclareLaunchArgument(
                 "gz_args_prefix",
@@ -142,6 +150,7 @@ def generate_launch_description() -> LaunchDescription:
             gz_sim,
             bridge,
             scan_to_range,
+            drive_wheels,
             sensor_drift,
             teleop,
             TimerAction(period=4.5, actions=[follow_camera]),

@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer="gregor",
     maintainer_email="gregor_knoche@outlook.de",
-    description="Spin-in-place track-width check using the gyro as a heading ruler.",
+    description="Gyro track-width check for the real brick.",
     license="Apache-2.0",
     tests_require=["pytest"],
     entry_points={

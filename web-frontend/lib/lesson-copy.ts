@@ -86,11 +86,12 @@ function readMissions(source: string): LessonCopy["missions"] {
       const id = (breakAt === -1 ? chunk : chunk.slice(0, breakAt)).trim();
       const rest = breakAt === -1 ? "" : chunk.slice(breakAt + 1);
       const item = readMeta(rest, ["title", "hint", "task"]).meta;
+      const hint = item.hint?.trim() ?? "";
       return {
         id,
-        title: item.title ?? "",
-        hint: item.hint ?? "",
-        task: item.task || meta.task || "",
+        title: item.title?.trim() ?? "",
+        hint,
+        task: item.task?.trim() || hint || meta.task?.trim() || "",
       };
     })
     .filter((item) => item.id);

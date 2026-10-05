@@ -1,6 +1,6 @@
 # RosTutorialOnPiBrick
 
-ROS 2 Jazzy lab: BrickPi3 on a Raspberry Pi, companion odometry and Nav2 on a laptop, Gazebo Harmonic overlay. Pi and Gazebo only publish raw sensors; companion owns `/odom`. Do not `colcon build` from this root.
+ROS 2 Jazzy lab: BrickPi3 on a Raspberry Pi, companion odometry and Nav2 on a laptop, Gazebo Harmonic overlay. Pi and Gazebo own raw sensors and `/drive_wheels`; companion owns `/odom`. Do not `colcon build` from this root.
 
 | Path | Role |
 | --- | --- |

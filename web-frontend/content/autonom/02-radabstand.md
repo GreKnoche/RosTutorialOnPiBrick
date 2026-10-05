@@ -45,13 +45,13 @@ task: Drehe 90°
 title: Ein Rad auf 0
 hint: Drehe 90°. Ein Rad hält, das andere fährt die ganze Differenz.
 
-### opposite
-title: Entgegengesetzt
-hint: Drehe 90°. Ein Rad vorwärts, das andere rückwärts.
-
 ### same
 title: Gleiche Richtung
 hint: Drehe 90°. Beide in dieselbe Richtung, mit unterschiedlicher Strecke.
+
+### opposite
+title: Entgegengesetzt
+hint: Drehe 90°. Ein Rad vorwärts, das andere rückwärts. Die Pose bleibt bei etwa 0,0.
 
 ## feedback
 
@@ -60,6 +60,7 @@ short: Noch zu wenig gedreht. Verändere Radabstand oder die Radwege.
 long: Noch zu weit gedreht. Verändere Radabstand oder die Radwege.
 hit: Getroffen — Mission „{title}“.
 wrong: 90° stimmen, aber das ist nicht Mission „{title}“.
+pose: 90° stimmen, aber die Pose ist nicht bei etwa 0,0.
 none: 90° stimmen, aber die Radwege passen zu keiner der drei Missionen.
 arc-result: Das ist die Wegdifferenz s<sub>r</sub> − s<sub>l</sub> für 90°. Wenn das linke Rad hält, setzt du sie vollständig rechts ein. Drehen beide, teilst du dieselbe Differenz auf die beiden Slider.
 zero-note: 0 bedeutet: das Rad hält. Negative Werte fahren rückwärts.

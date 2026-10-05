@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<sdf version="1.11">
+  <model name="ruler_tape">
+    <static>true</static>
+    <link name="link">
+      <!-- 1.2 m x 0.14 m. Origin is the tape centre; 0 cm is at local x = −0.6. -->
+      <visual name="visual">
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>1.2 0.14</size>
+          </plane>
+        </geometry>
+        <material>
+          <ambient>1 1 1 1</ambient>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.08 0.08 0.08 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://ruler_tape/materials/textures/ruler.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.85</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

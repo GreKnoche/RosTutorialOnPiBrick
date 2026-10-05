@@ -83,7 +83,9 @@ function drivenMetersFromPose(pose: Pose2D) {
 
 function hudLabel(pose: Pose2D, rulerMode: boolean, turnMode: boolean, pathMode: boolean) {
   if (rulerMode) return `${formatDe(drivenMetersFromPose(pose) * 100, 1)} cm`;
-  if (turnMode) return `${formatDe((pose.theta * 180) / Math.PI, 1)}°`;
+  if (turnMode) {
+    return `x ${formatDe(pose.x * 100, 1)} cm · y ${formatDe(pose.y * 100, 1)} cm · ${formatDe((pose.theta * 180) / Math.PI, 1)}°`;
+  }
   if (pathMode) {
     return `x ${formatDe(pose.x * 100, 1)} cm · y ${formatDe(pose.y * 100, 1)} cm · θ ${formatDe((pose.theta * 180) / Math.PI, 1)}°`;
   }

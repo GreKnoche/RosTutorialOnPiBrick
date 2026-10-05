@@ -21,6 +21,7 @@ const PATH_MAX = 45;
 const START_LEFT_PATH_CM = 0;
 const START_RIGHT_PATH_CM = 10;
 const ZERO_CM = 0.05;
+const POSE_TOLERANCE_CM = 2;
 
 export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: string }) {
   const missionIds = copy.missions.items.map((item) => item.id);
@@ -37,7 +38,7 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
   const headingDeg = (headingRad * 180) / Math.PI;
   const hit = Math.abs(headingRad - TARGET_RAD) <= TOLERANCE_RAD;
   const open = copy.missions.items.find((item) => item.id === checklist.openId) ?? null;
-  const missionKind = classifyMission(leftPathCm, rightPathCm);
+  const missionKind = classifyMission(leftPathCm, rightPathCm, separationCm);
   const drive = copy.sections["protractor-drive"];
   const feedback = !run.session.finished
     ? copy.texts.idle
@@ -47,9 +48,11 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
         : copy.texts.long
       : missionKind && missionKind === open?.id
         ? fillCopy(copy.texts.hit, { title: open.title })
-        : open
-          ? fillCopy(copy.texts.wrong, { title: open.title })
-          : copy.texts.none;
+        : open?.id === "opposite" && wheelsOpposite(leftPathCm, rightPathCm)
+          ? copy.texts.pose
+          : open
+            ? fillCopy(copy.texts.wrong, { title: open.title })
+            : copy.texts.none;
 
   return (
     <>
@@ -131,7 +134,7 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
             run.session.finish();
             if (Math.abs(radians - TARGET_RAD) > TOLERANCE_RAD) return;
             const next = copy.missions.items.find((item) => item.id === checklist.openId);
-            const kind = classifyMission(leftPathCm, rightPathCm);
+            const kind = classifyMission(leftPathCm, rightPathCm, separationCm);
             if (!next || kind !== next.id) return;
             checklist.mark(next.id);
             run.succeed(next.title);
@@ -161,7 +164,7 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
           run.session.reset();
         }}
         feedback={feedback}
-        feedbackOk={run.session.finished && hit}
+        feedbackOk={run.session.finished && hit && missionKind === open?.id}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberControl
@@ -227,14 +230,28 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
   );
 }
 
-function classifyMission(leftCm: number, rightCm: number): string | null {
+function classifyMission(leftCm: number, rightCm: number, separationCm: number): string | null {
   const leftZero = Math.abs(leftCm) <= ZERO_CM;
   const rightZero = Math.abs(rightCm) <= ZERO_CM;
   if (leftZero && rightZero) return null;
   if (leftZero !== rightZero) return "pivot";
-  if (leftCm * rightCm < 0) return "opposite";
   if (leftCm * rightCm > 0) return "same";
+  if (wheelsOpposite(leftCm, rightCm) && poseNearOrigin(leftCm, rightCm, separationCm)) return "opposite";
   return null;
+}
+
+function wheelsOpposite(leftCm: number, rightCm: number) {
+  return leftCm * rightCm < 0 && Math.abs(leftCm) > ZERO_CM && Math.abs(rightCm) > ZERO_CM;
+}
+
+function poseNearOrigin(leftCm: number, rightCm: number, separationCm: number) {
+  const ds = 0.5 * (leftCm + rightCm);
+  const dtheta = separationCm > 1e-9 ? (rightCm - leftCm) / separationCm : 0;
+  if (Math.abs(dtheta) < 1e-6) return Math.hypot(ds, 0) <= POSE_TOLERANCE_CM;
+  const radius = ds / dtheta;
+  const x = radius * Math.sin(dtheta);
+  const y = radius * (1 - Math.cos(dtheta));
+  return Math.hypot(x, y) <= POSE_TOLERANCE_CM;
 }
 
 function arcFromSeparation(separationCm: number) {
