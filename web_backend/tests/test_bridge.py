@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from web_backend.bridge import UNAVAILABLE, RobotBridge
+from bridge import UNAVAILABLE, RobotBridge
 
 
 def test_call_before_start_is_unavailable() -> None:

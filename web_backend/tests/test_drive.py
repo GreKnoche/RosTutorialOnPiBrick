@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from web_backend.app import create_app
-from web_backend.bridge import WheelResult, timed_out, unavailable
-from web_backend.drive import reject_revolutions
+from app import create_app
+from bridge import WheelResult, timed_out, unavailable
+from drive import reject_revolutions
 
 
 class FakeBridge:

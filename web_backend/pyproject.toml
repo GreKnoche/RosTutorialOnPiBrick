@@ -16,11 +16,10 @@ dependencies = [
 dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
-web-backend = "web_backend.__main__:main"
+web-backend = "main:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["web_backend*"]
+[tool.setuptools]
+py-modules = ["app", "bridge", "drive", "main"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

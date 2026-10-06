@@ -9,8 +9,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from web_backend.bridge import RobotBridge, WheelGateway
-from web_backend.drive import mount as mount_drive
+from bridge import RobotBridge, WheelGateway
+from drive import mount as mount_drive
 
 
 def create_app(bridge: WheelGateway | None = None) -> FastAPI:

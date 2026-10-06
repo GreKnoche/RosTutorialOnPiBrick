@@ -45,3 +45,5 @@ Thumbs.db
 
 # FastAPI/Uvicorn logs
 *.log
+
+helper.sh
