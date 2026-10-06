@@ -9,7 +9,7 @@ import { NumberControl } from "@/components/number-control";
 import { ScratchPad } from "@/components/scratch-pad";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
 import { clamp, formatDe } from "@/lib/format";
-import { driveWheels, hardwareNotice } from "@/lib/robot-drive";
+import { drivePathsCm, hardwareNotice, wheelCircumferenceCm } from "@/lib/robot-drive";
 
 const TARGET_M = 1;
 const TOLERANCE_M = 0.02;
@@ -174,7 +174,8 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
           setHardwareNote(null);
           setDistanceM(0);
           run.session.drive();
-          void driveWheels(revolutions, revolutions).then((result) => {
+          const pathCm = revolutions * wheelCircumferenceCm;
+          void drivePathsCm(pathCm, pathCm).then((result) => {
             if (driveToken.current !== token) return;
             if (!result.ok) setHardwareNote(hardwareNotice(result.message));
           });

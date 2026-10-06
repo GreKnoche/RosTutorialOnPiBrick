@@ -1,10 +1,10 @@
 import type { ComponentType } from "react";
-import { OdometrieAnimation } from "@/components/lessons/odometrie/animation";
-import { OdometrieLab } from "@/components/lessons/odometrie/lab";
-import { RadabstandAnimation } from "@/components/lessons/radabstand/animation";
-import { RadabstandLab } from "@/components/lessons/radabstand/lab";
-import { RadumfangAnimation } from "@/components/lessons/radumfang/animation";
-import { RadumfangLab } from "@/components/lessons/radumfang/lab";
+import { OdometrieAnimation } from "@/components/lessons/03_odometrie/animation";
+import { OdometrieLab } from "@/components/lessons/03_odometrie/lab";
+import { RadabstandAnimation } from "@/components/lessons/02_radabstand/animation";
+import { RadabstandLab } from "@/components/lessons/02_radabstand/lab";
+import { RadumfangAnimation } from "@/components/lessons/01_radumfang/animation";
+import { RadumfangLab } from "@/components/lessons/01_radumfang/lab";
 import type { LessonCopy } from "@/lib/lesson-copy";
 
 // Neues Kapitel:

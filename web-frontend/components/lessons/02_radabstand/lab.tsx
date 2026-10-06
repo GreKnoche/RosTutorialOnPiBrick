@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopySection } from "@/components/lessons/copy-section";
 import { LessonStudio } from "@/components/lessons/lesson-studio";
@@ -10,6 +10,7 @@ import { NumberControl } from "@/components/number-control";
 import { ScratchPad } from "@/components/scratch-pad";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
 import { clamp, formatDe } from "@/lib/format";
+import { drivePathsCm, hardwareNotice } from "@/lib/robot-drive";
 
 const TARGET_RAD = Math.PI / 2;
 const TOLERANCE_RAD = (3 * Math.PI) / 180;
@@ -34,6 +35,8 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
   const [leftPathCm, setLeftPathCm] = useState(START_LEFT_PATH_CM);
   const [rightPathCm, setRightPathCm] = useState(START_RIGHT_PATH_CM);
   const [headingRad, setHeadingRad] = useState(0);
+  const [hardwareNote, setHardwareNote] = useState<string | null>(null);
+  const driveToken = useRef(0);
 
   const headingDeg = (headingRad * 180) / Math.PI;
   const hit = Math.abs(headingRad - TARGET_RAD) <= TOLERANCE_RAD;
@@ -149,6 +152,8 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
         successTitle={run.doneTitle}
         onBannerNext={() => run.setBanner(run.banner === "success" ? "task" : "hidden")}
         onRestart={() => {
+          driveToken.current += 1;
+          setHardwareNote(null);
           setHeadingRad(0);
           checklist.reset();
           run.restart();
@@ -156,15 +161,25 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
         running={run.session.running}
         driveDisabled={run.bannerUp}
         onDrive={() => {
+          const token = driveToken.current + 1;
+          driveToken.current = token;
+          setHardwareNote(null);
           setHeadingRad(0);
           run.session.drive();
+          void drivePathsCm(leftPathCm, rightPathCm).then((result) => {
+            if (driveToken.current !== token) return;
+            if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+          });
         }}
         onReset={() => {
+          driveToken.current += 1;
+          setHardwareNote(null);
           setHeadingRad(0);
           run.session.reset();
         }}
         feedback={feedback}
         feedbackOk={run.session.finished && hit && missionKind === open?.id}
+        notice={hardwareNote}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <NumberControl
