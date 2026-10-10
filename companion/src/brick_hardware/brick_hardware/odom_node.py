@@ -11,7 +11,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
-from brick_core.geometry import yaw_to_quaternion
+from brick_core.geometry import Pose2D, yaw_from_quaternion, yaw_to_quaternion
 from brick_core.odometry import UnicycleOdometry
 
 LEFT_JOINT = "wheel_left_joint"
@@ -26,17 +26,24 @@ class OdomNode(Node):
     def __init__(self) -> None:
         super().__init__("odom_node")
         self.declare_parameter("chassis_file", "")
+        self.declare_parameter("origin_topic", "")
         chassis_file = str(self.get_parameter("chassis_file").value)
+        origin_topic = str(self.get_parameter("origin_topic").value).strip()
         self.chassis = self._load_chassis(chassis_file)
         self.odom = UnicycleOdometry(self.chassis)
         self._last_t: float | None = None
         self._warned_missing = False
+        self._origin_topic = origin_topic
+        self._origin_ready = origin_topic == ""
 
         self.odom_pub = self.create_publisher(Odometry, "odom", 10)
         self.create_subscription(JointState, "joint_states", self._on_joints, 10)
+        if origin_topic:
+            self.create_subscription(Odometry, origin_topic, self._on_origin, 10)
         self.get_logger().info(
             "odom_node: /joint_states -> /odom "
-            f"{self.chassis.odom_frame} (TF is odom_tf from /odom/gyro)"
+            f"{self.chassis.odom_frame}"
+            + (f", origin once from {origin_topic}" if origin_topic else "")
         )
 
     def _load_chassis(self, chassis_file: str) -> Chassis:
@@ -55,6 +62,25 @@ class OdomNode(Node):
             self.get_logger().info(f"loaded chassis from {found}")
         return chassis
 
+    def _on_origin(self, msg: Odometry) -> None:
+        if self._origin_ready:
+            return
+        pose = msg.pose.pose
+        q = pose.orientation
+        self.odom.reset(
+            Pose2D(
+                x=float(pose.position.x),
+                y=float(pose.position.y),
+                theta=yaw_from_quaternion(q.x, q.y, q.z, q.w),
+            )
+        )
+        self._last_t = None
+        self._origin_ready = True
+        self.get_logger().info(
+            f"odom origin {self.odom.pose.x:.3f} {self.odom.pose.y:.3f} "
+            f"yaw {self.odom.pose.theta:.3f} from {self._origin_topic}"
+        )
+
     def _on_joints(self, msg: JointState) -> None:
         try:
             left = float(msg.position[msg.name.index(LEFT_JOINT)])
@@ -67,6 +93,8 @@ class OdomNode(Node):
                 self._warned_missing = True
             return
         self._warned_missing = False
+        if not self._origin_ready:
+            return
 
         now = _stamp_sec(msg.header.stamp)
         dt = 0.0

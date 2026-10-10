@@ -45,3 +45,26 @@ def test_downward_pitch_keeps_the_center_ray() -> None:
     finite = np.isfinite(ranges)
     assert int(finite.sum()) == 1
     assert abs(float(ranges[finite][0]) - height / np.tan(pitch)) < 0.02
+
+
+def test_mount_offset_is_added_in_the_level_frame() -> None:
+    mask = np.zeros((120, 160), dtype=np.uint8)
+    mask[60, 80] = 255
+    height = 0.10
+    pitch = 0.45
+    forward = 0.03
+    ranges = ranges_from_edges(
+        mask,
+        camera_height_m=height,
+        pitch_rad=pitch,
+        horizontal_fov_rad=1.047,
+        vertical_fov_rad=0.0,
+        angle_increment_rad=0.0174532925,
+        range_min_m=0.05,
+        range_max_m=4.0,
+        origin_x_m=forward,
+    )
+    assert ranges is not None
+    finite = np.isfinite(ranges)
+    assert int(finite.sum()) == 1
+    assert abs(float(ranges[finite][0]) - (height / np.tan(pitch) + forward)) < 0.02

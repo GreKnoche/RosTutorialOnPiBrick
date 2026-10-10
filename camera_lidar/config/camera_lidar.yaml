@@ -6,7 +6,12 @@ camera_lidar:
     image_topic: /camera/image_raw
     debug_mask_topic: /camera_lidar/debug_mask
     scan_topic: /camera_lidar/scan
-    frame_id: camera_link
+    # Level base, not the pitched camera_link. A scan in camera_link is drawn
+    # in the tilted camera plane and dives through the ground.
+    frame_id: base_link
+    # Lens position in base_link. Matches shared/camera.yaml xyz x and y.
+    camera_forward_m: 0.03
+    camera_left_m: 0.0
 
     # Lens above the road: mount z 0.072 m plus the 0.028 m wheel radius.
     # base_link rests at the wheel radius, so 0.072 m is not the ground height.

@@ -28,4 +28,4 @@ WORKDIR /ws/companion
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
 
 # backend:=sim|hardware|gazebo — same robot contract over DDS; no HW in this image.
-CMD ["bash", "-lc", "source /opt/ros/${ROS_DISTRO}/setup.bash && source /ws/companion/install/setup.bash && echo companion backend=${BACKEND} lesson=${LESSON} ROS_DOMAIN_ID=${ROS_DOMAIN_ID} && ros2 launch brick_bringup tutorial.launch.py backend:=${BACKEND} lesson:=${LESSON} rviz:=${RVIZ}"]
+CMD ["bash", "-lc", "source /opt/ros/${ROS_DISTRO}/setup.bash && source /ws/companion/install/setup.bash && echo companion launch=${LAUNCH:-tutorial.launch.py} backend=${BACKEND} lesson=${LESSON} ROS_DOMAIN_ID=${ROS_DOMAIN_ID} && ros2 launch brick_bringup ${LAUNCH:-tutorial.launch.py} backend:=${BACKEND} lesson:=${LESSON} rviz:=${RVIZ}"]

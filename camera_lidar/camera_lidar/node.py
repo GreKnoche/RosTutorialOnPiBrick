@@ -46,7 +46,9 @@ class CameraLidar(Node):
         self.declare_parameter("image_topic", "/camera/image_raw")
         self.declare_parameter("debug_mask_topic", "/camera_lidar/debug_mask")
         self.declare_parameter("scan_topic", "/camera_lidar/scan")
-        self.declare_parameter("frame_id", "camera_link")
+        self.declare_parameter("frame_id", "base_link")
+        self.declare_parameter("camera_forward_m", 0.03)
+        self.declare_parameter("camera_left_m", 0.0)
         self.declare_parameter("camera_height_m", 0.072)
         self.declare_parameter("pitch_rad", 0.0)
         self.declare_parameter("horizontal_fov_rad", 1.047)
@@ -96,6 +98,8 @@ class CameraLidar(Node):
             angle_increment_rad=step,
             range_min_m=float(self.get_parameter("range_min_m").value),
             range_max_m=float(self.get_parameter("range_max_m").value),
+            origin_x_m=float(self.get_parameter("camera_forward_m").value),
+            origin_y_m=float(self.get_parameter("camera_left_m").value),
         )
         if ranges is None:
             return

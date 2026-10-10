@@ -51,6 +51,17 @@ def _setup(context, *args, **kwargs):
         ]
 
     use_sim_time = backend == "gazebo"
+    from brick_nav.odom_mux import DEFAULT_SOURCES, topic_key
+
+    selected_source = topic_key(
+        context.perform_substitution(LaunchConfiguration("odom_source"))
+    )
+    origin_topic = context.perform_substitution(
+        LaunchConfiguration("odom_origin_topic")
+    ).strip()
+    sources = list(DEFAULT_SOURCES)
+    if selected_source not in sources:
+        sources.append(selected_source)
     rsp = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -115,6 +126,7 @@ def _setup(context, *args, **kwargs):
             {
                 "chassis_file": chassis_path,
                 "use_sim_time": use_sim_time,
+                "origin_topic": origin_topic,
             }
         ],
     )
@@ -132,10 +144,8 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
-    # Always a pose in the odom frame. /odom/matched is expressed in map;
-    # broadcasting it publishes map→base_link and RViz cannot place the
-    # camera scan in the odom view.
-    selected_source = "odom/gyro"
+    # /odom/matched is expressed in map. Broadcasting it publishes
+    # map→base_link and RViz cannot place the camera scan in the odom view.
     odom_mux = Node(
         package="brick_nav",
         executable="odom_mux",
@@ -144,6 +154,7 @@ def _setup(context, *args, **kwargs):
         parameters=[
             {
                 "use_sim_time": use_sim_time,
+                "source_topics": sources,
                 "selected_source": selected_source,
             }
         ],
@@ -234,6 +245,16 @@ def generate_launch_description() -> LaunchDescription:
                 "rviz",
                 default_value="true",
                 description="Open RViz2 with odom, robot model, Range, IMU, and 2D Goal Pose.",
+            ),
+            DeclareLaunchArgument(
+                "odom_source",
+                default_value="odom/gyro",
+                description="Odometry topic forwarded to /odom/selected and TF.",
+            ),
+            DeclareLaunchArgument(
+                "odom_origin_topic",
+                default_value="",
+                description="If set, /odom copies x, y, and yaw once from this Odometry topic before integrating.",
             ),
             OpaqueFunction(function=_setup),
         ]

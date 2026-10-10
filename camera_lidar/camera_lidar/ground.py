@@ -65,6 +65,8 @@ def ranges_from_edges(
     angle_increment_rad: float,
     range_min_m: float,
     range_max_m: float,
+    origin_x_m: float = 0.0,
+    origin_y_m: float = 0.0,
 ) -> np.ndarray | None:
     """Nearest ground hit per beam. Empty or invalid input returns None."""
     if mask.size == 0 or angle_increment_rad <= 0 or horizontal_fov_rad <= 0:
@@ -101,8 +103,12 @@ def ranges_from_edges(
     if not np.any(hits):
         return ranges
     scale = camera_height_m / down[hits]
-    distance = np.hypot(scale * forward[hits], scale * left[hits]).astype(np.float32)
-    angle = np.arctan2(scale * left[hits], scale * forward[hits])
+    # Hits are in the level frame. Shift them from the lens to base_link so a
+    # LaserScan in that frame stays on the ground instead of the pitched camera plane.
+    forward_m = scale * forward[hits] + origin_x_m
+    left_m = scale * left[hits] + origin_y_m
+    distance = np.hypot(forward_m, left_m).astype(np.float32)
+    angle = np.arctan2(left_m, forward_m)
 
     keep = (
         (distance >= range_min_m)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
-from brick_core.geometry import Twist2D, wrap_angle
+from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
 from brick_core.robot import DiffDriveRobot
 from brick_core.sim_backend import SimBackend
@@ -73,6 +73,16 @@ def test_straight_line_odometry() -> None:
     assert abs(pose.x - distance) < 1e-9
     assert abs(pose.y) < 1e-9
     assert abs(pose.theta) < 1e-9
+
+
+def test_reset_pose_is_the_origin_for_later_wheel_steps() -> None:
+    chassis = Chassis()
+    odom = UnicycleOdometry(chassis)
+    odom.reset(Pose2D(x=0.0, y=-1.05, theta=0.0))
+    odom.update(0.2, 0.2)
+    pose = odom.update(0.2 + 0.5 / chassis.wheel_radius_m, 0.2 + 0.5 / chassis.wheel_radius_m)
+    assert abs(pose.x - 0.5) < 1e-9
+    assert abs(pose.y - (-1.05)) < 1e-9
 
 
 def test_spin_in_place_odometry() -> None:

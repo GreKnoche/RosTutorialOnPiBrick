@@ -14,6 +14,7 @@ services:
       - QT_X11_NO_MITSHM=1
       # sim = offline twin. hardware/gazebo need /joint_states on DDS; this container publishes /odom.
       - BACKEND=${BACKEND:-sim}
+      - LAUNCH=${LAUNCH:-tutorial.launch.py}
       - LESSON=${LESSON:-01}
       - RVIZ=${RVIZ:-true}
       - ROS_STATIC_PEERS=${ROS_STATIC_PEERS:-}
