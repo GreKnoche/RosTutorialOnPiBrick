@@ -10,6 +10,8 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
 
+from gyrodometry.timebase import stamp_matches_clock
+
 
 class OdomTf(Node):
     def __init__(self) -> None:
@@ -17,10 +19,21 @@ class OdomTf(Node):
         self.declare_parameter("odom_topic", "odom/gyro")
         topic = str(self.get_parameter("odom_topic").value)
         self._tf = TransformBroadcaster(self)
+        self._dropped = False
         self.create_subscription(Odometry, topic, self._on_odom, 10)
         self.get_logger().info(f"odom_tf: {topic} -> TF odom -> base_link")
 
     def _on_odom(self, msg: Odometry) -> None:
+        stamp = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
+        clock = self.get_clock().now().nanoseconds * 1e-9
+        if not stamp_matches_clock(stamp, clock):
+            if not self._dropped:
+                self.get_logger().warn(
+                    f"dropping odom TF stamp {stamp:.3f}s; clock is {clock:.3f}s"
+                )
+                self._dropped = True
+            return
+        self._dropped = False
         tf_msg = TransformStamped()
         tf_msg.header = msg.header
         tf_msg.child_frame_id = msg.child_frame_id or "base_link"

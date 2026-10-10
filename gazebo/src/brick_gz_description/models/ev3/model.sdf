@@ -5,6 +5,8 @@
   Geometry follows the official Gyro Sensor Driving Base and Ultrasonic
   Sensor Driving Base instruction PDFs (same chassis, both sensors fitted)
   plus LEGO Education DriveBase numbers: 56 mm wheels, 118 mm axle track.
+  A grayscale lane camera sits on top of the brick, looking along +X.
+  sim.launch rewrites that block from shared/camera.yaml.
 
   Technic module M = 8 mm. base_link origin is the midpoint of the wheel
   axles; +X forward (ultrasonic), +Y left, +Z up. Spawn the model at
@@ -713,6 +715,80 @@
       <parent>base_link</parent>
       <child>ultrasonic_link</child>
     </joint>
+
+    <!-- BEGIN camera -->
+    <!-- Grayscale lane camera. sim.launch rewrites this block from shared/camera.yaml. -->
+    <link name="camera_link">
+      <pose>0.03 0 0.072 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>0.0000006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00000064</iyy>
+          <iyz>0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <pose>-0.004 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.025 0.024 0.012</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="body">
+        <pose>-0.004 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.025 0.024 0.012</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.08 0.08 0.08 1</diffuse>
+        </material>
+      </visual>
+      <visual name="lens">
+        <pose>0.008 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.004</radius>
+            <length>0.004</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.15 0.16 0.18 1</ambient>
+          <diffuse>0.25 0.28 0.32 1</diffuse>
+        </material>
+      </visual>
+      <sensor name="camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>10</update_rate>
+        <topic>camera</topic>
+        <gz_frame_id>camera_optical_frame</gz_frame_id>
+        <visualize>false</visualize>
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>320</width>
+            <height>240</height>
+            <format>L8</format>
+          </image>
+          <clip>
+            <near>0.05</near>
+            <far>4</far>
+          </clip>
+        </camera>
+      </sensor>
+    </link>
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+    <!-- END camera -->
 
     <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
       <left_joint>wheel_left_joint</left_joint>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -10,12 +11,14 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
     SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -23,43 +26,51 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
     pkg_bringup = get_package_share_directory("brick_gz_bringup")
     pkg_gazebo = get_package_share_directory("brick_gz_gazebo")
+    pkg_description = get_package_share_directory("brick_gz_description")
     pkg_ros_gz_sim = get_package_share_directory("ros_gz_sim")
 
-    gz_sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
-        ),
-        launch_arguments={
-            "gz_args": [
-                LaunchConfiguration("gz_args_prefix"),
-                PathJoinSubstitution(
-                    [
-                        pkg_gazebo,
-                        "worlds",
-                        PythonExpression(
-                            [
-                                "'brick_' + '",
-                                LaunchConfiguration("world"),
-                                "' + '.sdf'",
-                            ]
-                        ),
-                    ]
-                ),
-            ]
-        }.items(),
-    )
+    def _start_gazebo(context, *args, **kwargs):
+        from brick_core.camera import find_camera_yaml, load_camera, write_gazebo_runtime
 
-    bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        parameters=[
-            {
-                "config_file": os.path.join(pkg_bringup, "config", "bridge.yaml"),
-                "qos_overrides./tf_static.publisher.durability": "transient_local",
-            }
-        ],
-        output="screen",
-    )
+        world_name = context.perform_substitution(LaunchConfiguration("world"))
+        prefix = context.perform_substitution(LaunchConfiguration("gz_args_prefix"))
+        camera_path = find_camera_yaml()
+        camera = load_camera(camera_path)
+        world_path, bridge_path = write_gazebo_runtime(
+            world_sdf=Path(pkg_gazebo) / "worlds" / f"brick_{world_name}.sdf",
+            model_sdf=Path(pkg_description) / "models" / "ev3" / "model.sdf",
+            model_config=Path(pkg_description) / "models" / "ev3" / "model.config",
+            bridge_yaml=Path(pkg_bringup) / "config" / "bridge.yaml",
+            camera=camera,
+        )
+        source = str(camera_path) if camera_path else "Camera() defaults"
+        gz_sim = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
+            ),
+            launch_arguments={"gz_args": f"{prefix}{world_path}"}.items(),
+        )
+        bridge = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            parameters=[
+                {
+                    "config_file": str(bridge_path),
+                    "qos_overrides./tf_static.publisher.durability": "transient_local",
+                }
+            ],
+            output="screen",
+        )
+        return [
+            LogInfo(
+                msg=(
+                    f"lane camera {camera.width}x{camera.height} mono8 "
+                    f"fov={camera.fov_horizontal_rad} rad from {source}"
+                )
+            ),
+            gz_sim,
+            bridge,
+        ]
 
     scan_to_range = Node(
         package="brick_gz_bringup",
@@ -102,6 +113,21 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("teleop")),
     )
 
+    camera_lidar = Node(
+        package="camera_lidar",
+        executable="camera_lidar",
+        name="camera_lidar",
+        output="screen",
+        parameters=[
+            os.path.join(
+                get_package_share_directory("camera_lidar"),
+                "config",
+                "camera_lidar.yaml",
+            )
+        ],
+        condition=IfCondition(LaunchConfiguration("camera_lidar")),
+    )
+
     follow_camera = ExecuteProcess(
         cmd=[
             "bash",
@@ -124,8 +150,8 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "world",
-                default_value="lab",
-                description="Gazebo world: lab (flat), ruler (1 m tape from origin), or relief (kerbs).",
+                default_value="oval",
+                description="Gazebo world: oval (stadium road, default), lab (flat), ruler (1 m tape), or relief (kerbs).",
             ),
             DeclareLaunchArgument(
                 "gz_args_prefix",
@@ -147,11 +173,16 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="true",
                 description="Snap GUI camera behind the EV3 (no laggy follow).",
             ),
-            gz_sim,
-            bridge,
+            DeclareLaunchArgument(
+                "camera_lidar",
+                default_value="true",
+                description="Publish a ground-plane LaserScan from /camera/image_raw.",
+            ),
+            OpaqueFunction(function=_start_gazebo),
             scan_to_range,
             drive_wheels,
             sensor_drift,
+            camera_lidar,
             teleop,
             TimerAction(period=4.5, actions=[follow_camera]),
         ]

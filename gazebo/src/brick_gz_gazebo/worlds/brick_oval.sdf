@@ -1,0 +1,130 @@
+<?xml version="1.0" ?>
+<!--
+  Stadium oval. Centerline straights are 2.4 m, end radius 1.05 m, road
+  0.72 m wide (same paint as the relief loop: asphalt, white edges, dirt
+  shoulder, dashed yellow center). Regenerate the texture with
+  models/oval_ground/generate_texture.py.
+
+  EV3 spawn is the middle of the south straight, on the centerline,
+  facing +X so a positive cmd_vel follows the oval counterclockwise.
+-->
+<sdf version="1.11">
+  <world name="brick_oval">
+    <physics name="2ms" type="ignored">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <scene>
+      <ambient>0.8 0.8 0.8 1</ambient>
+      <background>0.58 0.66 0.72 1</background>
+      <grid>false</grid>
+    </scene>
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.30 0.46 0.22 1</ambient>
+            <diffuse>0.34 0.50 0.24 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://oval_ground</uri>
+      <name>oval_ground</name>
+      <pose>0 0 0.0005 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_ne</name>
+      <pose>3.35 1.85 0 0 0 0.4</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_nw</name>
+      <pose>-3.35 1.85 0 0 0 -0.6</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_se</name>
+      <pose>3.35 -1.85 0 0 0 0.2</pose>
+    </include>
+    <include>
+      <uri>model://park_tree</uri>
+      <name>tree_sw</name>
+      <pose>-3.35 -1.85 0 0 0 -0.3</pose>
+    </include>
+
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_n</name>
+      <pose>0.2 1.9 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_s</name>
+      <pose>-0.4 -1.9 0 0 0 0.4</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_e</name>
+      <pose>3.15 0.15 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_w</name>
+      <pose>-3.15 -0.2 0 0 0 -0.5</pose>
+    </include>
+    <include>
+      <uri>model://park_bush</uri>
+      <name>bush_infield</name>
+      <pose>0 0 0 0 0 0.2</pose>
+    </include>
+
+    <include>
+      <uri>package://brick_gz_description/models/ev3</uri>
+      <name>ev3</name>
+      <pose>0 -1.05 0.028 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

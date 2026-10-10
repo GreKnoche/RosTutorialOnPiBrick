@@ -1,5 +1,6 @@
 # Bridge Gazebo Harmonic onto the same raw-sensor contract as brick_hw.
-# Public: /cmd_vel in, /joint_states /imu /ultrasonic out (US via scan_to_range).
+# Public: /cmd_vel in, /joint_states /imu /ultrasonic /camera/image_raw out
+# (US via scan_to_range). Camera topics follow shared/camera.yaml at launch.
 # Companion owns /odom and TF odom -> base_link. Debug-only: /odom/wheel,
 # /odom/perfect. Do not bridge DiffDrive or OdometryPublisher TF.
 ---
@@ -37,4 +38,14 @@
   gz_topic_name: "/model/ev3/joint_state"
   ros_type_name: "sensor_msgs/msg/JointState"
   gz_type_name: "gz.msgs.Model"
+  direction: GZ_TO_ROS
+- ros_topic_name: "/camera/image_raw"
+  gz_topic_name: "/camera"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+- ros_topic_name: "/camera/camera_info"
+  gz_topic_name: "/camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
   direction: GZ_TO_ROS

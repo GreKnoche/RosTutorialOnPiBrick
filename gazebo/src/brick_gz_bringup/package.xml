@@ -18,6 +18,7 @@
   <exec_depend>brick_core</exec_depend>
   <exec_depend>brick_interfaces</exec_depend>
   <exec_depend>brick_math</exec_depend>
+  <exec_depend>camera_lidar</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

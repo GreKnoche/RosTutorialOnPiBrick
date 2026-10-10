@@ -4,11 +4,17 @@ import math
 
 import pytest
 
+from gyrodometry.timebase import stamp_matches_clock
 from gyrodometry.borenstein import (
     THRESHOLD_DEG_S,
     heading_increment,
     travel_from_pose_delta,
 )
+
+
+def test_stamp_matches_clock_rejects_wall_time_during_sim() -> None:
+    assert stamp_matches_clock(12.5, 12.4)
+    assert not stamp_matches_clock(1_791_644_000.0, 12.4)
 
 
 def test_uses_odometry_when_rates_agree() -> None:

@@ -1,0 +1,29 @@
+# Forward camera to a ground-plane LaserScan. No IPM image.
+# Height, pitch, and horizontal FOV should match shared/camera.yaml.
+camera_lidar:
+  ros__parameters:
+    use_sim_time: true
+    image_topic: /camera/image_raw
+    debug_mask_topic: /camera_lidar/debug_mask
+    scan_topic: /camera_lidar/scan
+    frame_id: camera_link
+
+    # Lens above the road: mount z 0.072 m plus the 0.028 m wheel radius.
+    # base_link rests at the wheel radius, so 0.072 m is not the ground height.
+    camera_height_m: 0.100
+    # Positive pitch looks down. Must match shared/camera.yaml.
+    pitch_rad: 0.45
+    horizontal_fov_rad: 1.047
+    # 0 derives the vertical field from the image aspect and square pixels.
+    vertical_fov_rad: 0.0
+    angle_increment_rad: 0.0174532925
+    # The wheels sit in the bottom of the frame and would otherwise be the
+    # nearest hit on every center beam.
+    range_min_m: 0.15
+    range_max_m: 4.0
+
+    blur_kernel_size: 5
+    blur_sigma: 0.0
+    gradient_threshold: 35
+    morph_open_size: 3
+    morph_close_size: 5

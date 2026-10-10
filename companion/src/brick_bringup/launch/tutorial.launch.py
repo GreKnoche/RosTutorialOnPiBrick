@@ -32,6 +32,17 @@ def _setup(context, *args, **kwargs):
         chassis_path = ""
     with open(urdf_path, encoding="utf-8") as handle:
         robot_description = handle.read()
+    from brick_core.camera import (
+        camera_urdf_fragment,
+        find_camera_yaml,
+        load_camera,
+        splice_marked_block,
+    )
+
+    camera_path = find_camera_yaml()
+    camera = load_camera(camera_path)
+    robot_description = splice_marked_block(robot_description, camera_urdf_fragment(camera))
+    camera_source = str(camera_path) if camera_path else "Camera() defaults"
 
     lesson_launch = os.path.join(nav_share, "launch", f"lesson_{lesson}.launch.py")
     if not os.path.exists(lesson_launch):
@@ -60,9 +71,9 @@ def _setup(context, *args, **kwargs):
     )
     bringup_share = get_package_share_directory("brick_bringup")
     rviz_template = os.path.join(bringup_share, "rviz", "drive_to_pose.rviz")
-    # Gazebo has map → odom. Hardware and the sim twin only have odom → base_link.
-    fixed_frame = "map" if backend == "gazebo" else "odom"
-    map_enabled = "true" if backend == "gazebo" else "false"
+    # odom keeps the model and the camera scan in view without subscribing to /map.
+    fixed_frame = "odom"
+    map_enabled = "false"
     with open(rviz_template, encoding="utf-8") as handle:
         rviz_body = (
             handle.read()
@@ -121,8 +132,10 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
-    # map_match (and /odom/matched) only runs with the Gazebo relief map.
-    selected_source = "odom/matched" if backend == "gazebo" else "odom/gyro"
+    # Always a pose in the odom frame. /odom/matched is expressed in map;
+    # broadcasting it publishes map→base_link and RViz cannot place the
+    # camera scan in the odom view.
+    selected_source = "odom/gyro"
     odom_mux = Node(
         package="brick_nav",
         executable="odom_mux",
@@ -151,7 +164,8 @@ def _setup(context, *args, **kwargs):
         LogInfo(
             msg=(
                 f"Pi brick tutorial backend={backend} lesson={lesson} "
-                f"ROS_DOMAIN_ID={domain}"
+                f"ROS_DOMAIN_ID={domain} camera={camera.width}x{camera.height} "
+                f"from {camera_source}"
             )
         ),
         SetLaunchConfiguration("chassis_file", chassis_path),

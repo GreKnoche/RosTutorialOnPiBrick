@@ -20,7 +20,8 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-ev3
       - QT_X11_NO_MITSHM=1
       - GZ_VERSION=harmonic
-      - WORLD=${WORLD:-relief}
+      - WORLD=${WORLD:-oval}
+      - BRICK_CAMERA_YAML=/ws/camera.yaml
     devices:
       - /dev/dri
     volumes:
@@ -28,8 +29,10 @@ services:
       - ../shared/brick_math:/ws/src/brick_math
       - ../companion/src/brick_core:/ws/src/brick_core
       - ../companion/src/brick_interfaces:/ws/src/brick_interfaces
+      - ../camera_lidar:/ws/src/camera_lidar
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:${XAUTHORITY}:ro
+      - ../shared/camera.yaml:/ws/camera.yaml:ro
     stdin_open: true
     tty: true
     command: >

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-sdformat-urdf \
     ros-jazzy-teleop-twist-keyboard \
     python3-colcon-common-extensions \
+    python3-opencv \
     python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,6 +20,7 @@ COPY gazebo/src /ws/src
 COPY shared/brick_math /ws/src/brick_math
 COPY companion/src/brick_core /ws/src/brick_core
 COPY companion/src/brick_interfaces /ws/src/brick_interfaces
+COPY camera_lidar /ws/src/camera_lidar
 
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/ros/jazzy/setup.bash && colcon build --symlink-install

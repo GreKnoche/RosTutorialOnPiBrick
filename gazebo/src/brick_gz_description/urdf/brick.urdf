@@ -238,4 +238,45 @@
     <child link="ultrasonic_link"/>
     <origin xyz="0.078 0 -0.004" rpy="0 0 0"/>
   </joint>
+
+  <!-- BEGIN camera -->
+  <!-- Grayscale lane camera. tutorial.launch rewrites this block from shared/camera.yaml. -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="-0.004 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.024 0.012"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <visual>
+      <origin xyz="0.008 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.004" length="0.004"/>
+      </geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.004 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.024 0.012"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.0000006" ixy="0" ixz="0" iyy="0.00000064" iyz="0" izz="0.000001"/>
+    </inertial>
+  </link>
+  <link name="camera_optical_frame"/>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.03 0 0.072" rpy="0 0 0"/>
+  </joint>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+  </joint>
+  <!-- END camera -->
 </robot>
