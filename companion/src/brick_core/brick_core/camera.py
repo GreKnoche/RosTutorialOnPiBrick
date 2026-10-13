@@ -30,7 +30,7 @@ class Camera:
     fov_horizontal_rad: float = 1.047
     near_m: float = 0.05
     far_m: float = 4.0
-    xyz: tuple[float, float, float] = (0.03, 0.0, 0.072)
+    xyz: tuple[float, float, float] = (0.03, 0.0, 0.11)
     rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
     pitch_rad: float = 0.0
     frame: str = "camera_link"
@@ -42,7 +42,7 @@ class Camera:
     def from_dict(cls, data: Mapping[str, Any]) -> "Camera":
         frames = data.get("frames") or {}
         topics = data.get("topics") or {}
-        xyz = _vec3(data.get("xyz"), (0.03, 0.0, 0.072), "xyz")
+        xyz = _vec3(data.get("xyz"), (0.03, 0.0, 0.11), "xyz")
         rpy = _vec3(data.get("rpy"), (0.0, 0.0, 0.0), "rpy")
         if "pitch_rad" in data and data["pitch_rad"] is not None:
             pitch = float(data["pitch_rad"])

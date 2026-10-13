@@ -82,7 +82,9 @@ def ranges_from_edges(
     cy = (rows - 1) * 0.5
 
     half = 0.5 * horizontal_fov_rad
-    count = int(np.floor((2.0 * half) / angle_increment_rad)) + 1
+    # Karto (slam_toolbox) expects round((angle_max - angle_min) / increment) + 1.
+    # floor() is one short for this FOV, and every scan is then rejected.
+    count = int(np.round((2.0 * half) / angle_increment_rad)) + 1
     ranges = np.full(count, INF, dtype=np.float32)
 
     ys, xs = np.nonzero(mask)

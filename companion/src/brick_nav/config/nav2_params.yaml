@@ -1,5 +1,5 @@
 # Nav2 drive-to-pose on odometry only. No map, no AMCL, no lidar.
-# Gazebo uses config/nav2_params_gazebo.yaml plus maps/brick_relief.yaml.
+# Gazebo uses config/nav2_params_gazebo.yaml. /map comes from slam_toolbox.
 bt_navigator:
   ros__parameters:
     global_frame: odom

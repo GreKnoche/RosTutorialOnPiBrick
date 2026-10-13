@@ -5,7 +5,7 @@
   Geometry follows the official Gyro Sensor Driving Base and Ultrasonic
   Sensor Driving Base instruction PDFs (same chassis, both sensors fitted)
   plus LEGO Education DriveBase numbers: 56 mm wheels, 118 mm axle track.
-  A grayscale lane camera sits on top of the brick, looking along +X.
+  A grayscale lane camera sits on a Technic portal above the brick, looking along +X.
   sim.launch rewrites that block from shared/camera.yaml.
 
   Technic module M = 8 mm. base_link origin is the midpoint of the wheel
@@ -231,6 +231,79 @@
         <material>
           <ambient>0.45 0.46 0.47 1</ambient>
           <diffuse>0.52 0.53 0.54 1</diffuse>
+        </material>
+      </visual>
+      <!-- Technic portal: posts on the side beams, rails forward, camera on the front beam. -->
+      <visual name="mast_post_left">
+        <pose>0.014 0.046 0.072 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.008 0.008 0.040</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
+        </material>
+      </visual>
+      <visual name="mast_post_right">
+        <pose>0.014 -0.046 0.072 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.008 0.008 0.040</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
+        </material>
+      </visual>
+      <visual name="mast_rear">
+        <pose>0.014 0 0.096 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.008 0.108 0.008</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
+        </material>
+      </visual>
+      <visual name="mast_rail_left">
+        <pose>0.022 0.046 0.096 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.024 0.008 0.008</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
+        </material>
+      </visual>
+      <visual name="mast_rail_right">
+        <pose>0.022 -0.046 0.096 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.024 0.008 0.008</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
+        </material>
+      </visual>
+      <visual name="mast_front">
+        <pose>0.030 0 0.096 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.008 0.108 0.008</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.58 0.59 0.60 1</ambient>
+          <diffuse>0.66 0.67 0.68 1</diffuse>
         </material>
       </visual>
     </link>
@@ -719,7 +792,7 @@
     <!-- BEGIN camera -->
     <!-- Grayscale lane camera. sim.launch rewrites this block from shared/camera.yaml. -->
     <link name="camera_link">
-      <pose>0.03 0 0.072 0 0 0</pose>
+      <pose>0.03 0 0.11 0 0 0</pose>
       <inertial>
         <mass>0.01</mass>
         <inertia>

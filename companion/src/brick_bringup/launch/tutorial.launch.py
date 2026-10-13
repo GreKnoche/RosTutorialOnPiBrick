@@ -53,12 +53,17 @@ def _setup(context, *args, **kwargs):
     use_sim_time = backend == "gazebo"
     from brick_nav.odom_mux import DEFAULT_SOURCES, topic_key
 
-    selected_source = topic_key(
-        context.perform_substitution(LaunchConfiguration("odom_source"))
-    )
+    # Empty means the backend default: Gazebo world pose, gyrodometry elsewhere.
+    # An explicit odom_source:= or odom_origin_topic:= still wins.
+    selected_raw = context.perform_substitution(LaunchConfiguration("odom_source")).strip()
     origin_topic = context.perform_substitution(
         LaunchConfiguration("odom_origin_topic")
     ).strip()
+    if not selected_raw:
+        selected_raw = "odom/perfect" if backend == "gazebo" else "odom/gyro"
+    if not origin_topic and backend == "gazebo":
+        origin_topic = "odom/perfect"
+    selected_source = topic_key(selected_raw)
     sources = list(DEFAULT_SOURCES)
     if selected_source not in sources:
         sources.append(selected_source)
@@ -82,9 +87,11 @@ def _setup(context, *args, **kwargs):
     )
     bringup_share = get_package_share_directory("brick_bringup")
     rviz_template = os.path.join(bringup_share, "rviz", "drive_to_pose.rviz")
-    # odom keeps the model and the camera scan in view without subscribing to /map.
+    # Gazebo lesson 01 draws the live slam /map. The robot model stays on odom
+    # → base_link, so a map correction cannot teleport it.
+    live_map = use_sim_time and lesson == "01"
     fixed_frame = "odom"
-    map_enabled = "false"
+    map_enabled = "true" if live_map else "false"
     with open(rviz_template, encoding="utf-8") as handle:
         rviz_body = (
             handle.read()
@@ -175,6 +182,7 @@ def _setup(context, *args, **kwargs):
         LogInfo(
             msg=(
                 f"Pi brick tutorial backend={backend} lesson={lesson} "
+                f"odom_source={selected_source} "
                 f"ROS_DOMAIN_ID={domain} camera={camera.width}x{camera.height} "
                 f"from {camera_source}"
             )
@@ -248,13 +256,19 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "odom_source",
-                default_value="odom/gyro",
-                description="Odometry topic forwarded to /odom/selected and TF.",
+                default_value="",
+                description=(
+                    "Odometry topic forwarded to /odom/selected and TF. "
+                    "Empty selects odom/perfect on gazebo and odom/gyro otherwise."
+                ),
             ),
             DeclareLaunchArgument(
                 "odom_origin_topic",
                 default_value="",
-                description="If set, /odom copies x, y, and yaw once from this Odometry topic before integrating.",
+                description=(
+                    "If set, /odom copies x, y, and yaw once from this Odometry topic before integrating. "
+                    "Empty on gazebo copies odom/perfect so integration starts at the spawn pose."
+                ),
             ),
             OpaqueFunction(function=_setup),
         ]

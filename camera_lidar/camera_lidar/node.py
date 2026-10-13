@@ -49,7 +49,7 @@ class CameraLidar(Node):
         self.declare_parameter("frame_id", "base_link")
         self.declare_parameter("camera_forward_m", 0.03)
         self.declare_parameter("camera_left_m", 0.0)
-        self.declare_parameter("camera_height_m", 0.072)
+        self.declare_parameter("camera_height_m", 0.138)
         self.declare_parameter("pitch_rad", 0.0)
         self.declare_parameter("horizontal_fov_rad", 1.047)
         self.declare_parameter("vertical_fov_rad", 0.0)

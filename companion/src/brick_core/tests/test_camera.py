@@ -41,7 +41,7 @@ def test_pitch_and_size_rewrite_the_marked_block() -> None:
     block = camera_sdf_fragment(camera)
     assert "<width>160</width>" in block
     assert "<height>120</height>" in block
-    assert "<pose>0.03 0 0.072 0 0.4 0</pose>" in block
+    assert "<pose>0.03 0 0.11 0 0.4 0</pose>" in block
     assert "<horizontal_fov>0.8</horizontal_fov>" in block
     assert "<update_rate>5</update_rate>" in block
     urdf = camera_urdf_fragment(camera)

@@ -1,5 +1,4 @@
-# Nav2 on the Gazebo relief occupancy grid. map_match starts at identity
-# map → odom and corrects it after each goal's ultrasonic spin. No AMCL.
+# Nav2 on the live slam_toolbox /map from /camera_lidar/scan. No relief map, no AMCL.
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -102,11 +101,6 @@ global_costmap:
         cost_scaling_factor: 2.5
         inflation_radius: 0.18
       always_send_full_costmap: true
-
-map_server:
-  ros__parameters:
-    topic_name: map
-    frame_id: map
 
 behavior_server:
   ros__parameters:

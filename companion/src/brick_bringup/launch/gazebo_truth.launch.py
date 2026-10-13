@@ -1,8 +1,9 @@
 """Gazebo tutorial with TF from /odom/perfect.
 
-Wheel, gyro, and sono odometry still publish, but they copy x, y, and yaw
-once from the ground-truth pose before integrating. Without that copy they
-start at the origin while Gazebo spawned the brick on the track.
+tutorial.launch.py already selects this for backend:=gazebo. This file
+keeps the explicit entry point. Wheel, gyro, and sono odometry still
+publish, but they copy x, y, and yaw once from the ground-truth pose
+before integrating.
 """
 
 from __future__ import annotations

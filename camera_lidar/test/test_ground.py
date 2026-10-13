@@ -7,6 +7,24 @@ import numpy as np
 from camera_lidar.ground import ranges_from_edges
 
 
+def test_beam_count_matches_karto() -> None:
+    fov = 1.047
+    step = 0.0174532925
+    ranges = ranges_from_edges(
+        np.zeros((8, 8), dtype=np.uint8),
+        camera_height_m=0.1,
+        pitch_rad=0.0,
+        horizontal_fov_rad=fov,
+        vertical_fov_rad=0.0,
+        angle_increment_rad=step,
+        range_min_m=0.05,
+        range_max_m=4.0,
+    )
+    expected = int(np.round(fov / step)) + 1
+    assert ranges is not None
+    assert len(ranges) == expected
+
+
 def test_center_pixel_below_horizon_is_forward() -> None:
     mask = np.zeros((120, 160), dtype=np.uint8)
     mask[110, 80] = 255

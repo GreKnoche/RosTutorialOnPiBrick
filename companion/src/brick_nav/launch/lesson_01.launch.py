@@ -1,4 +1,4 @@
-"""Nav2 drive-to-pose. Gazebo loads the relief occupancy map; sim/hardware stay in odom."""
+"""Nav2 drive-to-pose. Gazebo maps /camera_lidar/scan live; sim/hardware stay in odom."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -24,54 +25,28 @@ def _setup(context, *args, **kwargs):
         "config",
         "nav2_params_gazebo.yaml" if gazebo else "nav2_params.yaml",
     )
-    map_yaml = os.path.join(nav_share, "maps", "brick_relief.yaml")
-    bt_name = "navigate_to_pose_localize.xml" if gazebo else "navigate_to_pose.xml"
-    bt_xml = os.path.join(nav_share, "behavior_trees", bt_name)
+    bt_xml = os.path.join(nav_share, "behavior_trees", "navigate_to_pose.xml")
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
     lifecycle_nodes = ["controller_server", "planner_server", "bt_navigator"]
-    if gazebo:
-        lifecycle_nodes = ["map_server", "behavior_server", *lifecycle_nodes]
 
     nodes = []
     if gazebo:
-        nodes.extend(
-            [
-                Node(
-                    package="brick_nav",
-                    executable="map_match",
-                    name="map_match",
-                    output="screen",
-                    parameters=[
-                        {
-                            "use_sim_time": use_sim_time,
-                            "yaml_filename": map_yaml,
-                        }
-                    ],
-                    remappings=remappings,
+        # slam_toolbox owns /map and map → odom. The costmap static layers
+        # subscribe to that topic; there is no relief-map map_server.
+        nodes.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        get_package_share_directory("slam_toolbox"),
+                        "launch",
+                        "online_async_launch.py",
+                    )
                 ),
-                Node(
-                    package="nav2_behaviors",
-                    executable="behavior_server",
-                    name="behavior_server",
-                    output="screen",
-                    parameters=[params, {"use_sim_time": use_sim_time}],
-                    remappings=remappings,
-                ),
-                Node(
-                    package="nav2_map_server",
-                    executable="map_server",
-                    name="map_server",
-                    output="screen",
-                    parameters=[
-                        params,
-                        {
-                            "use_sim_time": use_sim_time,
-                            "yaml_filename": map_yaml,
-                        },
-                    ],
-                    remappings=remappings,
-                ),
-            ]
+                launch_arguments={
+                    "use_sim_time": context.perform_substitution(use_sim_time),
+                    "slam_params_file": os.path.join(nav_share, "config", "slam_camera.yaml"),
+                }.items(),
+            )
         )
     nodes.extend(
         [

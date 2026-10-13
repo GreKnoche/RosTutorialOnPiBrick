@@ -13,9 +13,9 @@ camera_lidar:
     camera_forward_m: 0.03
     camera_left_m: 0.0
 
-    # Lens above the road: mount z 0.072 m plus the 0.028 m wheel radius.
-    # base_link rests at the wheel radius, so 0.072 m is not the ground height.
-    camera_height_m: 0.100
+    # Lens above the road: mount z 0.11 m plus the 0.028 m wheel radius.
+    # base_link rests at the wheel radius, so 0.11 m is not the ground height.
+    camera_height_m: 0.138
     # Positive pitch looks down. Must match shared/camera.yaml.
     pitch_rad: 0.45
     horizontal_fov_rad: 1.047
