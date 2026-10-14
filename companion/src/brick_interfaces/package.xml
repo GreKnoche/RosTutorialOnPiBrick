@@ -3,7 +3,7 @@
 <package format="3">
   <name>brick_interfaces</name>
   <version>0.1.0</version>
-  <description>Service definitions for wheel commands on the Pi or Gazebo I/O box.</description>
+  <description>Messages and services for wheel commands on the Pi or Gazebo I/O box.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
+
 from fastapi.testclient import TestClient
 
 from app import create_app
 from bridge import WheelResult, timed_out, unavailable
-from drive import reject_revolutions
+from drive import reject_revolutions, revolutions_to_speeds
 
 
 class FakeBridge:
@@ -18,6 +20,25 @@ class FakeBridge:
     def call(self, left: float, right: float, timeout_sec: float = 95.0) -> WheelResult:
         self.calls.append((left, right))
         return self._result
+
+
+def test_revolutions_to_speeds_match_time_and_sign() -> None:
+    left, right, duration = revolutions_to_speeds(2.5, 2.5)
+    assert math.isclose(left, 2.0)
+    assert math.isclose(right, 2.0)
+    assert math.isclose(duration, 2.5 * math.pi)
+
+    left, right, duration = revolutions_to_speeds(0.0, 1.5)
+    assert math.isclose(left, 0.0)
+    assert math.isclose(right, 2.0)
+    assert math.isclose(duration, 1.5 * math.pi)
+
+    left, right, duration = revolutions_to_speeds(-1.0, 2.0)
+    assert math.isclose(left, -1.0)
+    assert math.isclose(right, 2.0)
+    assert math.isclose(duration, 2.0 * math.pi)
+
+    assert revolutions_to_speeds(0.0, 0.0) == (0.0, 0.0, 0.0)
 
 
 def test_reject_revolutions_bounds() -> None:

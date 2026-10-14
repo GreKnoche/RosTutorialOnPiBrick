@@ -13,6 +13,7 @@ install(
     scripts/sensor_drift.py
     scripts/gyrodometry.py
     scripts/drive_wheels.py
+    scripts/wheel_twist.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

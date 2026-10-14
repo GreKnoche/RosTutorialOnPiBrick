@@ -1,8 +1,9 @@
-"""One ROS client for wheel revolutions on /drive_wheels.
+"""One ROS node for a timed /wheel_speeds stream.
 
-Left and right are independent counts. A straight line sends the same number
-twice. A turn sends two different numbers. Both are this same call. Converting
-degrees into revolutions stays outside this process.
+Left and right stay independent. A straight line sends the same revolution
+count twice. A turn sends two different counts. Both become rad/s on one
+topic. The node also subscribes to /joint_states. Converting degrees into
+revolutions stays outside this process.
 """
 
 from __future__ import annotations
@@ -13,10 +14,16 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from drive import revolutions_to_speeds
+
 
 ANSWERED = 200
 UNAVAILABLE = 503
 TIMED_OUT = 504
+STREAM_HZ = 20.0
+STOP_SAMPLES = 3
+_LEFT_JOINT = "wheel_left_joint"
+_RIGHT_JOINT = "wheel_right_joint"
 
 
 @dataclass(frozen=True)
@@ -45,38 +52,69 @@ class WheelGateway(Protocol):
     def call(self, left: float, right: float, timeout_sec: float = 95.0) -> WheelResult: ...
 
 
+@dataclass
+class _SpeedStream:
+    left: float
+    right: float
+    deadline: float
+    phase: str
+    zeros_left: int
+    next_pub: float
+    finished: threading.Event
+    outcome: dict[str, Any]
+
+
+def joint_wheel_positions(names: list[str], positions: list[float]) -> tuple[float, float] | None:
+    if _LEFT_JOINT in names and _RIGHT_JOINT in names and len(positions) >= len(names):
+        return (
+            float(positions[names.index(_LEFT_JOINT)]),
+            float(positions[names.index(_RIGHT_JOINT)]),
+        )
+    if len(positions) >= 2:
+        return float(positions[0]), float(positions[1])
+    return None
+
+
 class RobotBridge:
     def __init__(self) -> None:
         self._robot_ready = False
         self._owns_rclpy = False
         self._rclpy: Any = None
-        self._drive_type: Any = None
+        self._speed_type: Any = None
         self._node: Any = None
-        self._client: Any = None
+        self._pub: Any = None
         self._executor: Any = None
         self._thread: threading.Thread | None = None
         self._running = False
         self._jobs: queue.Queue[Any] = queue.Queue()
+        self._stream: _SpeedStream | None = None
+        self._joints: tuple[float, float] | None = None
 
     @property
     def robot_ready(self) -> bool:
         return self._robot_ready
+
+    @property
+    def joint_positions(self) -> tuple[float, float] | None:
+        return self._joints
 
     def start(self) -> None:
         if self._running:
             return
         try:
             import rclpy
-            from brick_interfaces.srv import DriveWheels
+            from brick_interfaces.msg import WheelSpeeds
             from rclpy.executors import SingleThreadedExecutor
             from rclpy.node import Node
+            from sensor_msgs.msg import JointState
 
             rclpy.init()
             self._owns_rclpy = True
             self._rclpy = rclpy
-            self._drive_type = DriveWheels
+            self._speed_type = WheelSpeeds
             self._node = Node("web_drive_client")
-            self._client = self._node.create_client(DriveWheels, "drive_wheels")
+            self._pub = self._node.create_publisher(WheelSpeeds, "wheel_speeds", 10)
+            self._node.create_subscription(JointState, "joint_states", self._on_joints, 10)
             self._executor = SingleThreadedExecutor()
             self._executor.add_node(self._node)
             self._thread = threading.Thread(target=self._spin, name="web_drive_client", daemon=True)
@@ -102,50 +140,95 @@ class RobotBridge:
         if self._owns_rclpy and self._rclpy is not None and self._rclpy.ok():
             self._rclpy.shutdown()
         self._owns_rclpy = False
-        self._client = None
+        self._pub = None
         self._executor = None
         self._rclpy = None
+        self._speed_type = None
+        self._stream = None
         self._robot_ready = False
 
     def call(self, left: float, right: float, timeout_sec: float = 95.0) -> WheelResult:
-        if not self._running or self._client is None or self._thread is None or not self._thread.is_alive():
+        if not self._running or self._pub is None or self._thread is None or not self._thread.is_alive():
             return unavailable("Roboter nicht verbunden")
         deadline = time.monotonic() + 1.0
         while not self._robot_ready:
             if time.monotonic() >= deadline:
-                return unavailable("drive_wheels nicht gestartet")
+                return unavailable("wheel_speeds nicht gestartet")
             time.sleep(0.05)
+        left_rad_s, right_rad_s, duration = revolutions_to_speeds(left, right)
         outcome: dict[str, Any] = {}
         finished = threading.Event()
 
         def job() -> None:
-            try:
-                request = self._drive_type.Request()
-                request.left = float(left)
-                request.right = float(right)
-                future = self._client.call_async(request)
-            except Exception as exc:
-                outcome["ok"] = False
-                outcome["message"] = str(exc)
-                finished.set()
-                return
-
-            def _done(fut: Any) -> None:
-                try:
-                    result = fut.result()
-                    outcome["ok"] = bool(result.success)
-                    outcome["message"] = str(result.message)
-                except Exception as exc:  # pragma: no cover - service failure
-                    outcome["ok"] = False
-                    outcome["message"] = str(exc)
-                finished.set()
-
-            future.add_done_callback(_done)
+            self._start_stream(left_rad_s, right_rad_s, duration, outcome, finished)
 
         self._jobs.put(job)
         if not finished.wait(timeout_sec):
+            self._jobs.put(lambda: self._cancel_stream(finished))
             return timed_out()
         return answered(bool(outcome.get("ok")), str(outcome.get("message") or ""))
+
+    def _on_joints(self, msg: Any) -> None:
+        parsed = joint_wheel_positions(list(msg.name), list(msg.position))
+        if parsed is not None:
+            self._joints = parsed
+
+    def _start_stream(
+        self,
+        left: float,
+        right: float,
+        duration: float,
+        outcome: dict[str, Any],
+        finished: threading.Event,
+    ) -> None:
+        if self._stream is not None:
+            outcome["ok"] = False
+            outcome["message"] = "beschäftigt"
+            finished.set()
+            return
+        now = time.monotonic()
+        self._stream = _SpeedStream(
+            left=left,
+            right=right,
+            deadline=now + max(0.0, duration),
+            phase="stop" if duration <= 0.0 else "run",
+            zeros_left=STOP_SAMPLES,
+            next_pub=now,
+            finished=finished,
+            outcome=outcome,
+        )
+
+    def _cancel_stream(self, finished: threading.Event) -> None:
+        stream = self._stream
+        if stream is not None and stream.finished is finished:
+            self._stream = None
+
+    def _emit(self, left: float, right: float) -> None:
+        message = self._speed_type()
+        message.left = float(left)
+        message.right = float(right)
+        self._pub.publish(message)
+
+    def _publish_due(self) -> None:
+        stream = self._stream
+        if stream is None or self._pub is None or self._speed_type is None:
+            return
+        now = time.monotonic()
+        if now < stream.next_pub:
+            return
+        stream.next_pub = now + 1.0 / STREAM_HZ
+        if stream.phase == "run" and now >= stream.deadline:
+            stream.phase = "stop"
+        if stream.phase == "stop":
+            self._emit(0.0, 0.0)
+            stream.zeros_left -= 1
+            if stream.zeros_left <= 0:
+                stream.outcome["ok"] = True
+                stream.outcome["message"] = "fertig"
+                self._stream = None
+                stream.finished.set()
+            return
+        self._emit(stream.left, stream.right)
 
     def _spin(self) -> None:
         while self._running and self._rclpy is not None and self._rclpy.ok():
@@ -158,9 +241,10 @@ class RobotBridge:
                     job()
                 except Exception as exc:
                     print(f"drive job failed ({exc})", flush=True)
+            self._publish_due()
             if self._executor is not None:
                 self._executor.spin_once(timeout_sec=0.05)
-            client = self._client
-            ready = bool(client is not None and client.service_is_ready())
+            pub = self._pub
+            ready = bool(pub is not None and pub.get_subscription_count() > 0)
             if self._running:
                 self._robot_ready = ready

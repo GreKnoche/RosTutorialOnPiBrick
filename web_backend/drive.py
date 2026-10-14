@@ -2,6 +2,7 @@
 
 Left and right stay independent. A turn is a later caller that sends two
 different counts to this same route. This module does not convert degrees.
+The bridge turns the counts into a timed wheel-speed stream.
 """
 
 from __future__ import annotations
@@ -14,6 +15,24 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 MAX_REVOLUTIONS = 20.0
+WHEEL_SPEED_RAD_S = 2.0
+
+
+def revolutions_to_speeds(
+    left: float, right: float, wheel_speed_rad_s: float = WHEEL_SPEED_RAD_S
+) -> tuple[float, float, float]:
+    """Return left rad/s, right rad/s, and the seconds both wheels run.
+
+    The larger revolution sets the duration at ``wheel_speed_rad_s``. The
+    shorter wheel is scaled so both sides start and stop together.
+    """
+    peak = max(abs(left), abs(right))
+    speed = abs(wheel_speed_rad_s)
+    if peak == 0.0 or speed == 0.0:
+        return 0.0, 0.0, 0.0
+    duration = peak * 2.0 * math.pi / speed
+    scale = math.copysign(speed, wheel_speed_rad_s) / peak
+    return left * scale, right * scale, duration
 
 
 def reject_revolutions(left: float, right: float) -> str | None:

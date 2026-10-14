@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "web-backend"
 version = "0.1.0"
-description = "HTTP door for the I/O-box drive_wheels service."
+description = "HTTP door that publishes a timed /wheel_speeds stream."
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110",

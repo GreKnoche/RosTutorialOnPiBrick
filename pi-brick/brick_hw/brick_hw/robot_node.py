@@ -1,14 +1,15 @@
-"""BrickPi3 I/O: /cmd_vel in, /drive_wheels, raw /imu /ultrasonic /joint_states out. No /odom."""
+"""BrickPi3 I/O: /cmd_vel and /wheel_speeds in, raw /imu /ultrasonic /joint_states out. No /odom."""
 
 from __future__ import annotations
 
 import math
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
 import rclpy
-from brick_interfaces.srv import DriveWheels
+from brick_interfaces.msg import WheelSpeeds
 from geometry_msgs.msg import Twist
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -19,15 +20,11 @@ from std_msgs.msg import Header
 from brick_core.chassis import Chassis, find_chassis_yaml, load_chassis
 from brick_core.geometry import Twist2D, wrap_angle, yaw_to_quaternion
 from brick_core.robot import DiffDriveRobot
-from brick_core.wheel_command import (
-    DriveParams,
-    cap_wheel_speed,
-    encoder_targets,
-    poll_wheel_drive,
-    reject_revolutions,
-)
 from brick_hw.backend import HalBackend
 from brick_hw.hal import BrickPi3Hal, MockHal
+
+
+_WHEEL_STALE_SEC = 0.2
 
 
 def _now_header(node: Node, frame_id: str) -> Header:
@@ -43,12 +40,6 @@ class RobotNode(Node):
         self.declare_parameter("mock", False)
         self.declare_parameter("rate_hz", 20.0)
         self.declare_parameter("chassis_file", "")
-        self.declare_parameter("wheel_speed_rad_s", 2.0)
-        self.declare_parameter("tolerance_rad", 0.05)
-        self.declare_parameter("timeout_sec", 90.0)
-        self.declare_parameter("max_revolutions", 20.0)
-        self.declare_parameter("brake_sec", 0.4)
-
         chassis_file = str(self.get_parameter("chassis_file").value)
         self.chassis = self._load_chassis(chassis_file)
         self.declare_parameter("left_motor", self.chassis.left_motor_port)
@@ -61,31 +52,22 @@ class RobotNode(Node):
         self.backend = HalBackend(self._make_hal())
         self.robot = DiffDriveRobot(self.backend, self.chassis)
         self._io = threading.Lock()
-        self._busy = False
+        self._wheel_mono: float | None = None
+        self._wheel_hold = False
         rate = max(float(self.get_parameter("rate_hz").value), 1.0)
-        self._params = DriveParams(
-            wheel_speed_rad_s=cap_wheel_speed(
-                self.chassis, float(self.get_parameter("wheel_speed_rad_s").value)
-            ),
-            tolerance_rad=float(self.get_parameter("tolerance_rad").value),
-            timeout_sec=float(self.get_parameter("timeout_sec").value),
-            max_revolutions=float(self.get_parameter("max_revolutions").value),
-            dt_sec=1.0 / rate,
-            brake_sec=max(0.0, float(self.get_parameter("brake_sec").value)),
-        )
 
         group = ReentrantCallbackGroup()
         self.cmd_sub = self.create_subscription(
             Twist, "cmd_vel", self._on_cmd, 10, callback_group=group
         )
+        self.create_subscription(
+            WheelSpeeds, "wheel_speeds", self._on_wheel_speeds, 10, callback_group=group
+        )
         self.imu_pub = self.create_publisher(Imu, "imu", 10)
         self.range_pub = self.create_publisher(Range, "ultrasonic", 10)
         self.joint_pub = self.create_publisher(JointState, "joint_states", 10)
-        self.create_service(
-            DriveWheels, "drive_wheels", self._on_drive, callback_group=group
-        )
 
-        self._dt = self._params.dt_sec
+        self._dt = 1.0 / rate
         self._gyro_invert = bool(self.get_parameter("gyro_invert").value)
         self._last_gyro_rad: float | None = None
         self._timer = self.create_timer(self._dt, self._tick, callback_group=group)
@@ -96,8 +78,7 @@ class RobotNode(Node):
             f"track={self.chassis.wheel_separation_m}m "
             f"gyro_invert={self._gyro_invert} "
             f"left={self.get_parameter('left_motor').value} "
-            f"right={self.get_parameter('right_motor').value} "
-            f"drive_wheels speed={self._params.wheel_speed_rad_s:.2f}rad/s"
+            f"right={self.get_parameter('right_motor').value}"
         )
 
     def _load_chassis(self, chassis_file: str) -> Chassis:
@@ -131,55 +112,28 @@ class RobotNode(Node):
                 "brickpi3 not found; launch with mock:=true to test without hardware"
             ) from exc
 
+    def _wheel_stream_fresh(self) -> bool:
+        if self._wheel_mono is None:
+            return False
+        return (time.monotonic() - self._wheel_mono) < _WHEEL_STALE_SEC
+
+    def _on_wheel_speeds(self, msg: WheelSpeeds) -> None:
+        with self._io:
+            self._wheel_mono = time.monotonic()
+            self._wheel_hold = True
+            self.backend.set_wheel_speeds(float(msg.left), float(msg.right))
+
     def _on_cmd(self, msg: Twist) -> None:
         with self._io:
-            if self._busy:
+            if self._wheel_stream_fresh():
                 return
             self.robot.set_cmd_vel(Twist2D(linear=msg.linear.x, angular=msg.angular.z))
 
-    def _on_drive(self, request: DriveWheels.Request, response: DriveWheels.Response):
-        left = float(request.left)
-        right = float(request.right)
-        reason = reject_revolutions(left, right, self._params.max_revolutions)
-        if reason:
-            response.success = False
-            response.message = reason
-            return response
-        with self._io:
-            if self._busy:
-                response.success = False
-                response.message = "beschäftigt"
-                return response
-            self._busy = True
-            encoders = self.backend.read_encoders()
-            targets = encoder_targets(left, right, encoders)
-            self.backend.set_wheel_targets(
-                targets[0], targets[1], self._params.wheel_speed_rad_s
-            )
-        try:
-            ok, message = poll_wheel_drive(
-                self._read_encoders,
-                self._hold_wheels,
-                targets,
-                self._params,
-            )
-        finally:
-            with self._io:
-                self._busy = False
-        response.success = ok
-        response.message = message
-        return response
-
-    def _read_encoders(self) -> tuple[float, float]:
-        with self._io:
-            return self.backend.read_encoders()
-
-    def _hold_wheels(self) -> None:
-        with self._io:
-            self.backend.hold_wheels()
-
     def _tick(self) -> None:
         with self._io:
+            if self._wheel_hold and not self._wheel_stream_fresh():
+                self.backend.set_wheel_speeds(0.0, 0.0)
+                self._wheel_hold = False
             state = self.robot.spin_once(self._dt)
 
         imu = Imu()
