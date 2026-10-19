@@ -18,6 +18,17 @@ export function MarkdownBlock({
       : "max-w-2xl text-sm leading-6";
   const components: Components = {
     p: ({ children }) => <p className={paragraph}>{children}</p>,
+    pre: ({ children }) => (
+      <pre className="max-w-2xl overflow-x-auto rounded-md border border-border bg-card p-3 font-mono text-xs leading-5">
+        {children}
+      </pre>
+    ),
+    code: ({ className, children }) =>
+      className ? (
+        <code className={className}>{children}</code>
+      ) : (
+        <code className="font-mono text-[0.85em]">{children}</code>
+      ),
   };
 
   return (

@@ -31,3 +31,4 @@ pi-brick/brick_hw/config/chassis.yaml
 brickpi.sh
 
 .ideas/
+.scripts/

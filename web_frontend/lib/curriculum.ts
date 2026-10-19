@@ -176,9 +176,10 @@ const curriculum: Curriculum = {
     {
       id: "07",
       slug: "dienste-aktionen",
-      title: "Dienste und Aktionen",
-      status: "stub",
-      summary: "Einmalige Anfragen und länger laufende Aufgaben mit Rückmeldung umsetzen.",
+      title: "Dienste, Aktionen und Lebenszyklus",
+      status: "ready",
+      summary:
+        "Einmalige Anfragen, Aufgaben mit Rückmeldung und Knoten, die erst nach einem Zustandswechsel arbeiten.",
       track: "ros",
       lab: "none",
     },

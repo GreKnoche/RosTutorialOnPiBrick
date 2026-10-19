@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]
@@ -19,7 +20,7 @@ dev = ["pytest>=8", "httpx>=0.27"]
 web-backend = "main:main"
 
 [tool.setuptools]
-py-modules = ["app", "bridge", "drive", "main"]
+py-modules = ["app", "bridge", "drive", "main", "twin", "twin_ros"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

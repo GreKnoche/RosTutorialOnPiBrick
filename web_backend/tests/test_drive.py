@@ -76,7 +76,7 @@ def test_drive_reports_a_missing_robot() -> None:
         health = client.get("/health")
     assert response.status_code == 503
     assert response.json() == {"ok": False, "message": "Roboter nicht verbunden"}
-    assert health.json() == {"ok": True, "robot": False}
+    assert health.json() == {"ok": True, "robot": False, "twin": False}
 
 
 def test_drive_keeps_a_robot_answer() -> None:

@@ -8,6 +8,7 @@ revolutions stays outside this process.
 
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import time
@@ -89,6 +90,8 @@ class RobotBridge:
         self._jobs: queue.Queue[Any] = queue.Queue()
         self._stream: _SpeedStream | None = None
         self._joints: tuple[float, float] | None = None
+        self._hub: Any = None
+        self._twin: Any = None
 
     @property
     def robot_ready(self) -> bool:
@@ -117,6 +120,7 @@ class RobotBridge:
             self._node.create_subscription(JointState, "joint_states", self._on_joints, 10)
             self._executor = SingleThreadedExecutor()
             self._executor.add_node(self._node)
+            self._attach_twin()
             self._thread = threading.Thread(target=self._spin, name="web_drive_client", daemon=True)
             self._running = True
             self._thread.start()
@@ -134,9 +138,13 @@ class RobotBridge:
         if thread is not None and thread.is_alive():
             self._robot_ready = False
             return
+        if self._twin is not None:
+            self._twin.destroy_node()
+            self._twin = None
         if self._node is not None:
             self._node.destroy_node()
             self._node = None
+        self._hub = None
         if self._owns_rclpy and self._rclpy is not None and self._rclpy.ok():
             self._rclpy.shutdown()
         self._owns_rclpy = False
@@ -146,6 +154,58 @@ class RobotBridge:
         self._speed_type = None
         self._stream = None
         self._robot_ready = False
+
+    def twin_online(self) -> bool:
+        return self._twin is not None and self._running and self._hub is not None
+
+    def twin_snapshot(self) -> dict[str, Any]:
+        hub = self._hub
+        if hub is None:
+            return {}
+        return hub.snapshot()
+
+    def twin_listen(self) -> queue.Queue[Any]:
+        if self._hub is None:
+            from twin import TwinHub
+
+            self._hub = TwinHub()
+        return self._hub.listen()
+
+    def twin_unlisten(self, box: queue.Queue[Any]) -> None:
+        if self._hub is not None:
+            self._hub.unlisten(box)
+
+    def twin_submit(self, payload: dict[str, Any]) -> None:
+        twin = self._twin
+        if twin is None or not self._running:
+            return
+
+        def job() -> None:
+            twin.submit(payload)
+
+        self._jobs.put(job)
+
+    def _attach_twin(self) -> None:
+        if os.environ.get("CANVAS_TWIN", "1").strip().lower() in {"0", "false", "off", "no"}:
+            print("canvas twin off (CANVAS_TWIN=0)", flush=True)
+            return
+        try:
+            from twin import TwinHub
+            from twin_ros import CanvasTwinNode
+
+            self._hub = TwinHub()
+            self._twin = CanvasTwinNode(self._hub)
+            if self._executor is not None:
+                self._executor.add_node(self._twin)
+        except Exception as exc:
+            print(f"canvas twin off ({exc})", flush=True)
+            twin = self._twin
+            self._twin = None
+            if twin is not None:
+                try:
+                    twin.destroy_node()
+                except Exception:
+                    pass
 
     def call(self, left: float, right: float, timeout_sec: float = 95.0) -> WheelResult:
         if not self._running or self._pub is None or self._thread is None or not self._thread.is_alive():
