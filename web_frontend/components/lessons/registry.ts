@@ -1,4 +1,6 @@
 import type { ComponentType } from "react";
+import { BehaviorTreesAnimation } from "@/components/lessons/behavior-trees/animation";
+import { BehaviorTreesLab } from "@/components/lessons/behavior-trees/lab";
 import { OdometrieAnimation } from "@/components/lessons/03_odometrie/animation";
 import { OdometrieLab } from "@/components/lessons/03_odometrie/lab";
 import { RadabstandAnimation } from "@/components/lessons/02_radabstand/animation";
@@ -21,6 +23,7 @@ const lessonModules: Record<string, LessonModule> = {
   "autonom:radumfang": { Animation: RadumfangAnimation, Lab: RadumfangLab },
   "autonom:radabstand": { Animation: RadabstandAnimation, Lab: RadabstandLab },
   "autonom:odometrie": { Animation: OdometrieAnimation, Lab: OdometrieLab },
+  "nav2:behavior-trees": { Animation: BehaviorTreesAnimation, Lab: BehaviorTreesLab },
 };
 
 export function lessonModule(track: string, slug: string) {

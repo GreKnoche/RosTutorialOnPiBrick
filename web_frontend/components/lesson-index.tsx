@@ -66,8 +66,11 @@ export function LessonIndex({
 
   return (
     <div className={columns === 2 ? "grid gap-x-8 sm:grid-cols-2" : undefined}>
-      {columnsOfLessons.map((column) => (
-        <ol key={column[0]?.id ?? "empty"} className="grid min-w-0 gap-y-0.5">
+      {columnsOfLessons.map((column, columnIndex) => (
+        <ol
+          key={column[0] ? `${column[0].track}-${column[0].id}` : `empty-${columnIndex}`}
+          className="grid min-w-0 gap-y-0.5"
+        >
           {column.map((lesson) => (
             <LessonRow
               key={`${lesson.track}-${lesson.id}`}

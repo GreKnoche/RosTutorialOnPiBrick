@@ -37,10 +37,14 @@ export function TrackLessons({
           {track?.description}
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
-          {ready > 0 && <Badge variant="default">{ready} Lektionen verfügbar</Badge>}
-          <Badge variant="outline">
-            {lessons.length - ready} Lektionen in Arbeit
-          </Badge>
+          {lessons.length === 0 ? (
+            <Badge variant="outline">noch keine Lektionen</Badge>
+          ) : (
+            <>
+              {ready > 0 && <Badge variant="default">{ready} Lektionen verfügbar</Badge>}
+              <Badge variant="outline">{lessons.length - ready} Lektionen in Arbeit</Badge>
+            </>
+          )}
         </div>
       </section>
       <LessonIndex lessons={lessons} showSurface={showSurface} />

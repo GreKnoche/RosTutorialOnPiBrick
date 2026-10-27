@@ -5,6 +5,7 @@ import { PathIcon } from "@/components/path-icon";
 import { curriculumOutline, trackHref } from "@/lib/curriculum";
 
 function availabilityLabel(ready: number, total: number) {
+  if (total === 0) return "noch keine Lektionen";
   if (ready === 0) return `${total} Lektionen in Arbeit`;
   const drafts = total - ready;
   return drafts > 0

@@ -20,7 +20,7 @@ const BLURBS: Record<TrackId, string> = {
   autonom:
     "Fahrzeugmodell, Räder und Kinematik, dazu Sensorik und die ersten eigenen Fahrmanöver, noch vor ROS 2.",
   ros: "Knoten, Topics, Parameter und die Roboterbeschreibung, mit der der EV3 an das System angebunden wird.",
-  nav2: "Costmap, Lokalisierung und Planung, bis der Roboter mit Nav2 selbst ein Ziel ansteuert.",
+  nav2: "Nav2 steuert die Fahrt über einen Verhaltensbaum.",
 };
 
 function drawAsphalt(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
@@ -136,7 +136,9 @@ export function TrackRace() {
         const card = cardRefs.current[index];
         const rect = card?.getBoundingClientRect();
         const canvasRect = canvas.getBoundingClientRect();
-        const y = rect ? rect.top + rect.height / 2 - canvasRect.top : ((index + 1) * h) / 4;
+        const y = rect
+          ? rect.top + rect.height / 2 - canvasRect.top
+          : ((index + 1) * h) / (tracks.length + 1);
         const finish = rect ? rect.left - canvasRect.left - 56 : w * 0.58;
         const winner = pick === track.id;
         const line = finish - BODY_L / 2;
