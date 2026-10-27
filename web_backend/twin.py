@@ -325,6 +325,7 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
         return ApplyResult()
     if kind == "twist":
         plant.command_twist(_finite(payload.get("linear")), _finite(payload.get("angular")))
+        plant.owner = client_id
         return ApplyResult()
     if kind == "goal":
         plant.owner = client_id

@@ -1,4 +1,4 @@
-"""Composable tutorial launch: backend:=sim|hardware|gazebo lesson:=00|01."""
+"""Composable tutorial launch: backend:=sim|hardware|gazebo|canvas lesson:=00|01."""
 
 from __future__ import annotations
 
@@ -20,9 +20,36 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, SetParameter
 
 
+def _drive_action(use_sim_time: bool) -> Node:
+    return Node(
+        package="brick_drive",
+        executable="drive_action",
+        name="drive_action",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "odom_topic": "odom",
+            }
+        ],
+    )
+
+
 def _setup(context, *args, **kwargs):
     lesson = context.perform_substitution(LaunchConfiguration("lesson"))
     backend = context.perform_substitution(LaunchConfiguration("backend"))
+    domain = os.environ.get("ROS_DOMAIN_ID", "0")
+    use_sim_time = backend == "gazebo"
+    if backend == "canvas":
+        return [
+            LogInfo(
+                msg=(
+                    "canvas: the web backend is the plant and publishes /odom; "
+                    f"this launch starts only drive_action (ROS_DOMAIN_ID={domain})"
+                )
+            ),
+            _drive_action(False),
+        ]
 
     desc_share = get_package_share_directory("brick_description")
     nav_share = get_package_share_directory("brick_nav")
@@ -50,7 +77,6 @@ def _setup(context, *args, **kwargs):
             LogInfo(msg=f"No launch file for lesson {lesson}: expected {lesson_launch}")
         ]
 
-    use_sim_time = backend == "gazebo"
     from brick_nav.odom_mux import DEFAULT_SOURCES, topic_key
 
     # Empty means the backend default: Gazebo world pose, gyrodometry elsewhere.
@@ -111,7 +137,6 @@ def _setup(context, *args, **kwargs):
         parameters=[{"use_sim_time": use_sim_time}],
         condition=IfCondition(LaunchConfiguration("rviz")),
     )
-    domain = os.environ.get("ROS_DOMAIN_ID", "0")
     wait = Node(
         package="brick_nav",
         executable="wait_for_odom",
@@ -197,6 +222,7 @@ def _setup(context, *args, **kwargs):
         wait,
         lesson_include,
         rviz,
+        _drive_action(use_sim_time),
     ]
     if use_sim_time:
         actions.insert(1, SetParameter(name="use_sim_time", value=True))
@@ -224,7 +250,9 @@ def _setup(context, *args, **kwargs):
         )
         return actions
     if backend != "sim":
-        return [LogInfo(msg=f"unknown backend {backend!r}; expected sim|hardware|gazebo")]
+        return [
+            LogInfo(msg=f"unknown backend {backend!r}; expected sim|hardware|gazebo|canvas")
+        ]
     actions.insert(
         1,
         Node(

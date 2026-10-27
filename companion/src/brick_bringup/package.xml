@@ -11,6 +11,7 @@
   <depend>brick_description</depend>
   <depend>brick_hardware</depend>
   <depend>brick_nav</depend>
+  <exec_depend>brick_drive</exec_depend>
   <depend>gyrodometry</depend>
   <depend>sonodometry</depend>
   <depend>rclpy</depend>

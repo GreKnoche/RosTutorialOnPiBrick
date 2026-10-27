@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>brick_lessons</name>
+  <version>0.1.0</version>
+  <description>Medium scaffolds and hard stubs that call the /drive action.</description>
+  <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>brick_interfaces</depend>
+  <depend>rclpy</depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

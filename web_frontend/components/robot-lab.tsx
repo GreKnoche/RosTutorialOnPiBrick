@@ -222,7 +222,11 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
           goal: view.goal ? { ...view.goal } : null,
           reached: sample.reached,
         });
-        if (rulerSpec) {
+        const nodeDriving =
+          sample.owner == null && Math.abs(sample.linear) + Math.abs(sample.angular) > 1e-3;
+        if (nodeDriving) {
+          setStatus("der Knoten fährt den Twin");
+        } else if (rulerSpec) {
           const meters = drivenMetersFromPose(pose);
           setStatus(sample.busy ? "fährt am Lineal" : meters > 0.005 ? "Fahrt beendet" : "am Start");
         } else if (turnSpec) {

@@ -1,0 +1,12 @@
+# Drive a signed distance, then a signed yaw, closed on wheel odometry.
+float64 distance_m
+float64 yaw_rad
+---
+bool success
+float64 distance_m
+float64 yaw_rad
+string message
+---
+float64 distance_m
+float64 yaw_rad
+float32 progress

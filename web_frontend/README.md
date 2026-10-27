@@ -15,6 +15,12 @@ Titel, Kurztext und Reihenfolge stehen in [`lib/curriculum.ts`](lib/curriculum.t
 
 Gibt es für den Slug ein Modul in [`components/lessons/registry.ts`](components/lessons/registry.ts), kommen Animation und Lab aus diesem Modul. Sonst zeigt die Seite den Markdown-Text und darunter den leeren Twin. So ist Lektion 4 heute: Eintrag im Verzeichnis, noch keine Markdown-Datei und kein Lab.
 
+## Schwierigkeit
+
+Jede Lektion hat Beginner, Medium und Hard. Der Umschalter hängt `?stufe=medium` oder `?stufe=hard` an die Adresse. Ohne Parameter bleibt Beginner. Animation und Robo-Lab bleiben auf allen drei Stufen. Medium und Hard zeigen darunter den Editor. Der Knoten ruft `/drive` auf. Der Action Server schickt `/cmd_vel`, und der Canvas-Twin auf der Seite fährt mit.
+
+Die Ziele stehen in [`lib/lesson-levels.ts`](lib/lesson-levels.ts). Dieselben Zahlen stehen in `companion/src/brick_lessons/brick_lessons/goals.py`. Medium und Hard schreiben den Knoten im Editor auf der Lektionsseite. Speichern schreibt `brick_lessons/medium/<track>_<id>.py` oder `hard/<track>_<id>.py`. Hard hat Import, `rclpy.init` und `destroy_node` schon stehen. Eine neue Lektion braucht einen Eintrag an beiden Stellen, sonst schlägt der Pytest in `brick_lessons` fehl.
+
 ## Nur Text
 
 Damit reicht es, wenn das Kapitel noch keine eigene Fahrt hat.

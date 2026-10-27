@@ -3,12 +3,13 @@
 <package format="3">
   <name>brick_interfaces</name>
   <version>0.1.0</version>
-  <description>Messages and services for wheel commands on the Pi or Gazebo I/O box.</description>
+  <description>Messages, services, and the drive action for the Pi brick.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>action_msgs</depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 

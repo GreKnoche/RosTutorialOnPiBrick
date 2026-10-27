@@ -15,9 +15,17 @@ import {
   type Lesson,
 } from "@/lib/curriculum";
 import type { LessonCopy } from "@/lib/lesson-copy";
+import type { LessonLevel } from "@/lib/lesson-levels";
 import { loadLessonCopy } from "@/lib/load-lesson-copy";
+import { LevelSwitch, LevelTask } from "@/components/lessons/level-task";
 
-export function LessonPage({ lesson }: { lesson: Lesson }) {
+export function LessonPage({
+  lesson,
+  level = "beginner",
+}: {
+  lesson: Lesson;
+  level?: LessonLevel;
+}) {
   const track = getTrackMeta(lesson.track);
   const { next, index, total } = lessonNeighbors(lesson);
   const lessons = lessonsForTrack(lesson.track);
@@ -49,6 +57,7 @@ export function LessonPage({ lesson }: { lesson: Lesson }) {
             <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">
               {lesson.summary}
             </p>
+            <LevelSwitch lesson={lesson} level={level} />
           </section>
           {active && copy ? (
             <LessonBody active={active} copy={copy} nextHref={nextHref} />
@@ -65,6 +74,7 @@ export function LessonPage({ lesson }: { lesson: Lesson }) {
               />
             </>
           )}
+          {level !== "beginner" ? <LevelTask lesson={lesson} level={level} /> : null}
         </div>
         <aside className="flex flex-col gap-2">
           <h2 className="px-2 text-sm font-medium text-heading">

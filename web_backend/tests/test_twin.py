@@ -49,6 +49,15 @@ def test_fast_spin_still_reaches_the_angle_when_yaw_rate_is_capped() -> None:
     assert math.isclose(plant.odom.pose.theta, wrap_angle(0.4 / separation), abs_tol=1e-3)
 
 
+def test_browser_twist_keeps_the_client_ros_twist_clears_it() -> None:
+    plant = CanvasPlant(Chassis())
+    apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
+    assert plant.owner == "lab"
+    assert plant._mode == "teleop"
+    plant.command_twist(0.12, 0.0)
+    assert plant.owner is None
+
+
 def test_goal_twist_comes_from_the_controller_and_cmd_clears_it() -> None:
     plant = CanvasPlant(Chassis())
     plant.reset(0.0, 0.0, 0.0)

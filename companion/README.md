@@ -15,12 +15,15 @@ Do not `colcon build` from the repo root.
 
 ## Teaching path
 
-`backend:=hardware` or `backend:=gazebo`. The same launch starts `odom_node`, `gyrodometry`, `sonodometry`, `odom_tf`, robot_state_publisher, the lesson, and RViz. `backend:=sim` is an offline rest (kinematic twin, no Pi or Gazebo).
+`backend:=hardware` or `backend:=gazebo`. The same launch starts `odom_node`, `gyrodometry`, `sonodometry`, `odom_tf`, robot_state_publisher, the lesson, RViz, and the `/drive` action server. `backend:=sim` is an offline rest (kinematic twin, no Pi or Gazebo). `backend:=canvas` starts only `drive_action`. The web backend is the plant: it already publishes wheel `/odom` and takes `/cmd_vel`.
 
 ```bash
 ros2 launch brick_bringup tutorial.launch.py backend:=hardware lesson:=01
 ros2 launch brick_bringup tutorial.launch.py backend:=gazebo lesson:=01
+ros2 launch brick_bringup tutorial.launch.py backend:=canvas
 ```
+
+`/drive` closes the goal on wheel `/odom` (not `/odom/selected`, `/odom/gyro`, or `/odom/perfect`) and publishes progress on the action feedback.
 
 Offline twin:
 
