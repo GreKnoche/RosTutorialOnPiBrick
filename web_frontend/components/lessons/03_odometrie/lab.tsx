@@ -6,6 +6,7 @@ import { LessonStudio } from "@/components/lessons/lesson-studio";
 import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { useMissionRun } from "@/components/lessons/use-mission-run";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
+import type { LessonLevel } from "@/lib/lesson-levels";
 import { formatDe } from "@/lib/format";
 import {
   formatGoalLabel,
@@ -37,7 +38,15 @@ rechts 1.38
 
 const ORIGIN: Pose2D = { x: 0, y: 0, theta: 0 };
 
-export function OdometrieLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: string }) {
+export function OdometrieLab({
+  copy,
+  nextHref,
+  level = "beginner",
+}: {
+  copy: LessonCopy;
+  nextHref?: string;
+  level?: LessonLevel;
+}) {
   const [source, setSource] = useState(DEFAULT_PROGRAM);
   const [labIndex, setLabIndex] = useState(0);
   const [trail, setTrail] = useState<Pose2D[]>([ORIGIN]);
@@ -52,6 +61,7 @@ export function OdometrieLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
   const separationCm = program.separationCm ?? DEFAULT_L;
   const hits = orderedGoalFlags(trail, spec.goalsCm);
   const steps = headingSteps(spec.goalsCm);
+  const showHelpers = level === "beginner";
   const drive = copy.sections["odometry-path"];
   const angle = copy.sections.angle;
   const feedback = program.error
@@ -167,33 +177,43 @@ export function OdometrieLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
             {steps.map((step) => (
               <li key={`${spec.id}-${step.from}-${step.to}`}>
                 {step.from} → {step.to} · {formatSigned(step.degrees, 1)}° ·{" "}
-                {pivotNote(step.degrees, program.separationCm, program.circumferenceCm, copy)}
+                {pivotNote(
+                  step.degrees,
+                  program.separationCm,
+                  program.circumferenceCm,
+                  copy,
+                  showHelpers,
+                )}
               </li>
             ))}
           </ul>
         </div>
 
-        <label className="grid gap-2 text-sm">
-          <span className="font-medium text-heading">{copy.texts.pseudocode}</span>
-          <textarea
-            aria-label={copy.texts.pseudocode}
-            value={source}
-            disabled={run.session.running}
-            spellCheck={false}
-            onChange={(event) => {
-              setSource(event.target.value);
-              run.session.clearFinished();
-            }}
-            className="min-h-52 w-full resize-y rounded-md bg-background px-3 py-2 font-mono text-sm leading-6 ring-1 ring-foreground/15"
-          />
-        </label>
-        <p className="text-sm leading-6">
-          {program.separationCm === null || program.circumferenceCm === null
-            ? copy.texts["missing-measures"]
-            : fillCopy(copy.texts["turn-revs"], {
-                revs: formatDe(turnRevs(program.separationCm, program.circumferenceCm), 2),
-              })}
-        </p>
+        {showHelpers ? (
+          <>
+            <label className="grid gap-2 text-sm">
+              <span className="font-medium text-heading">{copy.texts.pseudocode}</span>
+              <textarea
+                aria-label={copy.texts.pseudocode}
+                value={source}
+                disabled={run.session.running}
+                spellCheck={false}
+                onChange={(event) => {
+                  setSource(event.target.value);
+                  run.session.clearFinished();
+                }}
+                className="min-h-52 w-full resize-y rounded-md bg-background px-3 py-2 font-mono text-sm leading-6 ring-1 ring-foreground/15"
+              />
+            </label>
+            <p className="text-sm leading-6">
+              {program.separationCm === null || program.circumferenceCm === null
+                ? copy.texts["missing-measures"]
+                : fillCopy(copy.texts["turn-revs"], {
+                    revs: formatDe(turnRevs(program.separationCm, program.circumferenceCm), 2),
+                  })}
+            </p>
+          </>
+        ) : null}
       </LessonStudio>
     </>
   );
@@ -210,10 +230,11 @@ function pivotNote(
   separationCm: number | null,
   circumferenceCm: number | null,
   copy: LessonCopy,
+  withRevs: boolean,
 ) {
   if (Math.abs(degrees) < 0.05) return copy.texts.straight;
   const left = degrees > 0;
-  if (separationCm === null || circumferenceCm === null || circumferenceCm <= 0) {
+  if (!withRevs || separationCm === null || circumferenceCm === null || circumferenceCm <= 0) {
     return left ? copy.texts["turn-left"] : copy.texts["turn-right"];
   }
   const revs = formatDe(

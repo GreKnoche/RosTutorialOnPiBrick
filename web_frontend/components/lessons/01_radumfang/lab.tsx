@@ -8,7 +8,9 @@ import { useMissionChecklist, useMissionRun } from "@/components/lessons/use-mis
 import { NumberControl } from "@/components/number-control";
 import { ScratchPad } from "@/components/scratch-pad";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
+import type { LessonLevel } from "@/lib/lesson-levels";
 import { clamp, formatDe } from "@/lib/format";
+import { assignedNumber, loadLessonSource } from "@/lib/lesson-code";
 import { drivePathsCm, hardwareNotice, wheelCircumferenceCm } from "@/lib/robot-drive";
 
 const TARGET_M = 1;
@@ -24,7 +26,15 @@ const THEORY_MATCH_CM = 0.05;
 const MIN_REVOLUTIONS = 2.5;
 const REVOLUTION_MATCH = 0.05;
 
-export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: string }) {
+export function RadumfangLab({
+  copy,
+  nextHref,
+  level = "beginner",
+}: {
+  copy: LessonCopy;
+  nextHref?: string;
+  level?: LessonLevel;
+}) {
   const missionIds = copy.missions.items.map((item) => item.id);
   const checklist = useMissionChecklist(missionIds);
   const run = useMissionRun({ track: "autonom", lessonId: "01", allDone: checklist.allDone });
@@ -173,12 +183,33 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
           driveToken.current = token;
           setHardwareNote(null);
           setDistanceM(0);
-          run.session.drive();
-          const pathCm = revolutions * wheelCircumferenceCm;
-          void drivePathsCm(pathCm, pathCm).then((result) => {
+          if (level === "beginner") {
+            run.session.drive();
+            const pathCm = revolutions * wheelCircumferenceCm;
+            void drivePathsCm(pathCm, pathCm).then((result) => {
+              if (driveToken.current !== token) return;
+              if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+            });
+            return;
+          }
+          void (async () => {
+            const source = await loadLessonSource("autonom", "01", level);
             if (driveToken.current !== token) return;
-            if (!result.ok) setHardwareNote(hardwareNotice(result.message));
-          });
+            if (!source) {
+              setHardwareNote("Knoten nicht gelesen. Speichere ihn, dann fahre erneut.");
+              return;
+            }
+            const nextCircumference = assignedNumber(source, "RADUMFANG_CM", circumferenceCm);
+            const nextRevolutions = assignedNumber(source, "UMDREHUNGEN", revolutions);
+            setCircumferenceCm(nextCircumference);
+            setRevolutions(nextRevolutions);
+            run.session.drive();
+            const pathCm = nextRevolutions * nextCircumference;
+            void drivePathsCm(pathCm, pathCm).then((result) => {
+              if (driveToken.current !== token) return;
+              if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+            });
+          })();
         }}
         onReset={() => {
           driveToken.current += 1;
@@ -190,46 +221,55 @@ export function RadumfangLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: 
         feedbackOk={run.session.finished && hit}
         notice={hardwareNote}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberControl
-            id="radumfang"
-            label="Radumfang"
-            unit="cm"
-            min={CIRCUMFERENCE_MIN}
-            max={CIRCUMFERENCE_MAX}
-            step={0.01}
-            value={circumferenceCm}
-            disabled={run.session.running}
-            onChange={(value) => {
-              setCircumferenceCm(value);
-              run.session.clearFinished();
-            }}
-          />
-          <NumberControl
-            id="umdrehungen"
-            label="Umdrehungen"
-            min={1}
-            max={20}
-            step={0.01}
-            value={revolutions}
-            disabled={run.session.running}
-            onChange={(value) => {
-              setRevolutions(value);
-              run.session.clearFinished();
-            }}
-          />
-        </div>
+        {level === "beginner" ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <NumberControl
+              id="radumfang"
+              label="Radumfang"
+              unit="cm"
+              min={CIRCUMFERENCE_MIN}
+              max={CIRCUMFERENCE_MAX}
+              step={0.01}
+              value={circumferenceCm}
+              disabled={run.session.running}
+              onChange={(value) => {
+                setCircumferenceCm(value);
+                run.session.clearFinished();
+              }}
+            />
+            <NumberControl
+              id="umdrehungen"
+              label="Umdrehungen"
+              min={1}
+              max={20}
+              step={0.01}
+              value={revolutions}
+              disabled={run.session.running}
+              onChange={(value) => {
+                setRevolutions(value);
+                run.session.clearFinished();
+              }}
+            />
+          </div>
+        ) : (
+          <p className="text-sm leading-6">
+            Radumfang und Umdrehungen setzt du im Knoten. Nach dem Speichern fährt der Twin mit
+            diesen Werten.
+          </p>
+        )}
       </LessonStudio>
 
-      <CopySection copy={copy} id="revolutions-calc">
-        <ScratchPad
-          numerator="100 cm"
-          ariaLabel="Radumfang in Zentimeter"
-          value={helperDenom}
-          onChange={setHelperDenom}
-          compute={(denom) => 100 / denom}
-        />
-      </CopySection>
+      {level === "beginner" ? (
+        <CopySection copy={copy} id="revolutions-calc">
+          <ScratchPad
+            numerator="100 cm"
+            ariaLabel="Radumfang in Zentimeter"
+            value={helperDenom}
+            onChange={setHelperDenom}
+            compute={(denom) => 100 / denom}
+          />
+        </CopySection>
+      ) : null}
     </>
   );
 }

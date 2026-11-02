@@ -188,9 +188,20 @@ const curriculum: Curriculum = {
       slug: "behavior-trees",
       title: "Behavior Trees",
       status: "ready",
-      nav2_surface: "NavToPoseWithConsistentReplanningAndIfPathBecomesInvalid",
+      nav2_surface: "NavigateRecovery",
       summary:
-        "Der Nav2-Baum plant neu, wenn der Pfad ungültig wird, und fährt das Auto um den Block zum Parkplatz.",
+        "Ein kurzer Recovery-Baum fährt gegen ein Hindernis, setzt zurück und plant den Weg herum zum Ziel.",
+      track: "nav2",
+      lab: "none",
+    },
+    {
+      id: "02",
+      slug: "planner",
+      title: "Planer – Ein Weg um das Hindernis",
+      status: "ready",
+      nav2_surface: "ComputePathToPose",
+      summary:
+        "NavFn breitet sich vom Ziel über die Costmap aus. Der Pfad folgt dem Gefälle um den Block. Der Planer fährt nicht.",
       track: "nav2",
       lab: "none",
     },

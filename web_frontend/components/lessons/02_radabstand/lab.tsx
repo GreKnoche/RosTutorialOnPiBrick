@@ -9,7 +9,9 @@ import { useMissionChecklist, useMissionRun } from "@/components/lessons/use-mis
 import { NumberControl } from "@/components/number-control";
 import { ScratchPad } from "@/components/scratch-pad";
 import { fillCopy, type LessonCopy } from "@/lib/lesson-copy";
+import type { LessonLevel } from "@/lib/lesson-levels";
 import { clamp, formatDe } from "@/lib/format";
+import { assignedNumber, loadLessonSource } from "@/lib/lesson-code";
 import { drivePathsCm, hardwareNotice } from "@/lib/robot-drive";
 
 const TARGET_RAD = Math.PI / 2;
@@ -24,7 +26,15 @@ const START_RIGHT_PATH_CM = 10;
 const ZERO_CM = 0.05;
 const POSE_TOLERANCE_CM = 2;
 
-export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?: string }) {
+export function RadabstandLab({
+  copy,
+  nextHref,
+  level = "beginner",
+}: {
+  copy: LessonCopy;
+  nextHref?: string;
+  level?: LessonLevel;
+}) {
   const missionIds = copy.missions.items.map((item) => item.id);
   const checklist = useMissionChecklist(missionIds);
   const run = useMissionRun({ track: "autonom", lessonId: "02", allDone: checklist.allDone });
@@ -165,11 +175,33 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
           driveToken.current = token;
           setHardwareNote(null);
           setHeadingRad(0);
-          run.session.drive();
-          void drivePathsCm(leftPathCm, rightPathCm).then((result) => {
+          if (level === "beginner") {
+            run.session.drive();
+            void drivePathsCm(leftPathCm, rightPathCm).then((result) => {
+              if (driveToken.current !== token) return;
+              if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+            });
+            return;
+          }
+          void (async () => {
+            const source = await loadLessonSource("autonom", "02", level);
             if (driveToken.current !== token) return;
-            if (!result.ok) setHardwareNote(hardwareNotice(result.message));
-          });
+            if (!source) {
+              setHardwareNote("Knoten nicht gelesen. Speichere ihn, dann fahre erneut.");
+              return;
+            }
+            const nextSeparation = assignedNumber(source, "RADABSTAND_CM", separationCm);
+            const nextLeft = assignedNumber(source, "LINKS_CM", leftPathCm);
+            const nextRight = assignedNumber(source, "RECHTS_CM", rightPathCm);
+            setSeparationCm(nextSeparation);
+            setLeftPathCm(nextLeft);
+            setRightPathCm(nextRight);
+            run.session.drive();
+            void drivePathsCm(nextLeft, nextRight).then((result) => {
+              if (driveToken.current !== token) return;
+              if (!result.ok) setHardwareNote(hardwareNotice(result.message));
+            });
+          })();
         }}
         onReset={() => {
           driveToken.current += 1;
@@ -181,66 +213,77 @@ export function RadabstandLab({ copy, nextHref }: { copy: LessonCopy; nextHref?:
         feedbackOk={run.session.finished && hit && missionKind === open?.id}
         notice={hardwareNote}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberControl
-            id="turn-radabstand"
-            label="Radabstand"
-            unit="cm"
-            min={SEPARATION_MIN}
-            max={SEPARATION_MAX}
-            step={0.01}
-            value={separationCm}
-            disabled={run.session.running}
-            onChange={(value) => {
-              setSeparationCm(value);
-              run.session.clearFinished();
-            }}
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberControl
-            id="linkes-rad"
-            label="Linkes Rad fährt"
-            unit="cm"
-            min={PATH_MIN}
-            max={PATH_MAX}
-            step={0.01}
-            value={leftPathCm}
-            disabled={run.session.running}
-            onChange={(value) => {
-              setLeftPathCm(value);
-              run.session.clearFinished();
-            }}
-          />
-          <NumberControl
-            id="rechtes-rad"
-            label="Rechtes Rad fährt"
-            unit="cm"
-            min={PATH_MIN}
-            max={PATH_MAX}
-            step={0.01}
-            value={rightPathCm}
-            disabled={run.session.running}
-            onChange={(value) => {
-              setRightPathCm(value);
-              run.session.clearFinished();
-            }}
-          />
-        </div>
-        {copy.texts["zero-note"] ? (
-          <p className="text-xs text-muted-foreground">{copy.texts["zero-note"]}</p>
-        ) : null}
+        {level === "beginner" ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <NumberControl
+                id="turn-radabstand"
+                label="Radabstand"
+                unit="cm"
+                min={SEPARATION_MIN}
+                max={SEPARATION_MAX}
+                step={0.01}
+                value={separationCm}
+                disabled={run.session.running}
+                onChange={(value) => {
+                  setSeparationCm(value);
+                  run.session.clearFinished();
+                }}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <NumberControl
+                id="linkes-rad"
+                label="Linkes Rad fährt"
+                unit="cm"
+                min={PATH_MIN}
+                max={PATH_MAX}
+                step={0.01}
+                value={leftPathCm}
+                disabled={run.session.running}
+                onChange={(value) => {
+                  setLeftPathCm(value);
+                  run.session.clearFinished();
+                }}
+              />
+              <NumberControl
+                id="rechtes-rad"
+                label="Rechtes Rad fährt"
+                unit="cm"
+                min={PATH_MIN}
+                max={PATH_MAX}
+                step={0.01}
+                value={rightPathCm}
+                disabled={run.session.running}
+                onChange={(value) => {
+                  setRightPathCm(value);
+                  run.session.clearFinished();
+                }}
+              />
+            </div>
+            {copy.texts["zero-note"] ? (
+              <p className="text-xs text-muted-foreground">{copy.texts["zero-note"]}</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm leading-6">
+            Radabstand und die beiden Radwege setzt du im Knoten. Nach dem Speichern fährt der Twin
+            mit diesen Werten. 0 lässt das Rad halten, ein negatives Vorzeichen fährt rückwärts.
+          </p>
+        )}
       </LessonStudio>
 
-      <CopySection copy={copy} id="arc-calc">
-        <ScratchPad
-          numerator="L · π / 2"
-          ariaLabel="Radabstand in Zentimeter"
-          value={helperL}
-          onChange={setHelperL}
-          compute={(length) => (length * Math.PI) / 2}
-        />
-      </CopySection>
+      {level === "beginner" ? (
+        <CopySection copy={copy} id="arc-calc">
+          <ScratchPad
+            numerator="L · π / 2"
+            ariaLabel="Radabstand in Zentimeter"
+            value={helperL}
+            onChange={setHelperL}
+            compute={(length) => (length * Math.PI) / 2}
+          />
+        </CopySection>
+      ) : null}
     </>
   );
 }

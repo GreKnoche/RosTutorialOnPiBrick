@@ -6,7 +6,7 @@ import {
   CAR,
   FIELD,
   GOAL,
-  OBSTACLE,
+  OBSTACLES,
   TREE_LAYOUT,
   TREE_NAME,
   nodeTitle,
@@ -43,7 +43,7 @@ export function BtDemo() {
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.02, (now - last) / 1000) * 0.55;
+      const dt = Math.min(0.02, (now - last) / 1000) * 0.75;
       last = now;
       setFrame((current) => (current.world.done ? current : step(current.world, dt)));
       raf = requestAnimationFrame(loop);
@@ -58,20 +58,20 @@ export function BtDemo() {
 
   const runningLabel = frame.runningId ? nodeTitle(frame.runningId) : null;
   const live = frame.world.done
-    ? "Parkplatz erreicht"
+    ? "Goal reached"
     : runningLabel
       ? `${runningLabel} running`
-      : "Baum wartet";
+      : "Waiting";
 
   return (
     <section className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Beispiel
+            Example
           </p>
           <h2 className="font-heading mt-1 text-lg font-semibold text-heading">
-            Der Baum fährt zum Parkplatz
+            Back up, then go around
           </h2>
           <p className="mt-1 max-w-3xl font-mono text-[11px] leading-snug text-muted-foreground">
             {TREE_NAME}
@@ -79,7 +79,7 @@ export function BtDemo() {
         </div>
         <div className="flex gap-2">
           <Button type="button" disabled={running || frame.world.done} onClick={() => setRunning(true)}>
-            Fahren
+            Drive
           </Button>
           <Button
             type="button"
@@ -88,7 +88,7 @@ export function BtDemo() {
               setFrame(restingFrame());
             }}
           >
-            Zurücksetzen
+            Reset
           </Button>
         </div>
       </div>
@@ -100,9 +100,9 @@ export function BtDemo() {
         <WorldView frame={frame} />
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3 text-sm">
-        <Chip label="Pfad" on={frame.board.hasPath} />
-        <Chip label="gültig" on={frame.board.pathValid} />
-        <Chip label="am Ziel" on={frame.board.atGoal} />
+        <Chip label="Path" on={frame.board.hasPath} />
+        <Chip label="valid" on={frame.board.pathValid} />
+        <Chip label="at goal" on={frame.board.atGoal} />
         <span className="ml-auto font-mono text-xs text-muted-foreground">{live}</span>
       </div>
     </section>
@@ -112,70 +112,92 @@ export function BtDemo() {
 function Chip({ label, on }: { label: string; on: boolean }) {
   return (
     <span className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-heading">
-      {label}: {on ? "ja" : "nein"}
+      {label}: {on ? "yes" : "no"}
     </span>
   );
 }
 
+function edgePath(from: LayoutNode, to: LayoutNode) {
+  const y1 = from.y + from.h / 2;
+  const y2 = to.y - to.h / 2;
+  const mid = (y1 + y2) / 2;
+  return `M ${from.x} ${y1} V ${mid} H ${to.x} V ${y2}`;
+}
+
 function TreeView({ frame }: { frame: DemoFrame }) {
+  const layout = TREE_LAYOUT;
   return (
-    <div className="max-h-[320px] overflow-auto bg-[#12110e]">
+    <div className="bg-[#12110e] py-3">
       <svg
-        width={TREE_LAYOUT.width}
-        height={TREE_LAYOUT.height}
+        width={layout.width}
+        height={layout.height}
         role="img"
         aria-label={TREE_NAME}
-        className="block"
+        className="mx-auto block"
       >
         <title>{TREE_NAME}</title>
-        {TREE_LAYOUT.edges.map((edge) => {
-          const from = TREE_LAYOUT.nodes.find((item) => item.id === edge.from);
-          const to = TREE_LAYOUT.nodes.find((item) => item.id === edge.to);
+        {layout.edges.map((edge) => {
+          const from = layout.nodes.find((item) => item.id === edge.from);
+          const to = layout.nodes.find((item) => item.id === edge.to);
           if (!from || !to) return null;
           return (
-            <line
+            <path
               key={`${edge.from}-${edge.to}`}
-              x1={from.x}
-              y1={from.y + from.h / 2}
-              x2={to.x}
-              y2={to.y - to.h / 2}
+              d={edgePath(from, to)}
+              fill="none"
               stroke="#6b675c"
               strokeWidth="1.5"
             />
           );
         })}
-        {TREE_LAYOUT.nodes.map((item) => (
-          <TreeNode
-            key={item.id}
-            node={item}
-            status={frame.status[item.id] ?? "idle"}
-            leaf={frame.runningId === item.id}
-          />
-        ))}
+        {layout.nodes.map((item) => {
+          const status = frame.status[item.id] ?? "idle";
+          const active = frame.runningId === item.id;
+          return (
+            <TreeNode
+              key={item.id}
+              node={item}
+              status={status}
+              active={active}
+              dim={frame.runningId !== null && !active && status === "idle"}
+            />
+          );
+        })}
       </svg>
     </div>
   );
 }
 
-function TreeNode({ node, status, leaf }: { node: LayoutNode; status: Status; leaf: boolean }) {
-  const ink = STATUS_INK[status];
+function TreeNode({
+  node,
+  status,
+  active,
+  dim,
+}: {
+  node: LayoutNode;
+  status: Status;
+  active: boolean;
+  dim: boolean;
+}) {
+  const ink = active
+    ? { fill: "#5c4814", stroke: "#f0c84a", text: "#fff6d0" }
+    : STATUS_INK[status];
   const x = node.x - node.w / 2;
   const y = node.y - node.h / 2;
   return (
-    <g>
-      {leaf ? (
+    <g id={`bt-${node.id}`} opacity={dim ? 0.38 : 1}>
+      {active ? (
         <rect
-          x={x - 4}
-          y={y - 4}
-          width={node.w + 8}
-          height={node.h + 8}
-          rx="12"
+          x={x - 7}
+          y={y - 7}
+          width={node.w + 14}
+          height={node.h + 14}
+          rx="14"
           fill="none"
           stroke="#e6b325"
-          strokeWidth="2"
-          opacity="0.85"
+          strokeWidth="2.5"
         >
-          <animate attributeName="opacity" values="0.35;0.95;0.35" dur="1.2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.35;1;0.35" dur="1.1s" repeatCount="indefinite" />
         </rect>
       ) : null}
       <rect
@@ -186,28 +208,28 @@ function TreeNode({ node, status, leaf }: { node: LayoutNode; status: Status; le
         rx="8"
         fill={ink.fill}
         stroke={ink.stroke}
-        strokeWidth={status === "running" ? 2.4 : 1.4}
+        strokeWidth={active ? 2.6 : 1.4}
       />
       <text
         x={node.x}
-        y={status === "idle" ? node.y + 4 : node.y - 6}
+        y={active ? node.y - 5 : node.y + 4}
         textAnchor="middle"
         fill={ink.text}
-        fontSize={node.fontSize}
+        fontSize="13"
         fontFamily="Arial, Helvetica, sans-serif"
       >
         {node.title}
       </text>
-      {status !== "idle" ? (
+      {active ? (
         <text
           x={node.x}
           y={node.y + 12}
           textAnchor="middle"
-          fill={ink.stroke}
+          fill="#f0c84a"
           fontSize="11"
           fontFamily="Arial, Helvetica, sans-serif"
         >
-          {status}
+          running
         </text>
       ) : null}
     </g>
@@ -266,10 +288,10 @@ function WorldView({ frame }: { frame: DemoFrame }) {
       <svg
         viewBox={`0 0 ${FIELD.width * SCALE} ${FIELD.height * SCALE}`}
         role="img"
-        aria-label="Beispielumgebung mit Auto, Block und Parkplatz"
+        aria-label="Course with the car, one obstacle, and the goal"
         className="block h-auto w-full"
       >
-        <title>Beispielumgebung</title>
+        <title>Course</title>
         <rect width={FIELD.width * SCALE} height={FIELD.height * SCALE} fill="#12110e" />
         {Array.from({ length: FIELD.width - 1 }, (_, index) => (
           <line
@@ -291,14 +313,28 @@ function WorldView({ frame }: { frame: DemoFrame }) {
             stroke="#2a2926"
           />
         ))}
-        <rect
-          x={wx(OBSTACLE.x)}
-          y={wy(OBSTACLE.y + OBSTACLE.h)}
-          width={OBSTACLE.w * SCALE}
-          height={OBSTACLE.h * SCALE}
-          rx="8"
-          fill="#3c3b38"
-        />
+        {OBSTACLES.map((block) => (
+          <g key={`${block.x}-${block.y}`}>
+            <rect
+              x={wx(block.x)}
+              y={wy(block.y + block.h)}
+              width={block.w * SCALE}
+              height={block.h * SCALE}
+              rx="8"
+              fill="#3c3b38"
+            />
+            <text
+              x={wx(block.x + block.w / 2)}
+              y={wy(block.y + block.h / 2) + 4}
+              textAnchor="middle"
+              fill="#d6d3c8"
+              fontSize="13"
+              fontFamily="Arial, Helvetica, sans-serif"
+            >
+              Obstacle
+            </text>
+          </g>
+        ))}
         <circle
           cx={wx(GOAL.x)}
           cy={wy(GOAL.y)}
@@ -316,7 +352,7 @@ function WorldView({ frame }: { frame: DemoFrame }) {
           fontSize="14"
           fontFamily="Arial, Helvetica, sans-serif"
         >
-          Parkplatz
+          Goal
         </text>
         {frame.world.path && frame.world.path.length > 1 ? (
           <polyline

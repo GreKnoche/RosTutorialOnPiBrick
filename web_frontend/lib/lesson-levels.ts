@@ -120,6 +120,12 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
     medium: [meter],
     hard: [meter],
   },
+  "nav2:02": {
+    focus:
+      "Der Planer schreibt einen Pfad um den Block. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht compute_path_to_pose.",
+    medium: [meter],
+    hard: [meter],
+  },
 };
 
 export function parseLevel(value: string | undefined): LessonLevel {

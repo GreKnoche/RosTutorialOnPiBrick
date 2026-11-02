@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { GlossarySpoiler } from "@/components/glossary-spoiler";
 import { LessonIndex } from "@/components/lesson-index";
 import { CopySection } from "@/components/lessons/copy-section";
 import { lessonModule, type LessonModule } from "@/components/lessons/registry";
@@ -14,6 +15,7 @@ import {
   trackCrumbs,
   type Lesson,
 } from "@/lib/curriculum";
+import { freshGlossaryTerms, type GlossaryEntry } from "@/lib/glossary";
 import type { LessonCopy } from "@/lib/lesson-copy";
 import type { LessonLevel } from "@/lib/lesson-levels";
 import { loadLessonCopy } from "@/lib/load-lesson-copy";
@@ -31,6 +33,7 @@ export function LessonPage({
   const lessons = lessonsForTrack(lesson.track);
   const active = lessonModule(lesson.track, lesson.slug);
   const copy = loadLessonCopy(lesson.track, lesson.id, lesson.slug);
+  const terms = freshGlossaryTerms(lesson);
   const nextHref = next ? lessonHref(next) : undefined;
 
   return (
@@ -60,10 +63,17 @@ export function LessonPage({
             <LevelSwitch lesson={lesson} level={level} />
           </section>
           {active && copy ? (
-            <LessonBody active={active} copy={copy} nextHref={nextHref} />
+            <LessonBody
+              active={active}
+              copy={copy}
+              nextHref={nextHref}
+              level={level}
+              terms={terms}
+            />
           ) : (
             <>
               {copy?.intro ? <MarkdownBlock source={copy.intro} variant="intro" /> : null}
+              {terms.length > 0 ? <GlossarySpoiler terms={terms} /> : null}
               {copy
                 ? copy.sectionOrder.map((id) => <CopySection key={id} copy={copy} id={id} />)
                 : null}
@@ -104,18 +114,23 @@ function LessonBody({
   active,
   copy,
   nextHref,
+  level,
+  terms,
 }: {
   active: LessonModule;
   copy: LessonCopy;
   nextHref?: string;
+  level: LessonLevel;
+  terms: GlossaryEntry[];
 }) {
   const Animation = active.Animation;
   const Lab = active.Lab;
   return (
     <>
       {copy.intro ? <MarkdownBlock source={copy.intro} variant="intro" /> : null}
+      {terms.length > 0 ? <GlossarySpoiler terms={terms} /> : null}
       <Animation title={copy.animationTitle} />
-      <Lab copy={copy} nextHref={nextHref} />
+      <Lab copy={copy} nextHref={nextHref} level={level} />
     </>
   );
 }

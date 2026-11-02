@@ -15,6 +15,10 @@ from brick_lessons.goals import GOALS
 
 KEY = "autonom_01"
 
+# Dieselben Größen wie die Slider auf Beginner. Strecke = Umdrehungen * Radumfang.
+RADUMFANG_CM = 17.4
+UMDREHUNGEN = 1.0
+
 
 class LessonClient(Node):
     def __init__(self) -> None:
@@ -25,8 +29,9 @@ class LessonClient(Node):
         if not self._client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error("Action-Server /drive ist nicht da")
             return
-        for step in GOALS[KEY].medium:
-            self.send_step(step.distance_m, step.yaw_rad)
+        distance_m = UMDREHUNGEN * RADUMFANG_CM / 100.0
+        for _step in GOALS[KEY].medium:
+            self.send_step(distance_m, 0.0)
 
     def send_step(self, distance_m: float, yaw_rad: float) -> None:
         goal = Drive.Goal()
