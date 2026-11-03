@@ -23,7 +23,6 @@ Lesson 01 on `backend:=gazebo` maps `/camera_lidar/scan` live with `slam_toolbox
 | `/camera_lidar/scan` | ground-plane scan from `/camera/image_raw` |
 | `/odom/wheel` | DiffDrive encoder unicycle (debug) |
 | `/odom/gyro` | companion Borenstein fuse of `/odom` + `/imu` (no TF) |
-| `/odom/sono` | companion range-flow fuse of `/odom/gyro` + `/ultrasonic` |
 | `/odom/perfect` | Gazebo world pose (debug) |
 
 ## Docker (recommended)

@@ -6,7 +6,7 @@ def test_empty_selection_uses_the_first_source() -> None:
 
 
 def test_leading_slash_matches() -> None:
-    assert choose_source(["odom/gyro", "odom/sono"], "/odom/sono") == "odom/sono"
+    assert choose_source(["odom", "odom/gyro"], "/odom/gyro") == "odom/gyro"
 
 
 def test_unknown_source_is_rejected() -> None:

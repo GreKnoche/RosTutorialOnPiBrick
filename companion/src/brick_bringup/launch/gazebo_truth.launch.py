@@ -1,7 +1,7 @@
 """Gazebo tutorial with TF from /odom/perfect.
 
 tutorial.launch.py already selects this for backend:=gazebo. This file
-keeps the explicit entry point. Wheel, gyro, and sono odometry still
+keeps the explicit entry point. Wheel and gyro odometry still
 publish, but they copy x, y, and yaw once from the ground-truth pose
 before integrating.
 """

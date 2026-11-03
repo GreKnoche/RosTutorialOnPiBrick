@@ -10,7 +10,7 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
-DEFAULT_SOURCES = ["odom", "odom/gyro", "odom/sono", "odom/matched"]
+DEFAULT_SOURCES = ["odom", "odom/gyro"]
 
 
 def topic_key(name: str) -> str:

@@ -13,7 +13,6 @@
   <depend>brick_nav</depend>
   <exec_depend>brick_drive</exec_depend>
   <depend>gyrodometry</depend>
-  <depend>sonodometry</depend>
   <depend>rclpy</depend>
   <depend>ament_index_python</depend>
   <exec_depend>robot_state_publisher</exec_depend>

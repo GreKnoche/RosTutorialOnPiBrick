@@ -169,15 +169,6 @@ def _setup(context, *args, **kwargs):
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
     )
-    sonodometry = Node(
-        package="sonodometry",
-        executable="sonodometry",
-        name="sonodometry",
-        output="screen",
-        parameters=[{"use_sim_time": use_sim_time}],
-    )
-    # /odom/matched is expressed in map. Broadcasting it publishes
-    # map→base_link and RViz cannot place the camera scan in the odom view.
     odom_mux = Node(
         package="brick_nav",
         executable="odom_mux",
@@ -216,7 +207,6 @@ def _setup(context, *args, **kwargs):
         rsp,
         odom_node,
         gyrodometry,
-        sonodometry,
         odom_mux,
         odom_tf,
         wait,
@@ -232,7 +222,7 @@ def _setup(context, *args, **kwargs):
             LogInfo(
                 msg=(
                     "hardware: /cmd_vel /joint_states /imu /ultrasonic from brick_hw; "
-                    "companion publishes /odom, /odom/gyro, /odom/sono; TF follows /odom/selected "
+                    "companion publishes /odom and /odom/gyro; TF follows /odom/selected "
                     f"(ROS_DOMAIN_ID={domain})"
                 )
             ),

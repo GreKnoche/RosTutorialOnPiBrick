@@ -18,3 +18,11 @@ source /opt/ros/jazzy/setup.bash
 cd companion && colcon build --symlink-install && source install/setup.bash
 ros2 launch brick_bringup tutorial.launch.py backend:=sim lesson:=01
 ```
+
+Python unit tests run on every commit. Enable the hook once per clone:
+
+```bash
+git config core.hooksPath githooks
+```
+
+`core.hooksPath` replaces `.git/hooks/`. Run the same check by hand with `./scripts/test-python.sh`. That run uses `web_backend/.venv` when it exists, and does not start Gazebo. `git commit --no-verify` skips the hook.
