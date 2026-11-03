@@ -7,7 +7,16 @@ import math
 from brick_core.chassis import Chassis
 from brick_core.geometry import Pose2D, wrap_angle
 
-from twin import TICK_HZ, CanvasPlant, apply_message
+from twin import (
+    TICK_HZ,
+    ApplyResult,
+    CanvasPlant,
+    TwinHub,
+    apply_message,
+    done_message,
+    sample_dict,
+    segments_from_paths,
+)
 
 
 def _run(plant: CanvasPlant) -> None:
@@ -197,3 +206,115 @@ def test_socket_forwards_a_command_and_a_done_event() -> None:
     assert bridge.payloads == [{"type": "twist", "linear": 0.2, "angular": 0.0, "seq": 4}]
     assert done is not None
     assert done["seq"] == 4
+
+
+def test_segments_skip_a_zero_path_and_a_dead_chassis() -> None:
+    chassis = Chassis(wheel_radius_m=0.03, wheel_separation_m=0.12)
+    assert segments_from_paths(chassis, [(0.0, 0.0), (float("nan"), 0.1)]) == []
+    assert segments_from_paths(Chassis(wheel_radius_m=0.0), [(0.1, 0.1)]) == []
+
+
+def test_set_chassis_rejects_a_non_positive_radius() -> None:
+    plant = CanvasPlant(Chassis(wheel_radius_m=0.03, wheel_separation_m=0.12))
+    plant.set_chassis(0.0, 0.2)
+    plant.set_chassis(-0.01, 0.2)
+    plant.set_chassis(float("nan"), 0.2)
+    assert plant.chassis.wheel_radius_m == 0.03
+    assert plant.chassis.wheel_separation_m == 0.12
+
+
+def test_chassis_message_needs_both_sizes() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "chassis", "wheel_radius_m": 0.05})
+    assert plant.chassis.wheel_radius_m == Chassis().wheel_radius_m
+    apply_message(
+        plant,
+        {"type": "chassis", "wheel_radius_m": 0.05, "wheel_separation_m": 0.2},
+    )
+    assert plant.chassis.wheel_radius_m == 0.05
+    assert plant.chassis.wheel_separation_m == 0.2
+
+
+def test_reset_message_moves_the_pose() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "reset", "x": 0.2, "y": -0.1, "theta": 0.3})
+    assert math.isclose(plant.odom.pose.x, 0.2)
+    assert math.isclose(plant.odom.pose.y, -0.1)
+
+
+def test_nearby_goal_is_reached_on_the_next_tick() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "goal", "x": 0.01, "y": 0.0, "theta": 0.0, "client": "lab"})
+    assert plant.owner == "lab"
+    assert plant.goal is not None
+    assert plant.step(1.0 / TICK_HZ) is None
+    assert plant.reached is True
+    assert plant._mode == "idle"
+
+
+def test_twist_message_moves_forward() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
+    assert plant.step(0.0) is None
+    before = plant.odom.pose.x
+    plant.step(0.1)
+    assert plant.odom.pose.x > before
+
+
+def test_cancel_message_stops() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
+    apply_message(plant, {"type": "cancel"})
+    assert plant.owner is None
+    assert plant.command.linear == 0.0
+
+
+def test_unknown_message_leaves_the_pose() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "reset", "x": 0.2, "y": 0.0, "theta": 0.0})
+    stayed = plant.odom.pose.x
+    apply_message(plant, {"type": "nope", "x": 9.0})
+    assert plant.odom.pose.x == stayed
+
+
+def test_goal_sample_reports_the_target() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "goal", "x": 1.0, "y": 0.0, "theta": 0.0, "client": "lab"})
+    sample = plant.sample()
+    assert sample.goal_x == 1.0
+    assert sample.busy is True
+    assert sample_dict(sample)["goal"] == {"x": 1.0, "y": 0.0, "theta": 0.0}
+
+
+def test_bad_drive_finishes_in_place() -> None:
+    plant = CanvasPlant()
+    result = apply_message(
+        plant,
+        {
+            "type": "drive",
+            "seq": 2,
+            "client": 5,
+            "paths": "nope",
+        },
+    )
+    assert result.done is not None
+    assert result.client is None
+    assert result.seq == 2
+    assert len(result.done) == 1
+    message = done_message(ApplyResult(done=result.done, seq=2, client=None, jump=True))
+    assert message["poses"][0]["x"] == result.done[0].x
+
+
+def test_hub_stores_the_latest_sample_and_forgets_a_listener() -> None:
+    hub = TwinHub()
+    assert hub.snapshot()["x"] == 0.0
+    box = hub.listen()
+    other = hub.listen()
+    hub.unlisten(other)
+    plant = CanvasPlant()
+    plant.reset(0.4, 0.0, 0.0)
+    hub.store(plant.sample())
+    assert hub.snapshot()["x"] == 0.4
+    hub.emit_done({"type": "done", "seq": 1})
+    assert box.get_nowait() == {"type": "done", "seq": 1}
+    assert other.empty()
