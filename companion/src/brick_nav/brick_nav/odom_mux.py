@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from typing import Optional
 
-import rclpy
-from nav_msgs.msg import Odometry
-from rcl_interfaces.msg import SetParametersResult
-from rclpy.node import Node
-from rclpy.parameter import Parameter
+try:
+    import rclpy
+    from nav_msgs.msg import Odometry
+    from rcl_interfaces.msg import SetParametersResult
+    from rclpy.node import Node
+    from rclpy.parameter import Parameter
+except ImportError:
+    rclpy = None
+    Odometry = None
+    SetParametersResult = None
+    Node = object
+    Parameter = None
 
 DEFAULT_SOURCES = ["odom", "odom/gyro"]
 

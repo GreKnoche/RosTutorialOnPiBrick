@@ -28,3 +28,5 @@ git config core.hooksPath githooks
 `core.hooksPath` replaces `.git/hooks/`. Run the same check by hand with `./scripts/test-python.sh`. That run uses `web_backend/.venv` when it exists, and does not start Gazebo. `git commit --no-verify` skips the hook.
 
 Frontend smoke tests are separate: `cd web_frontend && npm test`. They are not part of the commit hook.
+
+GitHub Actions runs `./scripts/test-python.sh` and `cd web_frontend && npm test` on every push and pull request. Gazebo stays out of that workflow.
