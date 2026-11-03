@@ -9,6 +9,17 @@ npm run dev
 
 Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lektionen sind unter `/autonom/<slug>` erreichbar, ROS 2 unter `/ros/<slug>`, Nav2 unter `/nav2/<id>`.
 
+## Smoke-Tests
+
+Einmalig den Browser laden, danach die Seiten prüfen:
+
+```bash
+npx playwright install chromium
+npm test
+```
+
+`npm test` startet die App auf Port 61333, sofern dort noch nichts läuft. Ein schon laufender Dev-Server wird benutzt. Das Backend ist dafür nicht nötig. Der Lauf hängt nicht am Git-Commit.
+
 ## Was woher kommt
 
 Titel, Kurztext und Reihenfolge stehen in [`lib/curriculum.ts`](lib/curriculum.ts). Das ist das Verzeichnis. Der Fließtext in der Lektion steht in `content/<track>/<id>-<slug>.md`. Die Seite [`components/lessons/lesson-page.tsx`](components/lessons/lesson-page.tsx) liest beides und zeichnet Kopf, Seitenleiste und den Link zum nächsten Kapitel.
