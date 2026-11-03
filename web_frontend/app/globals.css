@@ -20,6 +20,10 @@
   --border: #d0d0ce;
   --active-lesson: #d6e6f2;
   --active-lesson-hover: #c5d9ea;
+  --glossary: #e3f0f7;
+  --glossary-hover: #d5e8f2;
+  --glossary-foreground: #315f73;
+  --glossary-border: #a9c7d6;
   color-scheme: light;
 }
 
@@ -43,6 +47,10 @@
   --color-border: var(--border);
   --color-active-lesson: var(--active-lesson);
   --color-active-lesson-hover: var(--active-lesson-hover);
+  --color-glossary: var(--glossary);
+  --color-glossary-hover: var(--glossary-hover);
+  --color-glossary-foreground: var(--glossary-foreground);
+  --color-glossary-border: var(--glossary-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);

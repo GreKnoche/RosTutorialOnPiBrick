@@ -19,6 +19,7 @@ export type Lesson = {
   track: TrackId;
   lab: LabKind;
   nav2_surface?: string;
+  taughtTerms?: string[];
 };
 
 export type Curriculum = {

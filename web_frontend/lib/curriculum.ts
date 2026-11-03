@@ -49,6 +49,7 @@ const curriculum: Curriculum = {
         "Der Radabstand liegt zwischen den Aufstandspunkten, und ohne Rutschen ergibt die Wegdifferenz geteilt durch den Abstand den Drehwinkel.",
       track: "autonom",
       lab: "none",
+      taughtTerms: ["Bogenmaß"],
     },
     {
       id: "03",
@@ -59,6 +60,7 @@ const curriculum: Curriculum = {
         "Feste Punkte mit Umdrehungen anfahren: im Code setzt du Umfang, Abstand und wie oft links und rechts drehen.",
       track: "autonom",
       lab: "none",
+      taughtTerms: ["Odometrie"],
     },
     {
       id: "04",
@@ -182,6 +184,7 @@ const curriculum: Curriculum = {
         "Einmalige Anfragen, Aufgaben mit Rückmeldung und Knoten, die erst nach einem Zustandswechsel arbeiten.",
       track: "ros",
       lab: "none",
+      taughtTerms: ["Dienst", "Aktion", "Lebenszyklus"],
     },
     {
       id: "01",
@@ -204,6 +207,7 @@ const curriculum: Curriculum = {
         "NavFn breitet sich vom Ziel über die Costmap aus. Der Pfad folgt dem Gefälle um den Block. Der Planer fährt nicht.",
       track: "nav2",
       lab: "none",
+      taughtTerms: ["Costmap", "Dijkstra", "NavFn"],
     },
   ],
 };

@@ -58,6 +58,9 @@ export function freshGlossaryTerms(lesson: Lesson): GlossaryEntry[] {
   if (!copy) return [];
 
   const glossary = loadGlossary();
+  const taughtTerms = new Set(
+    (lesson.taughtTerms ?? []).map((term) => term.toLocaleLowerCase("de")),
+  );
   const seen = new Set<string>();
   for (const earlier of loadCurriculum().lessons) {
     if (earlier.track === lesson.track && earlier.id === lesson.id) break;
@@ -70,6 +73,7 @@ export function freshGlossaryTerms(lesson: Lesson): GlossaryEntry[] {
   }
 
   return termsInText(glossary, lessonTermText(lesson, copy)).filter(
-    (entry) => !seen.has(entry.term),
+    (entry) =>
+      !seen.has(entry.term) && !taughtTerms.has(entry.term.toLocaleLowerCase("de")),
   );
 }

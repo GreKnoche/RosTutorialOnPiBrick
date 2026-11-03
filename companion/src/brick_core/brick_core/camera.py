@@ -32,7 +32,7 @@ class Camera:
     far_m: float = 4.0
     xyz: tuple[float, float, float] = (0.03, 0.0, 0.11)
     rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
-    pitch_rad: float = 0.0
+    pitch_rad: float = 0.45
     frame: str = "camera_link"
     optical_frame: str = "camera_optical_frame"
     image_topic: str = "/camera/image_raw"

@@ -1,55 +1,55 @@
 ## Odometrie
 
-Schätzung der Pose aus den Radumdrehungen. Der Roboter rechnet, wo er zu sein glaubt.
+Fortlaufende Schätzung der Bewegung und Pose eines Roboters. In diesem Kurs wird sie aus den gemessenen Radumdrehungen berechnet.
 
 ## Pose
 
-Ort und Blickrichtung in der Fläche, als x, y und Winkel.
+Position und Ausrichtung eines Roboters. In der Fläche besteht sie aus x, y und einem Drehwinkel.
 
 ## Bogenmaß
 
-Der Winkel als Bogenlänge. Ein voller Kreis ist 2π, 90° sind π / 2.
+Ein Winkelmaß, bei dem der Winkel dem Verhältnis aus Bogenlänge und Radius entspricht. Ein voller Kreis hat 2π, 90° sind π / 2.
 
 ## Knoten
 
-Ein ROS-2-Programm mit eigenen Schnittstellen. Es veröffentlicht, hört zu oder beantwortet Anfragen.
+Eine Softwareeinheit im ROS-2-System, die eine klar abgegrenzte Aufgabe übernimmt. Ein Prozess kann einen oder mehrere Knoten enthalten.
 
 ## Topic
 
-Der Name, unter dem Nachrichten weiterlaufen. Eine Veröffentlichung gelingt auch, wenn gerade niemand zuhört.
+Ein benannter Kanal für fortlaufende Nachrichten. Publisher senden, ohne auf eine Antwort zu warten; Subscriber empfangen die Nachrichten.
 
 ## Dienst
 
-Eine Anfrage und genau eine Antwort. Die Arbeit ist sofort fertig, ohne Zwischenstand und ohne Abbruch.
+Eine Schnittstelle für eine Anfrage und genau eine Antwort. Dienste sind für kurze Vorgänge ohne laufendes Feedback oder geregelten Abbruch gedacht.
 
 ## Aktion
 
-Eine Aufgabe mit Ziel, Rückmeldung und Ergebnis. Sie dauert, und sie lässt sich abbrechen.
+Eine Schnittstelle für länger laufende Aufgaben. Ein Ziel kann angenommen oder abgelehnt werden, während der Ausführung Feedback liefern und mit einem Ergebnis enden oder abgebrochen werden.
 
 ## Lebenszyklus
 
-Feste Zustände eines Knotens, bevor er Daten verarbeitet. Der Wechsel heißt configure, dann activate.
+Ein festgelegtes Zustandsmodell für verwaltete Knoten. Übergänge wie `configure` und `activate` trennen das Einrichten eines Knotens von seiner aktiven Arbeit.
 
 ## Launch
 
-Eine Datei, die mehrere Knoten gemeinsam startet und ihnen ihre Parameter mitgibt.
+Eine Startbeschreibung für ein ROS-2-System. Sie startet Prozesse und Knoten gemeinsam und kann ihnen Parameter und Umbenennungen mitgeben.
 
 ## URDF
 
-Die Beschreibung von Fahrgestell und Sensoren. Daraus kommen die festen Abstände am Roboter.
+Ein XML-Format, das die Bauteile und Gelenke eines Roboters sowie ihre feste Anordnung beschreibt.
 
 ## TF
 
-Die Koordinatensysteme des Roboters und ihre Lage zueinander. Ein Sensor sitzt damit fest relativ zum Fahrgestell.
+Das ROS-2-System für Koordinatentransformationen. Es beschreibt, wo die Koordinatensysteme des Roboters relativ zueinander liegen.
 
 ## Costmap
 
-Das Raster der Umgebung für den Planer. Belegte Zellen und der Ring darum kosten mehr, freie Zellen weniger.
+Ein Raster, das jeder Zelle der Umgebung Navigationskosten zuweist. Hindernisse und ihr Sicherheitsabstand kosten mehr als freie Flächen.
 
 ## Dijkstra
 
-Die Suche vom Ziel über jede erreichbare Zelle. Der Pfad folgt danach dem Gefälle zum Start.
+Ein Algorithmus, der in einem gewichteten Graphen den günstigsten Weg bestimmt. NavFn breitet die Suche dafür vom Ziel über die erreichbaren Costmap-Zellen aus.
 
 ## NavFn
 
-Der Planer, der diese Suche auf der Costmap ausführt. Ohne A* ist die Suche Dijkstra.
+Ein globaler Nav2-Planer, der einen Pfad durch die Costmap berechnet. Je nach Einstellung verwendet er Dijkstra oder A*.
