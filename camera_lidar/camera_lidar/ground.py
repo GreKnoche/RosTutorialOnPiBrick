@@ -1,3 +1,6 @@
+# Copyright (c) 2026 HTWK Smart Driving
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Project image-edge pixels onto the ground plane.
 
 Optical axes: +Z forward, +X right, +Y down. Positive pitch looks down.
@@ -15,6 +18,11 @@ except ImportError:  # pragma: no cover - tests of the projection do not need Op
 
 
 INF = float("inf")
+
+
+def beam_count(horizontal_fov_rad: float, angle_increment_rad: float) -> int:
+    """Karto length: round((angle_max - angle_min) / increment) + 1."""
+    return int(np.round(horizontal_fov_rad / angle_increment_rad)) + 1
 
 
 def odd_kernel(size: int) -> int:
@@ -68,7 +76,12 @@ def ranges_from_edges(
     origin_x_m: float = 0.0,
     origin_y_m: float = 0.0,
 ) -> np.ndarray | None:
-    """Nearest ground hit per beam. Empty or invalid input returns None."""
+    """Nearest ground hit per beam.
+
+    Invalid geometry returns None: an empty array, a non-positive field of
+    view or angle step, or a lens at or below the ground. A mask with no
+    edge pixels returns one inf per beam.
+    """
     if mask.size == 0 or angle_increment_rad <= 0 or horizontal_fov_rad <= 0:
         return None
     if camera_height_m <= 0:
@@ -82,9 +95,9 @@ def ranges_from_edges(
     cy = (rows - 1) * 0.5
 
     half = 0.5 * horizontal_fov_rad
-    # Karto (slam_toolbox) expects round((angle_max - angle_min) / increment) + 1.
-    # floor() is one short for this FOV, and every scan is then rejected.
-    count = int(np.round((2.0 * half) / angle_increment_rad)) + 1
+    # floor() is one short when the field is not an integer number of steps,
+    # and slam_toolbox then rejects the scan.
+    count = beam_count(horizontal_fov_rad, angle_increment_rad)
     ranges = np.full(count, INF, dtype=np.float32)
 
     ys, xs = np.nonzero(mask)
@@ -93,9 +106,9 @@ def ranges_from_edges(
 
     opt_x = (xs.astype(np.float64) - cx) / fx
     opt_y = (ys.astype(np.float64) - cy) / fy
-    # Positive pitch rotates camera +X down about the left axis. Undo that
-    # into the level robot frame. The opposite sign points the center ray up
-    # and drops every road pixel once the camera looks down.
+    # Positive pitch looks down: a rotation about the left axis. Undo it so
+    # the ray is in the level robot frame. The opposite sign points the
+    # center ray up and drops every road pixel once the camera looks down.
     cosine = np.cos(pitch_rad)
     sine = np.sin(pitch_rad)
     forward = cosine - sine * opt_y
@@ -105,8 +118,8 @@ def ranges_from_edges(
     if not np.any(hits):
         return ranges
     scale = camera_height_m / down[hits]
-    # Hits are in the level frame. Shift them from the lens to base_link so a
-    # LaserScan in that frame stays on the ground instead of the pitched camera plane.
+    # Hits are measured from the lens. Shift them by the lens position in
+    # base_link so the range starts at that frame's origin.
     forward_m = scale * forward[hits] + origin_x_m
     left_m = scale * left[hits] + origin_y_m
     distance = np.hypot(forward_m, left_m).astype(np.float32)

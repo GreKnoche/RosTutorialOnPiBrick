@@ -4,11 +4,18 @@
   <name>camera_lidar</name>
   <version>0.1.0</version>
   <description>Ground-plane LaserScan from a forward camera. No inverse-perspective image.</description>
-  <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="smart-driving@htwk-leipzig.de">HTWK Smart Driving</maintainer>
+  <license>BSD-3-Clause</license>
+  <url type="website">https://smart-driving.htwk-leipzig.de/</url>
+  <author email="gregor.knoche@stud.htwk-leipzig.de">Gregor Knoche</author>
+
+  <buildtool_depend>ament_python</buildtool_depend>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
 

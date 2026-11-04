@@ -123,7 +123,9 @@ def generate_launch_description() -> LaunchDescription:
                 get_package_share_directory("camera_lidar"),
                 "config",
                 "camera_lidar.yaml",
-            )
+            ),
+            os.path.join(pkg_bringup, "config", "camera_lidar.yaml"),
+            {"use_sim_time": True},
         ],
         condition=IfCondition(LaunchConfiguration("camera_lidar")),
     )

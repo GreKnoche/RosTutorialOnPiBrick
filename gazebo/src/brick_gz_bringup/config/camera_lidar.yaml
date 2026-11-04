@@ -1,0 +1,14 @@
+# PiBrick portal camera. Loaded after the camera_lidar defaults.
+# Mount matches shared/camera.yaml: 0.03 m forward, pitch 0.45 rad down.
+# Height is the 0.11 m mount plus the 0.0277 m wheel radius from
+# shared/chassis.yaml. 0.1377 m is stored as 0.138. base_link sits at the
+# axle. The wheels fill the bottom of the frame, so range_min starts past them.
+camera_lidar:
+  ros__parameters:
+    camera_forward_m: 0.03
+    camera_left_m: 0.0
+    camera_height_m: 0.138
+    pitch_rad: 0.45
+    horizontal_fov_rad: 1.047
+    range_min_m: 0.15
+    range_max_m: 4.0

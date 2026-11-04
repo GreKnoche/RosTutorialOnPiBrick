@@ -1,3 +1,6 @@
+# Copyright (c) 2026 HTWK Smart Driving
+# SPDX-License-Identifier: BSD-3-Clause
+
 """ROS 2 node: forward camera image in, ground-plane LaserScan out."""
 
 from __future__ import annotations
@@ -7,26 +10,11 @@ from typing import Optional
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image, LaserScan
 
 from camera_lidar.ground import edge_mask, ranges_from_edges
-
-
-def image_array(msg: Image) -> np.ndarray:
-    if msg.encoding in ("mono8", "8UC1"):
-        channels = 1
-    elif msg.encoding in ("bgr8", "rgb8"):
-        channels = 3
-    else:
-        raise ValueError(f"unsupported encoding {msg.encoding}")
-    flat = np.frombuffer(msg.data, dtype=np.uint8)
-    if channels == 3:
-        image = flat.reshape(msg.height, msg.width, 3)
-        if msg.encoding == "rgb8":
-            image = image[:, :, ::-1]
-    else:
-        image = flat.reshape(msg.height, msg.width)
-    return np.ascontiguousarray(image)
+from camera_lidar.images import image_array
 
 
 def mono_msg(mask: np.ndarray, header) -> Image:
@@ -47,9 +35,9 @@ class CameraLidar(Node):
         self.declare_parameter("debug_mask_topic", "/camera_lidar/debug_mask")
         self.declare_parameter("scan_topic", "/camera_lidar/scan")
         self.declare_parameter("frame_id", "base_link")
-        self.declare_parameter("camera_forward_m", 0.03)
+        self.declare_parameter("camera_forward_m", 0.0)
         self.declare_parameter("camera_left_m", 0.0)
-        self.declare_parameter("camera_height_m", 0.138)
+        self.declare_parameter("camera_height_m", 0.2)
         self.declare_parameter("pitch_rad", 0.0)
         self.declare_parameter("horizontal_fov_rad", 1.047)
         self.declare_parameter("vertical_fov_rad", 0.0)
@@ -64,7 +52,10 @@ class CameraLidar(Node):
 
         image_topic = str(self.get_parameter("image_topic").value)
         scan_topic = str(self.get_parameter("scan_topic").value)
-        self.create_subscription(Image, image_topic, self._on_image, 10)
+        # Best effort, so a sensor-data camera and a reliable driver both connect.
+        self.create_subscription(
+            Image, image_topic, self._on_image, qos_profile_sensor_data
+        )
         self._debug = self.create_publisher(
             Image, str(self.get_parameter("debug_mask_topic").value), 10
         )

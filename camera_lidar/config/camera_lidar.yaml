@@ -1,30 +1,29 @@
 # Forward camera to a ground-plane LaserScan. No IPM image.
-# Height, pitch, and horizontal FOV should match shared/camera.yaml.
+# Geometry is a level camera 0.2 m above the ground, looking straight ahead,
+# with a 60 degree horizontal field. Replace it for a real mount.
+# Wall clock. A simulator launch must set use_sim_time true on this node.
 camera_lidar:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     image_topic: /camera/image_raw
     debug_mask_topic: /camera_lidar/debug_mask
     scan_topic: /camera_lidar/scan
-    # Level base, not the pitched camera_link. A scan in camera_link is drawn
-    # in the tilted camera plane and dives through the ground.
+    # Level base, not the pitched camera frame. A scan in the camera frame is
+    # drawn in the tilted camera plane and dives through the ground.
     frame_id: base_link
-    # Lens position in base_link. Matches shared/camera.yaml xyz x and y.
-    camera_forward_m: 0.03
+    # Lens position in base_link. x forward, y left.
+    camera_forward_m: 0.0
     camera_left_m: 0.0
-
-    # Lens above the road: mount z 0.11 m plus the 0.028 m wheel radius.
-    # base_link rests at the wheel radius, so 0.11 m is not the ground height.
-    camera_height_m: 0.138
-    # Positive pitch looks down. Must match shared/camera.yaml.
-    pitch_rad: 0.45
+    # Lens height above the road.
+    camera_height_m: 0.2
+    # Positive pitch looks down.
+    pitch_rad: 0.0
+    # About 60 degrees. Measure the lens.
     horizontal_fov_rad: 1.047
     # 0 derives the vertical field from the image aspect and square pixels.
     vertical_fov_rad: 0.0
     angle_increment_rad: 0.0174532925
-    # The wheels sit in the bottom of the frame and would otherwise be the
-    # nearest hit on every center beam.
-    range_min_m: 0.15
+    range_min_m: 0.05
     range_max_m: 4.0
 
     blur_kernel_size: 5
