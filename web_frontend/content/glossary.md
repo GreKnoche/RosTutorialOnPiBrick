@@ -6,6 +6,10 @@ Fortlaufende Schätzung der Bewegung und Pose eines Roboters. In diesem Kurs wir
 
 Position und Ausrichtung eines Roboters. In der Fläche besteht sie aus x, y und einem Drehwinkel.
 
+## Gyroskop
+
+Ein Sensor für die Drehrate. Die Richtung, die du daraus liest, hängt nicht an den Umdrehungen der Räder.
+
 ## Bogenmaß
 
 Ein Winkelmaß, bei dem der Winkel dem Verhältnis aus Bogenlänge und Radius entspricht. Ein voller Kreis hat 2π, 90° sind π / 2.

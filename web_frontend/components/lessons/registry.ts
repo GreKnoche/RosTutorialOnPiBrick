@@ -3,6 +3,8 @@ import { BehaviorTreesAnimation } from "@/components/lessons/behavior-trees/anim
 import { BehaviorTreesLab } from "@/components/lessons/behavior-trees/lab";
 import { PlannerAnimation } from "@/components/lessons/planner/animation";
 import { PlannerLab } from "@/components/lessons/planner/lab";
+import { GyroskopAnimation } from "@/components/lessons/05_gyroskop/animation";
+import { GyroskopLab } from "@/components/lessons/05_gyroskop/lab";
 import { KalibrierungAnimation } from "@/components/lessons/04_kalibrierung/animation";
 import { KalibrierungLab } from "@/components/lessons/04_kalibrierung/lab";
 import { OdometrieAnimation } from "@/components/lessons/03_odometrie/animation";
@@ -29,6 +31,7 @@ const lessonModules: Record<string, LessonModule> = {
   "autonom:radabstand": { Animation: RadabstandAnimation, Lab: RadabstandLab },
   "autonom:odometrie": { Animation: OdometrieAnimation, Lab: OdometrieLab },
   "autonom:kalibrierung-drift": { Animation: KalibrierungAnimation, Lab: KalibrierungLab },
+  "autonom:gyroskop": { Animation: GyroskopAnimation, Lab: GyroskopLab },
   "nav2:behavior-trees": { Animation: BehaviorTreesAnimation, Lab: BehaviorTreesLab },
   "nav2:planner": { Animation: PlannerAnimation, Lab: PlannerLab },
 };

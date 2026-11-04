@@ -78,9 +78,10 @@ const curriculum: Curriculum = {
       title: "Gyroskop – Orientierung zusätzlich beobachten",
       status: "stub",
       summary:
-        "Die Orientierungsänderung unabhängig von den Rädern beobachten und mit der Odometrie vergleichen.",
+        "Du vergleichst Odometrie und Gyro und findest den passenden Wechsel zwischen beiden Richtungen.",
       track: "autonom",
       lab: "none",
+      taughtTerms: ["Gyroskop"],
     },
     {
       id: "06",

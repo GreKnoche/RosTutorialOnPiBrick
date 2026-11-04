@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import math
 
-# Paper: 0.125° per 0.1 s sample (≈ 1.25 °/s). Rate form is dt-independent.
-THRESHOLD_DEG_S = 3.0
+# Borenstein & Feng, ICRA 1996: Δθ_thres = 0.125° per sample.
+# At T = 0.1 s that is 1.25 °/s. The rate form does not depend on dt.
+THRESHOLD_DEG_S = 1.25
 
 
 def travel_from_pose_delta(dx: float, dy: float, yaw_prev: float, dtheta: float) -> float:

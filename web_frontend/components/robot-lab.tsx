@@ -4,9 +4,10 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { LabKind } from "@/lib/types";
+import { CanvasPlant, type WheelPath } from "@/lib/canvas-plant";
 import { DEFAULT_CHASSIS, type Chassis, type Pose2D, type Twist2D } from "@/lib/ev3-core";
 import { formatDe } from "@/lib/format";
-import { openTwin, type TwinDone, type TwinLink, type TwinState } from "@/lib/twin-socket";
+import { openTwin, type TwinLink } from "@/lib/twin-socket";
 
 export type RulerDrive = {
   circumferenceCm: number;
@@ -71,15 +72,6 @@ function radiusM(circumferenceCm: number) {
   return circumferenceCm / 100 / (2 * Math.PI);
 }
 
-function viewChassis(radius: number, separation: number): Chassis {
-  return {
-    ...DEFAULT_CHASSIS,
-    wheelRadius: radius,
-    wheelSeparation: separation,
-    bodyWidth: separation,
-  };
-}
-
 function twistFromKeys(keys: Set<string>): Twist2D {
   let linear = 0;
   let angular = 0;
@@ -88,6 +80,35 @@ function twistFromKeys(keys: Set<string>): Twist2D {
   if (keys.has("a") || keys.has("arrowleft")) angular += DEFAULT_CHASSIS.maxAngular;
   if (keys.has("d") || keys.has("arrowright")) angular -= DEFAULT_CHASSIS.maxAngular;
   return { linear, angular };
+}
+
+function motionStatus(
+  pose: Pose2D,
+  plant: { busy: boolean; reached: boolean; goal: Pose2D | null; command: Twist2D },
+  lab: LabKind,
+  rulerMode: boolean,
+  turnMode: boolean,
+  pathMode: boolean,
+  trailLength: number,
+) {
+  if (rulerMode) {
+    const meters = drivenMetersFromPose(pose);
+    return plant.busy ? "fährt am Lineal" : meters > 0.005 ? "Fahrt beendet" : "am Start";
+  }
+  if (turnMode) {
+    return plant.busy ? "dreht am Winkelmesser" : Math.abs(pose.theta) > 0.01 ? "Drehung beendet" : "am Start";
+  }
+  if (pathMode) {
+    return plant.busy ? "fährt den Pfad" : trailLength > 1 ? "Pfad beendet" : "am Start";
+  }
+  if (lab === "goal") {
+    return plant.reached ? "Ziel erreicht" : plant.goal ? "fährt zum Ziel" : "wartet auf ein Ziel";
+  }
+  if (lab === "teleop") {
+    const moving = Math.abs(plant.command.linear) + Math.abs(plant.command.angular) > 1e-3;
+    return moving ? "manuelle Steuerung" : "wartet auf WASD";
+  }
+  return "Entwurf — nur Roboterschnittstelle";
 }
 
 function hudLabel(pose: Pose2D, rulerMode: boolean, turnMode: boolean, pathMode: boolean) {
@@ -118,14 +139,15 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
   const frameRef = useRef<HTMLDivElement>(null);
   const clientId = useRef(useId());
   const seqRef = useRef(0);
-  const genRef = useRef(-1);
   const linkRef = useRef<TwinLink | null>(null);
+  const plantRef = useRef<CanvasPlant | null>(null);
+  if (plantRef.current === null) plantRef.current = new CanvasPlant();
   const keysRef = useRef(new Set<string>());
   const lastTwist = useRef<Twist2D>({ linear: 0, angular: 0 });
   const rulerRef = useRef(ruler);
   const turnRef = useRef(turn);
   const pathRef = useRef(path);
-  const connectedRef = useRef(false);
+  const followRef = useRef(false);
   const viewRef = useRef<DrawTwin>({
     odom: { pose: { x: 0, y: 0, theta: 0 } },
     chassis: { ...DEFAULT_CHASSIS },
@@ -136,8 +158,8 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
   const rulerEnabled = ruler !== undefined;
   const turnEnabled = turn !== undefined;
   const pathEnabled = path !== undefined;
-  const [connected, setConnected] = useState(false);
-  const [status, setStatus] = useState("nicht verbunden");
+  const [rosUp, setRosUp] = useState(false);
+  const [status, setStatus] = useState("am Start");
   const [snapshot, setSnapshot] = useState<Snapshot>({
     pose: { x: 0, y: 0, theta: 0 },
     cmd: { linear: 0, angular: 0 },
@@ -158,22 +180,95 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
     pathRef.current = path;
   }, [path]);
 
-  const send = useCallback((payload: Record<string, unknown>) => {
+  const mirror = useCallback((payload: Record<string, unknown>) => {
     linkRef.current?.send(payload);
   }, []);
 
+  const showPlant = useCallback((jumpTrail: Pose2D[] | null, done: boolean) => {
+    const plant = plantRef.current;
+    if (!plant) return;
+    const view = viewRef.current;
+    const pose = plant.pose;
+    view.chassis = { ...plant.chassis };
+    view.goal = plant.goal ? { ...plant.goal } : null;
+    view.reached = plant.reached;
+    view.odom.pose = pose;
+    if (jumpTrail && jumpTrail.length > 0) {
+      view.trail = jumpTrail.map((point) => ({ ...point }));
+      view.odom.pose = { ...view.trail[view.trail.length - 1] };
+    } else {
+      const last = view.trail[view.trail.length - 1];
+      if (!last || Math.hypot(last.x - pose.x, last.y - pose.y) > 0.008) {
+        view.trail.push({ ...pose });
+        if (view.trail.length > 400) view.trail.shift();
+      }
+    }
+    const shown = { ...view.odom.pose };
+    const rulerSpec = rulerRef.current;
+    const turnSpec = turnRef.current;
+    const pathSpec = pathRef.current;
+    if (followRef.current) {
+      if (rulerSpec) rulerSpec.onDistance(drivenMetersFromPose(shown));
+      if (turnSpec) turnSpec.onHeading(shown.theta);
+      if (pathSpec) pathSpec.onPose({ ...shown });
+      if (done) {
+        const trail = view.trail.map((point) => ({ ...point }));
+        if (rulerSpec) rulerSpec.onDone(drivenMetersFromPose(shown));
+        else if (turnSpec) turnSpec.onDone(shown.theta);
+        else if (pathSpec) pathSpec.onDone(shown, trail);
+      }
+    }
+    const goal = view.goal ? { ...view.goal } : null;
+    const cmd = { ...plant.command };
+    setSnapshot((current) => {
+      if (
+        current.pose.x === shown.x &&
+        current.pose.y === shown.y &&
+        current.pose.theta === shown.theta &&
+        current.cmd.linear === cmd.linear &&
+        current.cmd.angular === cmd.angular &&
+        current.reached === plant.reached &&
+        current.goal?.x === goal?.x &&
+        current.goal?.y === goal?.y &&
+        current.goal?.theta === goal?.theta
+      ) {
+        return current;
+      }
+      return { pose: shown, cmd, rangeM: 2.5, goal, reached: plant.reached };
+    });
+    const nextStatus = motionStatus(
+      shown,
+      plant,
+      lab,
+      Boolean(rulerSpec),
+      Boolean(turnSpec),
+      Boolean(pathSpec),
+      view.trail.length,
+    );
+    setStatus((current) => (current === nextStatus ? current : nextStatus));
+  }, [lab]);
+
   const publishKeys = useCallback(() => {
-    if (lab !== "teleop" || rulerRef.current || turnRef.current || pathRef.current) return;
+    const plant = plantRef.current;
+    if (!plant || lab !== "teleop" || rulerRef.current || turnRef.current || pathRef.current) return;
     const twist = twistFromKeys(keysRef.current);
     if (twist.linear === lastTwist.current.linear && twist.angular === lastTwist.current.angular) return;
     lastTwist.current = twist;
-    send({ type: "twist", linear: twist.linear, angular: twist.angular, client: clientId.current });
-  }, [lab, send]);
+    plant.commandTwist(twist.linear, twist.angular);
+    mirror({ type: "twist", linear: twist.linear, angular: twist.angular, client: clientId.current });
+    showPlant(null, false);
+  }, [lab, mirror, showPlant]);
 
   const resetOrigin = useCallback((x: number, y: number, theta: number, radius: number, separation: number) => {
+    const plant = plantRef.current;
+    if (!plant) return;
     seqRef.current += 1;
-    viewRef.current.chassis = viewChassis(radius, separation);
-    send({
+    followRef.current = false;
+    lastTwist.current = { linear: 0, angular: 0 };
+    plant.setChassis(radius, separation);
+    plant.reset(x, y, theta);
+    viewRef.current.trail = [];
+    mirror({
       type: "reset",
       client: clientId.current,
       wheel_radius_m: radius,
@@ -182,97 +277,80 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
       y,
       theta,
     });
-  }, [send]);
+    showPlant(null, false);
+  }, [mirror, showPlant]);
+
+  const drivePaths = useCallback((
+    x: number,
+    y: number,
+    theta: number,
+    radius: number,
+    separation: number,
+    paths: WheelPath[],
+  ) => {
+    const plant = plantRef.current;
+    if (!plant || paths.length === 0) return;
+    plant.setChassis(radius, separation);
+    plant.reset(x, y, theta);
+    viewRef.current.trail = [];
+    followRef.current = true;
+    const jump = jumped();
+    const done = plant.commandPaths(paths, jump);
+    const seq = ++seqRef.current;
+    mirror({
+      type: "drive",
+      seq,
+      client: clientId.current,
+      wheel_radius_m: radius,
+      wheel_separation_m: separation,
+      x,
+      y,
+      theta,
+      jump,
+      paths: paths.map((path) => ({ left_m: path.leftM, right_m: path.rightM })),
+    });
+    showPlant(done, done !== null);
+  }, [mirror, showPlant]);
+
+  const aimAt = useCallback((x: number, y: number, theta: number) => {
+    const plant = plantRef.current;
+    if (!plant) return;
+    plant.commandGoal(x, y, theta);
+    mirror({ type: "goal", client: clientId.current, x, y, theta });
+    showPlant(null, false);
+  }, [mirror, showPlant]);
 
   useEffect(() => {
     const link = openTwin({
-      onConnection: (up) => {
-        connectedRef.current = up;
-        setConnected(up);
-        if (!up) setStatus("nicht verbunden");
-      },
-      onState: (sample: TwinState) => {
-        connectedRef.current = true;
-        const view = viewRef.current;
-        const pose = { x: sample.x, y: sample.y, theta: sample.theta };
-        view.odom.pose = pose;
-        view.goal = sample.goal ? { ...sample.goal } : null;
-        view.reached = sample.reached;
-        if (sample.generation !== genRef.current) {
-          genRef.current = sample.generation;
-          view.trail = [{ ...pose }];
-        } else {
-          const last = view.trail[view.trail.length - 1];
-          if (!last || Math.hypot(last.x - pose.x, last.y - pose.y) > 0.008) {
-            view.trail.push({ ...pose });
-            if (view.trail.length > 400) view.trail.shift();
-          }
-        }
-        const mine = sample.owner === clientId.current;
-        const rulerSpec = rulerRef.current;
-        const turnSpec = turnRef.current;
-        const pathSpec = pathRef.current;
-        if (mine && rulerSpec) rulerSpec.onDistance(drivenMetersFromPose(pose));
-        if (mine && turnSpec) turnSpec.onHeading(pose.theta);
-        if (mine && pathSpec) pathSpec.onPose({ ...pose });
-        setSnapshot({
-          pose,
-          cmd: { linear: sample.linear, angular: sample.angular },
-          rangeM: 2.5,
-          goal: view.goal ? { ...view.goal } : null,
-          reached: sample.reached,
-        });
-        const nodeDriving =
-          sample.owner == null && Math.abs(sample.linear) + Math.abs(sample.angular) > 1e-3;
-        if (nodeDriving) {
-          setStatus("der Knoten fährt den Twin");
-        } else if (rulerSpec) {
-          const meters = drivenMetersFromPose(pose);
-          setStatus(sample.busy ? "fährt am Lineal" : meters > 0.005 ? "Fahrt beendet" : "am Start");
-        } else if (turnSpec) {
-          setStatus(
-            sample.busy ? "dreht am Winkelmesser" : Math.abs(pose.theta) > 0.01 ? "Drehung beendet" : "am Start",
-          );
-        } else if (pathSpec) {
-          setStatus(sample.busy ? "fährt den Pfad" : view.trail.length > 1 ? "Pfad beendet" : "am Start");
-        } else if (lab === "goal") {
-          setStatus(sample.reached ? "Ziel erreicht" : sample.goal ? "fährt zum Ziel" : "wartet auf /goal_pose");
-        } else if (lab === "teleop") {
-          const moving = Math.abs(sample.linear) + Math.abs(sample.angular) > 1e-3;
-          setStatus(moving ? "manuelle Steuerung" : "wartet auf WASD");
-        } else {
-          setStatus("Entwurf — nur Roboterschnittstelle");
-        }
-      },
-      onDone: (msg: TwinDone) => {
-        if (msg.client !== clientId.current || msg.seq !== seqRef.current) return;
-        const view = viewRef.current;
-        if (msg.jump && msg.poses.length > 0) {
-          view.trail = msg.poses.map((point) => ({ ...point }));
-          const last = view.trail[view.trail.length - 1];
-          view.odom.pose = { ...last };
-        }
-        const pose = { ...view.odom.pose };
-        const trail = view.trail.map((point) => ({ ...point }));
-        const rulerSpec = rulerRef.current;
-        const turnSpec = turnRef.current;
-        const pathSpec = pathRef.current;
-        if (rulerSpec) rulerSpec.onDone(drivenMetersFromPose(pose));
-        else if (turnSpec) turnSpec.onDone(pose.theta);
-        else if (pathSpec) pathSpec.onDone(pose, trail);
-      },
+      onConnection: (up) => setRosUp(up),
+      onState: () => {},
+      onDone: () => {},
     });
     linkRef.current = link;
     return () => {
       link.close();
       linkRef.current = null;
     };
-  }, [lab]);
+  }, []);
 
   useEffect(() => {
+    let last = performance.now();
     const step = () => {
+      const plant = plantRef.current;
       const view = viewRef.current;
       const pathSpec = pathRef.current;
+      if (plant) {
+        const now = performance.now();
+        let dt = Math.min(0.25, (now - last) / 1000);
+        last = now;
+        let finished = false;
+        while (dt > 1e-4) {
+          const take = Math.min(0.05, dt);
+          if (plant.step(take)) finished = true;
+          dt -= take;
+        }
+        showPlant(null, finished);
+      }
       try {
         draw(
           canvasRef.current,
@@ -295,104 +373,69 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
     step();
     const id = window.setInterval(step, 50);
     return () => window.clearInterval(id);
-  }, [lab, lessonId, showTopics, rulerEnabled, turnEnabled, pathEnabled]);
+  }, [lab, lessonId, showTopics, rulerEnabled, turnEnabled, pathEnabled, showPlant]);
 
   useEffect(() => {
-    if (!connected || !rulerEnabled) return;
+    if (!rulerEnabled) return;
     const spec = rulerRef.current;
     if (!spec) return;
     resetOrigin(RULER_START_X, 0, 0, radiusM(spec.circumferenceCm), DEFAULT_CHASSIS.wheelSeparation);
-  }, [connected, rulerEnabled, resetOrigin]);
+  }, [rulerEnabled, resetOrigin]);
 
   useEffect(() => {
     const spec = rulerRef.current;
-    if (!connected || !rulerEnabled || !spec || spec.runId === 0) return;
-    const radius = radiusM(spec.circumferenceCm);
+    if (!rulerEnabled || !spec || spec.runId === 0) return;
     const distance = (spec.revolutions * spec.circumferenceCm) / 100;
-    viewRef.current.chassis = viewChassis(radius, DEFAULT_CHASSIS.wheelSeparation);
-    const seq = ++seqRef.current;
-    send({
-      type: "drive",
-      seq,
-      client: clientId.current,
-      wheel_radius_m: radius,
-      wheel_separation_m: DEFAULT_CHASSIS.wheelSeparation,
-      x: RULER_START_X,
-      y: 0,
-      theta: 0,
-      jump: jumped(),
-      paths: [{ left_m: distance, right_m: distance }],
-    });
-  }, [connected, rulerEnabled, ruler?.runId, send]);
+    drivePaths(RULER_START_X, 0, 0, radiusM(spec.circumferenceCm), DEFAULT_CHASSIS.wheelSeparation, [
+      { leftM: distance, rightM: distance },
+    ]);
+  }, [rulerEnabled, ruler?.runId, drivePaths]);
 
   useEffect(() => {
     const spec = rulerRef.current;
-    if (!connected || !rulerEnabled || !spec || spec.resetId === 0) return;
+    if (!rulerEnabled || !spec || spec.resetId === 0) return;
     resetOrigin(RULER_START_X, 0, 0, radiusM(spec.circumferenceCm), DEFAULT_CHASSIS.wheelSeparation);
-  }, [connected, rulerEnabled, ruler?.resetId, resetOrigin]);
+  }, [rulerEnabled, ruler?.resetId, resetOrigin]);
 
   useEffect(() => {
-    if (!connected || !turnEnabled) return;
+    if (!turnEnabled) return;
     const spec = turnRef.current;
     if (!spec) return;
     resetOrigin(0, 0, 0, DEFAULT_CHASSIS.wheelRadius, spec.separationCm / 100);
-  }, [connected, turnEnabled, resetOrigin]);
+  }, [turnEnabled, resetOrigin]);
 
   useEffect(() => {
     const spec = turnRef.current;
-    if (!connected || !turnEnabled || !spec || spec.runId === 0) return;
-    const separation = spec.separationCm / 100;
-    viewRef.current.chassis = viewChassis(DEFAULT_CHASSIS.wheelRadius, separation);
-    const seq = ++seqRef.current;
-    send({
-      type: "drive",
-      seq,
-      client: clientId.current,
-      wheel_radius_m: DEFAULT_CHASSIS.wheelRadius,
-      wheel_separation_m: separation,
-      x: 0,
-      y: 0,
-      theta: 0,
-      jump: jumped(),
-      paths: [{ left_m: spec.leftPathCm / 100, right_m: spec.rightPathCm / 100 }],
-    });
-  }, [connected, turnEnabled, turn?.runId, send]);
+    if (!turnEnabled || !spec || spec.runId === 0) return;
+    drivePaths(0, 0, 0, DEFAULT_CHASSIS.wheelRadius, spec.separationCm / 100, [
+      { leftM: spec.leftPathCm / 100, rightM: spec.rightPathCm / 100 },
+    ]);
+  }, [turnEnabled, turn?.runId, drivePaths]);
 
   useEffect(() => {
     const spec = turnRef.current;
-    if (!connected || !turnEnabled || !spec || spec.resetId === 0) return;
+    if (!turnEnabled || !spec || spec.resetId === 0) return;
     resetOrigin(0, 0, 0, DEFAULT_CHASSIS.wheelRadius, spec.separationCm / 100);
-  }, [connected, turnEnabled, turn?.resetId, resetOrigin]);
+  }, [turnEnabled, turn?.resetId, resetOrigin]);
 
   useEffect(() => {
     const spec = pathRef.current;
-    if (!connected || !pathEnabled || !spec || spec.runId === 0 || spec.segments.length === 0) return;
-    const radius = radiusM(spec.circumferenceCm);
-    const separation = spec.separationCm / 100;
-    viewRef.current.chassis = viewChassis(radius, separation);
-    const seq = ++seqRef.current;
-    send({
-      type: "drive",
-      seq,
-      client: clientId.current,
-      wheel_radius_m: radius,
-      wheel_separation_m: separation,
-      x: 0,
-      y: 0,
-      theta: 0,
-      jump: jumped(),
-      paths: spec.segments.map((segment) => ({
-        left_m: segment.leftCm / 100,
-        right_m: segment.rightCm / 100,
-      })),
-    });
-  }, [connected, pathEnabled, path?.runId, send]);
+    if (!pathEnabled || !spec || spec.runId === 0 || spec.segments.length === 0) return;
+    drivePaths(
+      0,
+      0,
+      0,
+      radiusM(spec.circumferenceCm),
+      spec.separationCm / 100,
+      spec.segments.map((segment) => ({ leftM: segment.leftCm / 100, rightM: segment.rightCm / 100 })),
+    );
+  }, [pathEnabled, path?.runId, drivePaths]);
 
   useEffect(() => {
     const spec = pathRef.current;
-    if (!connected || !pathEnabled || !spec || spec.resetId === 0) return;
+    if (!pathEnabled || !spec || spec.resetId === 0) return;
     resetOrigin(0, 0, 0, radiusM(spec.circumferenceCm), spec.separationCm / 100);
-  }, [connected, pathEnabled, path?.resetId, resetOrigin]);
+  }, [pathEnabled, path?.resetId, resetOrigin]);
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -432,7 +475,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
       event.nativeEvent.offsetX,
       event.nativeEvent.offsetY,
     );
-    send({ type: "goal", client: clientId.current, x: world.x, y: world.y, theta: 0 });
+    aimAt(world.x, world.y, 0);
   };
 
   const pose = snapshot.pose;
@@ -443,8 +486,11 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">ROS-Twin</Badge>
-          <span className="text-xs text-muted-foreground">{status}</span>
+          <Badge variant="secondary">Canvas</Badge>
+          <span className="text-xs text-muted-foreground">
+            {status}
+            {rosUp ? " · ROS verbunden" : " · ROS nicht verbunden"}
+          </span>
         </div>
         {!ruler && !turn && !path && (
         <div className="flex flex-wrap gap-2">
@@ -518,7 +564,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
             <Button
               size="sm"
               variant="outline"
-              onClick={() => send({ type: "goal", client: clientId.current, x: 0.4, y: 0.12, theta: 0 })}
+              onClick={() => aimAt(0.4, 0.12, 0)}
             >
               Beispielziel
             </Button>
@@ -563,17 +609,15 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
       </div>
       <p className="text-xs text-muted-foreground">
         {ruler
-          ? "Dieselbe Simulationsfläche. Der Twin fährt geradeaus; die Strecke kommt aus der Odometrie."
+          ? "Eigene Canvas. Der Roboter fährt geradeaus; dieselbe Fahrt geht parallel an ROS."
           : turn
-            ? "Dieselbe Simulationsfläche. Die Räder fahren die eingestellten Wege; der Winkel kommt aus der Odometrie."
+            ? "Eigene Canvas. Die Räder fahren die eingestellten Wege; dieselbe Fahrt geht parallel an ROS."
             : path
-              ? "Die Scheiben sind feste Ziele. Links und rechts sind Umdrehungen; die Pose kommt aus Umfang und Radabstand."
+              ? "Eigene Canvas. Links und rechts sind Umdrehungen; dieselbe Fahrt geht parallel an ROS."
           : lab === "teleop"
-            ? "Mit W A S D oder den Pfeiltasten fahren. R setzt zurück. Die Pose kommt aus /odom."
+            ? "Mit W A S D oder den Pfeiltasten fahren. R setzt zurück. Dieselbe Fahrt geht parallel an ROS."
             : lab === "goal"
-              ? showTopics
-                ? "In die Fläche klicken, um /goal_pose zu veröffentlichen. Es wird derselbe PosePursuitController wie im ROS-Knoten verwendet."
-                : "In die Fläche klicken, um ein Ziel zu setzen."
+              ? "In die Fläche klicken setzt ein Ziel. Derselbe Klick geht parallel an ROS."
               : "Diese Lektion enthält noch keine Steuerung."}
       </p>
       {showTopics && (
