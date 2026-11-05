@@ -3,6 +3,10 @@ import { BehaviorTreesAnimation } from "@/components/lessons/behavior-trees/anim
 import { BehaviorTreesLab } from "@/components/lessons/behavior-trees/lab";
 import { PlannerAnimation } from "@/components/lessons/planner/animation";
 import { PlannerLab } from "@/components/lessons/planner/lab";
+import { Bt2Animation } from "@/components/lessons/bt2/animation";
+import { Bt2Lab } from "@/components/lessons/bt2/lab";
+import { PluginsAnimation } from "@/components/lessons/plugins/animation";
+import { PluginsLab } from "@/components/lessons/plugins/lab";
 import { GyroskopAnimation } from "@/components/lessons/05_gyroskop/animation";
 import { GyroskopLab } from "@/components/lessons/05_gyroskop/lab";
 import { KalibrierungAnimation } from "@/components/lessons/04_kalibrierung/animation";
@@ -34,6 +38,8 @@ const lessonModules: Record<string, LessonModule> = {
   "autonom:gyroskop": { Animation: GyroskopAnimation, Lab: GyroskopLab },
   "nav2:behavior-trees": { Animation: BehaviorTreesAnimation, Lab: BehaviorTreesLab },
   "nav2:planner": { Animation: PlannerAnimation, Lab: PlannerLab },
+  "nav2:bt2": { Animation: Bt2Animation, Lab: Bt2Lab },
+  "nav2:plugins": { Animation: PluginsAnimation, Lab: PluginsLab },
 };
 
 export function lessonModule(track: string, slug: string) {

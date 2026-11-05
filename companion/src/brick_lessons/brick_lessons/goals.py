@@ -55,6 +55,8 @@ _SPECS: tuple[tuple[str, str, tuple[Step, ...], tuple[Step, ...]], ...] = (
     ("ros", "07", *_same(1.0)),
     ("nav2", "01", *_same(1.0)),
     ("nav2", "02", *_same(1.0)),
+    ("nav2", "03", *_same(1.0)),
+    ("nav2", "04", *_same(1.0)),
 )
 
 GOALS: dict[str, LessonGoals] = {

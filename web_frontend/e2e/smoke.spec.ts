@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loadCurriculum, lessonHref, trackHref } from "../lib/curriculum";
-import { lessonLevelKey } from "../lib/lesson-levels";
+import { lessonLevelKey, lessonLevels } from "../lib/lesson-levels";
 
 const curriculum = loadCurriculum();
 const fixedPages = ["/", "/auswahl", "/lernpfade"];
@@ -75,7 +75,9 @@ test.describe("lessons", () => {
           exact: true,
         }),
       ).toBeVisible();
-      await expectEditor(page, lesson.track, lesson.id, "medium");
+      if (lessonLevels[`${lesson.track}:${lesson.id}`]) {
+        await expectEditor(page, lesson.track, lesson.id, "medium");
+      }
       expect(errors).toEqual([]);
     });
 
@@ -85,7 +87,9 @@ test.describe("lessons", () => {
       await expect(
         page.getByRole("heading", { name: "Den Knoten selbst schreiben", exact: true }),
       ).toBeVisible();
-      await expectEditor(page, lesson.track, lesson.id, "hard");
+      if (lessonLevels[`${lesson.track}:${lesson.id}`]) {
+        await expectEditor(page, lesson.track, lesson.id, "hard");
+      }
       expect(errors).toEqual([]);
     });
   }

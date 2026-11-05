@@ -210,6 +210,30 @@ const curriculum: Curriculum = {
       lab: "none",
       taughtTerms: ["Costmap", "Dijkstra", "NavFn"],
     },
+    {
+      id: "03",
+      slug: "bt2",
+      title: "Kontrollknoten",
+      status: "stub",
+      nav2_surface: "RecoveryNode & PipelineSequence",
+      summary:
+        "Du verbindest PipelineSequence und RecoveryNode, damit Nav2 einen Pfad plant, ihm folgt und bei einem Fehler mit BackUp gezielt reagiert.",
+      track: "nav2",
+      lab: "none",
+      taughtTerms: ["Behavior Tree", "Tick", "PipelineSequence", "RecoveryNode"],
+    },
+    {
+      id: "04",
+      slug: "plugins",
+      title: "Plugins – der Baum ruft, der Server arbeitet",
+      status: "stub",
+      nav2_surface: "GridBased & FollowPath",
+      summary:
+        "Du verfolgst, wie Behavior-Tree-Blätter über Server, Plugins und das Blackboard zusammenarbeiten.",
+      track: "nav2",
+      lab: "none",
+      taughtTerms: ["Plugin", "Blackboard"],
+    },
   ],
 };
 

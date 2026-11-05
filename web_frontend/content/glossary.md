@@ -57,3 +57,28 @@ Ein Algorithmus, der in einem gewichteten Graphen den günstigsten Weg bestimmt.
 ## NavFn
 
 Ein globaler Nav2-Planer, der einen Pfad durch die Costmap berechnet. Je nach Einstellung verwendet er Dijkstra oder A*.
+
+## Behavior Tree
+
+Eine Baumstruktur, in der Kontrollknoten den Tick an ihre Kinder weitergeben und deren Status auswerten. Nav2 verbindet damit Navigation, Reaktion und Wiederherstellung.
+
+## Tick
+
+Ein Aufruf, der einen Knoten im Behavior Tree aktiviert. Der Knoten antwortet mit `SUCCESS`, `FAILURE` oder `RUNNING`.
+
+## PipelineSequence
+
+Ein Kontrollknoten, der frühere Kinder erneut tickt, während ein späteres Kind noch läuft. Nav2 kann damit weiter planen, während FollowPath den aktuellen Pfad abfährt.
+
+## RecoveryNode
+
+Ein Nav2-Kontrollknoten mit einem Hauptast und einem Recovery-Ast. Scheitert der Hauptast, führt er die Wiederherstellung aus und wiederholt den Hauptast bis zur Grenze aus `number_of_retries`.
+
+## Plugin
+
+Ein Plugin ist eine austauschbare Klasse. Ein Server lädt sie unter einem Namen.
+
+## Blackboard
+
+Das Blackboard hält gemeinsame Werte im Behavior Tree. Ein Blatt schreibt einen Wert und ein anderes liest ihn.
+

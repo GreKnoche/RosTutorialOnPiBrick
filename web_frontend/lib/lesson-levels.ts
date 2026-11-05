@@ -126,6 +126,18 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
     medium: [meter],
     hard: [meter],
   },
+  "nav2:03": {
+    focus:
+      "Die Kontrollknoten ordnen den Tick. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht den Behavior Tree.",
+    medium: [meter],
+    hard: [meter],
+  },
+  "nav2:04": {
+    focus:
+      "Die Plugins stecken hinter den Blättern. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht den Server.",
+    medium: [meter],
+    hard: [meter],
+  },
 };
 
 export function parseLevel(value: string | undefined): LessonLevel {
