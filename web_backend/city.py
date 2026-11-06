@@ -13,9 +13,9 @@ from dataclasses import dataclass
 BODY_LENGTH_M = 0.128
 BODY_WIDTH_M = 0.084
 
-SCAN_MIN = -math.pi
+SCAN_MIN = -math.pi / 2.0
 SCAN_INCREMENT = math.pi / 180.0
-SCAN_COUNT = int(round((math.pi - SCAN_MIN) / SCAN_INCREMENT)) + 1
+SCAN_COUNT = int(round((math.pi / 2.0 - SCAN_MIN) / SCAN_INCREMENT)) + 1
 RANGE_MIN_M = 0.05
 RANGE_MAX_M = 4.0
 
@@ -589,39 +589,61 @@ def bmp_bytes(rgb: bytes, width: int, height: int) -> bytes:
 
 class City:
     def __init__(self) -> None:
-        self.width = 13.0
-        self.height = 10.0
-        self.start_x = 5.2
-        self.start_y = 4.2
+        # Centerlines measured on the reference sheet. 56 px of asphalt is one road width.
+        scale = ROAD_W / 56.0
+
+        def xp(px: float) -> float:
+            return 1.4 + (px - 52.0) * scale
+
+        def yp(py: float) -> float:
+            return 0.9 + (620.0 - py) * scale
+
+        left_x, right_x = xp(52.0), xp(618.0)
+        top_y, mid_y = yp(82.0), yp(258.0)
+        stem_x, ustem_x = xp(266.0), xp(404.0)
+        corner, u_r = 108.0 * scale, 107.0 * scale
+        corner_y, left_u_y, right_u_y = yp(190.0), yp(328.0), yp(464.0)
+        top_left, top_right = xp(160.0), xp(510.0)
+        left_u_x, right_u_x = xp(159.0), xp(511.0)
+        spur_end = yp(577.0)
+        self.width = right_x - left_x + 2.4
+        self.height = top_y - spur_end + 2.2
+        self.start_x = left_x + 1.05
+        self.start_y = mid_y
         self.start_theta = 0.0
-        left_x, mid_y = 1.8, 4.2
-        upper_y, top_y = 6.0, 8.0
-        inner_x, cross_x = 4.4, 6.4
-        right_x, spur_x = 9.4, 10.5
-        corner = 0.95
-        right_mouth = 6.9
         self._ribbons = [
-            _straight(left_x + corner, top_y, right_x - corner, top_y),
-            _bend(left_x + corner, top_y - corner, corner, math.pi, math.pi / 2.0),
-            _straight(left_x, top_y - corner, left_x, mid_y),
-            _bend(right_x - corner, top_y - corner, corner, math.pi / 2.0, 0.0),
-            _straight(right_x, top_y - corner, right_x, mid_y),
-            _straight(left_x, upper_y, right_x, upper_y),
-            _straight(left_x, mid_y, spur_x, mid_y),
-            _straight(inner_x, mid_y, inner_x, upper_y),
-            _straight(cross_x, upper_y, cross_x, mid_y - 1.15),
-            _bend((left_x + inner_x) / 2.0, mid_y, (inner_x - left_x) / 2.0, math.pi, math.tau),
-            _bend((right_x + right_mouth) / 2.0, mid_y, (right_x - right_mouth) / 2.0, 0.0, -math.pi),
-            _straight(spur_x, mid_y, spur_x, mid_y - 1.5),
+            _straight(top_left, top_y, top_right, top_y),
+            _bend(top_left, corner_y, corner, math.pi, math.pi / 2.0),
+            _straight(left_x, corner_y, left_x, left_u_y),
+            _bend(top_right, corner_y, corner, math.pi / 2.0, 0.0),
+            _straight(right_x, corner_y, right_x, spur_end),
+            _straight(left_x, mid_y, right_x, mid_y),
+            _straight(stem_x, top_y, stem_x, left_u_y),
+            _bend(left_u_x, left_u_y, u_r, math.pi, math.tau),
+            _straight(ustem_x, mid_y, ustem_x, right_u_y),
+            _bend(right_u_x, right_u_y, u_r, math.pi, math.tau),
         ]
         self.roads = [_ribbon_polygon(_extended(ribbon, 0.22)) for ribbon in self._ribbons]
+        gap = ROAD_W / 2.0 + 0.14
+        outer = ROAD_W / 2.0 + 0.18
         self.houses = (
-            House("westblock", 4.95, 4.75, 0.85, 0.68, (196, 92, 74)),
-            House("mitte", 2.35, 4.72, 1.5, 0.72, (212, 160, 54)),
-            House("nordblock", 4.95, 6.55, 0.85, 0.8, (74, 116, 168)),
-            House("ostblock", 7.05, 4.74, 1.55, 0.7, (150, 112, 74)),
-            House("sued", 2.9, 3.48, 0.4, 0.24, (120, 116, 96)),
-            House("kurve", 7.95, 3.5, 0.4, 0.22, (184, 96, 62)),
+            House("nordblock", stem_x + gap, mid_y + gap + 0.5, 1.05, 0.68, (74, 116, 168)),
+            House("mitte", left_x + gap + 0.12, mid_y + gap, 1.25, 0.58, (212, 160, 54)),
+            House("ostblock", right_u_x - 1.15, mid_y + gap + 0.22, 1.15, 0.58, (150, 112, 74)),
+            House("sued", left_u_x - 0.26, left_u_y - 0.62, 0.52, 0.34, (120, 116, 96)),
+            House("i-haus", right_u_x - 0.24, right_u_y - 0.84, 0.48, (mid_y - 0.52) - (right_u_y - 0.84), (42, 74, 120)),
+            House("i-west", right_u_x - 0.88, mid_y - 1.42, 0.50, 0.68, (214, 164, 64)),
+            House("i-ost", right_u_x + 0.34, right_u_y - 0.50, 0.32, 0.46, (168, 78, 72)),
+            House("winkel", top_left - 0.2, top_y + outer, 1.45, 0.46, (176, 78, 92)),
+            House("winkel-b", top_left - 0.2, top_y + outer, 0.46, 1.18, (176, 78, 92)),
+            House("westaus", left_x - outer - 0.74, mid_y - 0.2, 0.7, 0.58, (96, 124, 88)),
+            House("ostaus", right_x + outer, right_u_y + 0.85, 0.66, 0.72, (96, 104, 148)),
+            House("suedaus", left_u_x - 0.32, left_u_y - u_r - outer - 0.5, 0.82, 0.46, (168, 132, 78)),
+            House("nordwest", left_x - outer - 0.7, top_y - 0.9, 0.66, 0.52, (188, 164, 92)),
+            House("suedost", right_u_x - 0.15, right_u_y - u_r - outer - 0.5, 0.74, 0.44, (120, 78, 140)),
+            House("kehre-west", ustem_x - outer - 0.62, right_u_y + 0.08, 0.56, 0.46, (196, 112, 72)),
+            House("kehre-ost", right_x + outer, right_u_y - 0.62, 0.54, 0.48, (72, 140, 120)),
+            House("kehre-sued", right_u_x - 1.2, right_u_y - u_r - outer - 0.46, 0.58, 0.4, (150, 96, 150)),
         )
         self.edges = []
         self.lanes = []
@@ -639,7 +661,13 @@ class City:
                 mid_y_mark = (mark.y0 + mark.y1) / 2.0
                 if not _near_ribbon(mid_x, mid_y_mark, self._ribbons, index, ROAD_W * 0.8):
                     self.lanes.append(mark)
-        self._spots = ((7.15, 4.2), (3.0, 4.2), (4.4, 5.05), (7.6, 6.0), (8.15, 2.95))
+        self._spots = (
+            (self.start_x + 2.15, mid_y),
+            (right_x - 1.15, mid_y),
+            (stem_x, (top_y + mid_y) / 2.0),
+            (left_u_x, left_u_y - u_r),
+            (right_u_x, right_u_y - u_r),
+        )
         self.clutter: list[House] = []
         self._rects = [house.bounds for house in self.houses]
         self.shore = _shore(self.roads, self.houses)
@@ -760,6 +788,8 @@ class City:
         walls = ((0, 1, 0.86), (1, 2, 0.74), (2, 3, 0.95), (3, 0, 0.68))
         faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
         for a, b, shade in walls:
+            if self._wall_inside_other(corners[a], corners[b], house):
+                continue
             face = self._face(x, y, theta, corners[a], corners[b], 0.0, house.height, _shade(house.color, shade))
             if face is not None:
                 faces.append(face)
@@ -767,6 +797,16 @@ class City:
         if roof is not None:
             faces.append(roof)
         return faces
+
+    def _wall_inside_other(self, a: tuple[float, float], b: tuple[float, float], house: House) -> bool:
+        mx = (a[0] + b[0]) / 2.0
+        my = (a[1] + b[1]) / 2.0
+        for other in self.houses:
+            if other is house or other.color != house.color:
+                continue
+            if other.x < mx < other.x + other.w and other.y < my < other.y + other.h:
+                return True
+        return False
 
     def _face(
         self,

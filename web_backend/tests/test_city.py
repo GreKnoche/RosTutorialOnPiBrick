@@ -47,11 +47,14 @@ def test_a_ray_stops_on_the_near_face() -> None:
 def test_the_forward_beam_ends_on_the_house() -> None:
     CITY.set_clutter(False)
     house = CITY.house("mitte")
-    ranges = CITY.scan(3.1, 4.2, math.pi / 2.0)
+    x = house.x + house.w / 2.0
+    y = house.y - 0.55
+    ranges = CITY.scan(x, y, math.pi / 2.0)
+    ahead = SCAN_COUNT // 2
     assert len(ranges) == SCAN_COUNT
-    assert math.isclose(ranges[180], house.y - 4.2, abs_tol=1e-3)
-    assert math.isinf(ranges[90])
-    assert ranges[180] < RANGE_MAX_M
+    assert math.isclose(ranges[ahead], house.y - y, abs_tol=1e-3)
+    assert math.isinf(ranges[0])
+    assert ranges[ahead] < RANGE_MAX_M
 
 
 def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
@@ -60,23 +63,24 @@ def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
     house = CITY.house("mitte")
     radius = foot_radius()
     limit = house.y - radius
+    x = house.x + house.w / 2.0
     apply_message(
         plant,
-        {"type": "reset", "client": "labor", "x": 3.1, "y": 4.2, "theta": math.pi / 2.0},
+        {"type": "reset", "client": "labor", "x": x, "y": house.y - 0.55, "theta": math.pi / 2.0},
     )
     plant.command_twist(0.3, 0.0)
     for _ in range(80):
         plant.step(1.0 / TICK_HZ)
     assert plant.odom.pose.y <= limit + 1e-3
     assert plant.odom.pose.y > limit - 0.04
-    assert abs(plant.odom.pose.x - 3.1) < 0.03
+    assert abs(plant.odom.pose.x - x) < 0.03
 
     apply_message(
         plant,
         {
             "type": "reset",
             "client": "labor",
-            "x": 2.6,
+            "x": house.x + 0.18,
             "y": limit - 0.001,
             "theta": 0.25,
         },
@@ -84,7 +88,7 @@ def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
     plant.command_twist(0.25, 0.0)
     for _ in range(40):
         plant.step(1.0 / TICK_HZ)
-    assert plant.odom.pose.x > 2.85
+    assert plant.odom.pose.x > house.x + 0.4
     assert plant.odom.pose.y <= limit + 1e-3
 
 
@@ -171,7 +175,8 @@ def test_the_camera_shows_sky_road_and_a_house() -> None:
     lower = [_pixel(along, IMAGE_W // 2, y) for y in range(IMAGE_H // 2, IMAGE_H)]
     assert ROAD in lower
     house = CITY.house("mitte")
-    facing = CITY.render_bmp(3.1, 4.42, math.pi / 2.0)
+    house_x = house.x + house.w / 2.0
+    facing = CITY.render_bmp(house_x, house.y - 0.28, math.pi / 2.0)
     center = _pixel(facing, IMAGE_W // 2, IMAGE_H // 2)
     assert center != SKY
     assert center[0] > 140
@@ -190,7 +195,9 @@ def test_city_route_returns_the_same_map() -> None:
     assert body["start"] == {"x": CITY.start_x, "y": CITY.start_y, "theta": 0.0}
     assert body["view"] == {"width": 1.9, "height": 1.3}
     margin = max(house.w for house in CITY.houses)
-    assert math.isclose(body["shore"]["x"], min(point[0] for road in CITY.roads for point in road) - margin, abs_tol=1e-6)
+    xs = [point[0] for road in CITY.roads for point in road]
+    xs.extend(edge for house in CITY.houses for edge in (house.x, house.x + house.w))
+    assert math.isclose(body["shore"]["x"], min(xs) - margin, abs_tol=1e-6)
     assert len(body["houses"]) == len(CITY.houses)
     assert len(body["lanes"]) > 0
     assert body["houses"][1]["color"] == "#d4a036"
@@ -238,19 +245,20 @@ def test_drift_bends_the_heading_only_for_the_holder() -> None:
 def test_clutter_is_a_lidar_hit_until_the_holder_clears_it() -> None:
     CITY.set_clutter(False)
     try:
-        clear = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[180]
+        ahead = SCAN_COUNT // 2
+        clear = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[ahead]
         plant = CanvasPlant()
         apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
         apply_message(plant, {"type": "flags", "client": "labor", "clutter": True})
         spot_x = CITY._spots[0][0]
-        hit = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[180]
+        hit = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[ahead]
         assert math.isinf(clear)
         assert math.isclose(hit, spot_x - 0.11 - CITY.start_x, abs_tol=1e-3)
         apply_message(plant, {"type": "flags", "client": "other", "clutter": False})
         assert CITY.clutter
         apply_message(plant, {"type": "flags", "client": "labor", "clutter": False})
         assert CITY.clutter == []
-        assert math.isinf(CITY.scan(CITY.start_x, CITY.start_y, 0.0)[180])
+        assert math.isinf(CITY.scan(CITY.start_x, CITY.start_y, 0.0)[ahead])
     finally:
         CITY.set_clutter(False)
 

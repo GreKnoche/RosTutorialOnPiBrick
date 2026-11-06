@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CITY_VIEW_H, CITY_VIEW_W, SCAN_MIN, SCAN_STEP, cityScreen } from "@/lib/city-view";
+import { CITY_VIEW_H, CITY_VIEW_W, SCAN_MIN, SCAN_STEP, cityScreen, clampZoom } from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
 import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
 
@@ -142,6 +142,56 @@ function paintGround(
   }
 }
 
+function outerEdges(house: Rect, others: Rect[]): Array<[number, number, number, number]> {
+  const x0 = house.x;
+  const y0 = house.y;
+  const x1 = house.x + house.w;
+  const y1 = house.y + house.h;
+  const sides: Array<[number, number, number, number]> = [
+    [x0, y0, x1, y0],
+    [x1, y0, x1, y1],
+    [x1, y1, x0, y1],
+    [x0, y1, x0, y0],
+  ];
+  const kept: Array<[number, number, number, number]> = [];
+  for (const [ax, ay, bx, by] of sides) {
+    const horizontal = Math.abs(ay - by) < 1e-6;
+    const lo = horizontal ? Math.min(ax, bx) : Math.min(ay, by);
+    const hi = horizontal ? Math.max(ax, bx) : Math.max(ay, by);
+    const blocked: Array<[number, number]> = [];
+    for (const other of others) {
+      const span = horizontal
+        ? ay > other.y + 1e-6 && ay < other.y + other.h - 1e-6
+          ? [Math.max(lo, other.x), Math.min(hi, other.x + other.w)]
+          : null
+        : ax > other.x + 1e-6 && ax < other.x + other.w - 1e-6
+          ? [Math.max(lo, other.y), Math.min(hi, other.y + other.h)]
+          : null;
+      if (span && span[1] - span[0] > 1e-4) blocked.push([span[0], span[1]]);
+    }
+    blocked.sort((p, q) => p[0] - q[0]);
+    let cursor = lo;
+    for (const [a, b] of blocked) {
+      if (a > cursor + 1e-4) pushEdge(kept, horizontal, ax, ay, cursor, Math.min(a, hi));
+      cursor = Math.max(cursor, b);
+    }
+    if (cursor < hi - 1e-4) pushEdge(kept, horizontal, ax, ay, cursor, hi);
+  }
+  return kept;
+}
+
+function pushEdge(
+  kept: Array<[number, number, number, number]>,
+  horizontal: boolean,
+  ax: number,
+  ay: number,
+  from: number,
+  to: number,
+) {
+  if (horizontal) kept.push([from, ay, to, ay]);
+  else kept.push([ax, from, ax, to]);
+}
+
 function syncSize(canvas: HTMLCanvasElement, frame: HTMLDivElement | null) {
   const rect = frame?.getBoundingClientRect();
   const cssW = Math.max(rect?.width || canvas.clientWidth || 720, 320);
@@ -164,12 +214,13 @@ function draw(
   ranges: Array<number | null> | undefined,
   clutter: Rect[],
   showRays: boolean,
+  zoom: number,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const to = (x: number, y: number) => cityScreen(pose.x, pose.y, x, y, width, height);
+  const to = (x: number, y: number) => cityScreen(pose.x, pose.y, x, y, width, height, zoom);
   const ppm = to(pose.x, pose.y).ppm;
 
   paintGround(ctx, to, city?.shore ?? null, width, height);
@@ -206,15 +257,26 @@ function draw(
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
-    for (const house of [...city.houses, ...clutter]) {
+    const blocks = [...city.houses, ...clutter];
+    for (const house of blocks) {
       const a = to(house.x, house.y + house.h);
       const b = to(house.x + house.w, house.y);
       ctx.fillStyle = house.color;
       ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
-      ctx.strokeStyle = "rgba(255,247,237,0.35)";
-      ctx.lineWidth = Math.max(1, ppm * 0.01);
-      ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
     }
+    ctx.strokeStyle = "rgba(255,247,237,0.35)";
+    ctx.lineWidth = Math.max(1, ppm * 0.01);
+    ctx.beginPath();
+    for (const house of blocks) {
+      const others = blocks.filter((other) => other !== house && other.color === house.color);
+      for (const edge of outerEdges(house, others)) {
+        const a = to(edge[0], edge[1]);
+        const b = to(edge[2], edge[3]);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+    }
+    ctx.stroke();
   }
 
   if (showRays && ranges) {
@@ -269,7 +331,7 @@ export function CityLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
-  const poseRef = useRef({ x: 5.2, y: 4.2, theta: 0 });
+  const poseRef = useRef({ x: 2.45, y: 5.55, theta: 0 });
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const linkRef = useRef<TwinLink | null>(null);
@@ -285,9 +347,12 @@ export function CityLab() {
   const [rays, setRays] = useState(true);
   const raysRef = useRef(true);
   raysRef.current = rays;
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
   const [readout, setReadout] = useState<Readout>({
-    x: 5.2,
-    y: 4.2,
+    x: 2.45,
+    y: 5.55,
     theta: 0,
     linear: 0,
     angular: 0,
@@ -360,11 +425,21 @@ export function CityLab() {
         rangesRef.current,
         clutterRef.current,
         raysRef.current,
+        zoomRef.current,
       );
     };
     step();
     const id = window.setInterval(step, 50);
-    return () => window.clearInterval(id);
+    const frame = frameRef.current;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setZoom((current) => clampZoom(current * (event.deltaY > 0 ? 1 / 1.12 : 1.12)));
+    };
+    frame?.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.clearInterval(id);
+      frame?.removeEventListener("wheel", onWheel);
+    };
   }, [mapUp]);
 
   const sendFlags = (nextDrift: boolean, nextClutter: boolean) => {
@@ -377,7 +452,7 @@ export function CityLab() {
   };
 
   const reset = () => {
-    const start = cityRef.current?.start ?? { x: 5.2, y: 4.2, theta: 0 };
+    const start = cityRef.current?.start ?? { x: 2.45, y: 5.55, theta: 0 };
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -403,8 +478,19 @@ export function CityLab() {
         </Button>
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div ref={frameRef} className="h-[28rem] overflow-hidden rounded-lg border border-border bg-[#4098d8]">
+        <div
+          ref={frameRef}
+          className="relative h-[calc(100dvh-13rem)] min-h-[40rem] overflow-hidden rounded-lg border border-border bg-[#4098d8]"
+        >
           <canvas ref={canvasRef} className="h-full w-full" />
+          <div className="absolute bottom-3 left-3 flex items-center gap-1">
+            <Button type="button" aria-label="Herauszoomen" onClick={() => setZoom((current) => clampZoom(current / 1.25))}>
+              −
+            </Button>
+            <Button type="button" aria-label="Hineinzoomen" onClick={() => setZoom((current) => clampZoom(current * 1.25))}>
+              +
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 text-sm">
@@ -484,7 +570,8 @@ export function CityLab() {
               : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
           </p>
           <p className="text-xs text-muted-foreground">
-            Sichtfenster {formatDe(CITY_VIEW_W, 1)} m mal {formatDe(CITY_VIEW_H, 1)} m. Topics /scan, /camera/image_raw und /imu. In
+            Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Mausrad zoomt. Topics /scan,
+            /camera/image_raw und /imu. In
             rviz2 Fixed Frame odom, RobotModel auf /robot_description.
           </p>
         </div>
