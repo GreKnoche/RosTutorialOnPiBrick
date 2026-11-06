@@ -47,9 +47,9 @@ def test_a_ray_stops_on_the_near_face() -> None:
 def test_the_forward_beam_ends_on_the_house() -> None:
     CITY.set_clutter(False)
     house = CITY.house("mitte")
-    ranges = CITY.scan(6.2, 2.0, math.pi / 2.0)
+    ranges = CITY.scan(3.1, 4.2, math.pi / 2.0)
     assert len(ranges) == SCAN_COUNT
-    assert math.isclose(ranges[180], house.y - 2.0, abs_tol=1e-3)
+    assert math.isclose(ranges[180], house.y - 4.2, abs_tol=1e-3)
     assert math.isinf(ranges[90])
     assert ranges[180] < RANGE_MAX_M
 
@@ -62,21 +62,21 @@ def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
     limit = house.y - radius
     apply_message(
         plant,
-        {"type": "reset", "client": "labor", "x": 6.2, "y": 2.0, "theta": math.pi / 2.0},
+        {"type": "reset", "client": "labor", "x": 3.1, "y": 4.2, "theta": math.pi / 2.0},
     )
     plant.command_twist(0.3, 0.0)
     for _ in range(80):
         plant.step(1.0 / TICK_HZ)
     assert plant.odom.pose.y <= limit + 1e-3
     assert plant.odom.pose.y > limit - 0.04
-    assert abs(plant.odom.pose.x - 6.2) < 0.03
+    assert abs(plant.odom.pose.x - 3.1) < 0.03
 
     apply_message(
         plant,
         {
             "type": "reset",
             "client": "labor",
-            "x": 6.0,
+            "x": 2.6,
             "y": limit - 0.001,
             "theta": 0.25,
         },
@@ -84,7 +84,7 @@ def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
     plant.command_twist(0.25, 0.0)
     for _ in range(40):
         plant.step(1.0 / TICK_HZ)
-    assert plant.odom.pose.x > 6.2
+    assert plant.odom.pose.x > 2.85
     assert plant.odom.pose.y <= limit + 1e-3
 
 
@@ -171,7 +171,7 @@ def test_the_camera_shows_sky_road_and_a_house() -> None:
     lower = [_pixel(along, IMAGE_W // 2, y) for y in range(IMAGE_H // 2, IMAGE_H)]
     assert ROAD in lower
     house = CITY.house("mitte")
-    facing = CITY.render_bmp(6.2, 2.2, math.pi / 2.0)
+    facing = CITY.render_bmp(3.1, 4.42, math.pi / 2.0)
     center = _pixel(facing, IMAGE_W // 2, IMAGE_H // 2)
     assert center != SKY
     assert center[0] > 140
@@ -188,12 +188,31 @@ def test_city_route_returns_the_same_map() -> None:
     with TestClient(create_app(Bridge())) as client:  # type: ignore[arg-type]
         body = client.get("/city").json()
     assert body["start"] == {"x": CITY.start_x, "y": CITY.start_y, "theta": 0.0}
-    assert body["view"] == {"width": 3.2, "height": 2.2}
+    assert body["view"] == {"width": 1.9, "height": 1.3}
+    margin = max(house.w for house in CITY.houses)
+    assert math.isclose(body["shore"]["x"], min(point[0] for road in CITY.roads for point in road) - margin, abs_tol=1e-6)
     assert len(body["houses"]) == len(CITY.houses)
     assert len(body["lanes"]) > 0
     assert body["houses"][1]["color"] == "#d4a036"
-    assert len(body["roads"]) >= 6
+    assert len(body["roads"]) >= 8
     assert len(body["roads"][0]["points"]) >= 4
+
+
+def test_houses_stay_off_the_asphalt() -> None:
+    from city import ROAD_W, _dist_ribbon
+
+    limit = ROAD_W / 2.0 + 0.08
+    for house in CITY.houses:
+        samples = (
+            (house.x, house.y),
+            (house.x + house.w, house.y),
+            (house.x, house.y + house.h),
+            (house.x + house.w, house.y + house.h),
+            (house.x + house.w / 2.0, house.y + house.h / 2.0),
+        )
+        for px, py in samples:
+            nearest = min(_dist_ribbon(px, py, ribbon) for ribbon in CITY._ribbons)
+            assert nearest > limit, house.name
 
 
 def test_drift_bends_the_heading_only_for_the_holder() -> None:

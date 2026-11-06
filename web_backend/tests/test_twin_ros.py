@@ -176,9 +176,26 @@ def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch)
         def on_image(msg: Image) -> None:
             images.append((int(msg.width), int(msg.height), str(msg.encoding)))
 
+        from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+        from std_msgs.msg import String
+        from tf2_msgs.msg import TFMessage
+
+        frames: set[str] = set()
+        descriptions: list[str] = []
+
+        def on_tf(msg: TFMessage) -> None:
+            for item in msg.transforms:
+                frames.add(str(item.child_frame_id))
+
+        def on_description(msg: String) -> None:
+            descriptions.append(str(msg.data))
+
+        held = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         listener.create_subscription(LaserScan, "scan", on_scan, 10)
         listener.create_subscription(Imu, "imu", on_imu, 10)
         listener.create_subscription(Image, "camera/image_raw", on_image, 10)
+        listener.create_subscription(TFMessage, "tf", on_tf, 10)
+        listener.create_subscription(String, "robot_description", on_description, held)
         executor = SingleThreadedExecutor()
         executor.add_node(twin)
         executor.add_node(listener)
@@ -200,6 +217,8 @@ def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch)
         assert scan_frames[-1] == "base_link"
         assert images[-1] == (320, 240, "rgb8")
         assert math.isclose(yaws[-1], twin.plant.odom.pose.theta, abs_tol=1e-4)
+        assert {"base_link", "gyro_link", "camera_link", "camera_optical_frame", "wheel_left_link"} <= frames
+        assert descriptions and "ev3_educator" in descriptions[-1]
     finally:
         if executor is not None:
             executor.shutdown()

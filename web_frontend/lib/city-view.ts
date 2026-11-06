@@ -1,7 +1,7 @@
 /** Bird's-eye window. North stays up, and the twin stays in the middle. */
 
-export const CITY_VIEW_W = 3.2;
-export const CITY_VIEW_H = 2.2;
+export const CITY_VIEW_W = 1.9;
+export const CITY_VIEW_H = 1.3;
 
 /** Same beam table as the backend scan: one degree, from -180° through +180°. */
 export const SCAN_MIN = -Math.PI;

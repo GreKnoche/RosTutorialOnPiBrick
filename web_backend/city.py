@@ -27,7 +27,9 @@ CAMERA_NEAR_M = 0.12
 HOUSE_HEIGHT_M = 1.15
 
 SKY = (142, 196, 232)
-GRASS = (106, 138, 78)
+GRASS = (116, 206, 167)
+TUFT = (73, 168, 122)
+WATER = (64, 152, 216)
 ROAD = (60, 59, 56)
 EDGE = (244, 244, 242)
 LANE = (244, 214, 120)
@@ -157,31 +159,10 @@ def _dashes(x0: float, y0: float, x1: float, y1: float) -> list[Segment]:
     return marks
 
 
-ROAD_W = 0.9
+ROAD_W = 0.72
 CONE_COLOR = (232, 120, 32)
 CONE_SIZE = 0.22
 CONE_HEIGHT = 0.28
-
-
-def _street(x0: float, y0: float, x1: float, y1: float) -> list[tuple[float, float]]:
-    length = math.hypot(x1 - x0, y1 - y0)
-    dx = (x1 - x0) / length
-    dy = (y1 - y0) / length
-    px = -dy * ROAD_W / 2.0
-    py = dx * ROAD_W / 2.0
-    return [(x0 + px, y0 + py), (x1 + px, y1 + py), (x1 - px, y1 - py), (x0 - px, y0 - py)]
-
-
-def _side_edges(x0: float, y0: float, x1: float, y1: float) -> list[Segment]:
-    length = math.hypot(x1 - x0, y1 - y0)
-    dx = (x1 - x0) / length
-    dy = (y1 - y0) / length
-    px = -dy * ROAD_W / 2.0
-    py = dx * ROAD_W / 2.0
-    return [
-        Segment(x0 + px, y0 + py, x1 + px, y1 + py),
-        Segment(x0 - px, y0 - py, x1 - px, y1 - py),
-    ]
 
 
 def _arc_points(cx: float, cy: float, radius: float, a0: float, a1: float, steps: int) -> list[tuple[float, float]]:
@@ -192,10 +173,27 @@ def _arc_points(cx: float, cy: float, radius: float, a0: float, a1: float, steps
     return points
 
 
-def _arc_road(cx: float, cy: float, radius: float, a0: float, a1: float, steps: int = 20) -> list[tuple[float, float]]:
-    outer = _arc_points(cx, cy, radius + ROAD_W / 2.0, a0, a1, steps)
-    inner = _arc_points(cx, cy, max(0.2, radius - ROAD_W / 2.0), a0, a1, steps)
-    return outer + inner[::-1]
+def _straight(x0: float, y0: float, x1: float, y1: float) -> list[tuple[float, float]]:
+    return [(x0, y0), (x1, y1)]
+
+
+def _bend(cx: float, cy: float, radius: float, a0: float, a1: float) -> list[tuple[float, float]]:
+    steps = max(16, int(abs(a1 - a0) / 0.08))
+    return _arc_points(cx, cy, radius, a0, a1, steps)
+
+
+def _extended(points: list[tuple[float, float]], extra: float) -> list[tuple[float, float]]:
+    """Push both ends along the tangent so a curve meets the straight without a grass wedge."""
+    if len(points) < 2 or extra <= 0.0:
+        return points
+
+    def outward(tip: tuple[float, float], nxt: tuple[float, float]) -> tuple[float, float]:
+        dx = tip[0] - nxt[0]
+        dy = tip[1] - nxt[1]
+        length = math.hypot(dx, dy) or 1.0
+        return (tip[0] + dx / length * extra, tip[1] + dy / length * extra)
+
+    return [outward(points[0], points[1]), *points, outward(points[-1], points[-2])]
 
 
 def _chain(points: list[tuple[float, float]]) -> list[Segment]:
@@ -215,43 +213,98 @@ def _dist_point_seg(px: float, py: float, x0: float, y0: float, x1: float, y1: f
     return math.hypot(px - (x0 + t * dx), py - (y0 + t * dy))
 
 
-def _inside_other(
+def _dist_ribbon(px: float, py: float, points: list[tuple[float, float]]) -> float:
+    best = 1e9
+    for index in range(len(points) - 1):
+        dist = _dist_point_seg(px, py, points[index][0], points[index][1], points[index + 1][0], points[index + 1][1])
+        if dist < best:
+            best = dist
+    return best
+
+
+def _near_ribbon(
     px: float,
     py: float,
-    streets: tuple[tuple[float, float, float, float], ...],
+    ribbons: list[list[tuple[float, float]]],
     skip: int,
-    arc: tuple[float, float, float] | None,
+    limit: float,
 ) -> bool:
-    limit = ROAD_W / 2.0 - 0.04
-    for index, (x0, y0, x1, y1) in enumerate(streets):
+    for index, ribbon in enumerate(ribbons):
         if index == skip:
             continue
-        if _dist_point_seg(px, py, x0, y0, x1, y1) < limit:
-            return True
-    if arc is not None and skip != -2:
-        cx, cy, radius = arc
-        angle = math.atan2(py - cy, px - cx)
-        if -0.08 <= angle <= math.pi / 2.0 + 0.08 and abs(math.hypot(px - cx, py - cy) - radius) < limit:
+        if _dist_ribbon(px, py, ribbon) < limit:
             return True
     return False
 
 
+def _unit_normals(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    normals: list[tuple[float, float]] = []
+    for index in range(len(points) - 1):
+        dx = points[index + 1][0] - points[index][0]
+        dy = points[index + 1][1] - points[index][1]
+        length = math.hypot(dx, dy)
+        if length < 1e-9:
+            normals.append((0.0, 1.0))
+        else:
+            normals.append((-dy / length, dx / length))
+    return normals
+
+
+def _offset_side(points: list[tuple[float, float]], sign: float) -> list[tuple[float, float]]:
+    """Left (sign +1) or right edge of a road ribbon. Joins stay close to the corner."""
+    half = ROAD_W / 2.0
+    normals = _unit_normals(points)
+    side: list[tuple[float, float]] = []
+    for index, (x, y) in enumerate(points):
+        if index == 0:
+            nx, ny = normals[0]
+            side.append((x + sign * nx * half, y + sign * ny * half))
+            continue
+        if index == len(points) - 1:
+            nx, ny = normals[-1]
+            side.append((x + sign * nx * half, y + sign * ny * half))
+            continue
+        ax, ay = normals[index - 1]
+        bx, by = normals[index]
+        nx, ny = ax + bx, ay + by
+        norm = math.hypot(nx, ny)
+        if norm < 1e-6:
+            side.append((x + sign * bx * half, y + sign * by * half))
+            continue
+        nx /= norm
+        ny /= norm
+        dot = nx * bx + ny * by
+        if dot < 0.35:
+            side.append((x + sign * ax * half, y + sign * ay * half))
+            side.append((x + sign * bx * half, y + sign * by * half))
+            continue
+        scale = min(half / dot, half * 3.0)
+        side.append((x + sign * nx * scale, y + sign * ny * scale))
+    return side
+
+
+def _ribbon_polygon(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    left = _offset_side(points, 1.0)
+    right = _offset_side(points, -1.0)
+    return left + right[::-1]
+
+
 def _gap_edges(
     edges: list[Segment],
-    streets: tuple[tuple[float, float, float, float], ...],
+    ribbons: list[list[tuple[float, float]]],
     skip: int,
-    arc: tuple[float, float, float] | None,
 ) -> list[Segment]:
+    limit = ROAD_W / 2.0 - 0.04
     kept: list[Segment] = []
     for edge in edges:
         length = math.hypot(edge.x1 - edge.x0, edge.y1 - edge.y0)
-        steps = max(1, int(length / 0.15))
+        steps = max(1, int(length / 0.12))
         run: tuple[float, float] | None = None
         prev: tuple[float, float] | None = None
         for step in range(steps + 1):
             t = step / steps
             point = (edge.x0 + t * (edge.x1 - edge.x0), edge.y0 + t * (edge.y1 - edge.y0))
-            open_here = not _inside_other(point[0], point[1], streets, skip, arc)
+            open_here = not _near_ribbon(point[0], point[1], ribbons, skip, limit)
             if open_here and run is None:
                 run = point
             if (not open_here) and run is not None and prev is not None:
@@ -295,6 +348,83 @@ def _dashes_along(points: list[tuple[float, float]]) -> list[Segment]:
 
 def _shade(color: tuple[int, int, int], scale: float) -> tuple[int, int, int]:
     return tuple(max(0, min(255, int(channel * scale))) for channel in color)  # type: ignore[return-value]
+
+
+def _shore(
+    roads: list[list[tuple[float, float]]],
+    houses: tuple[House, ...],
+) -> tuple[float, float, float, float]:
+    xs = [point[0] for road in roads for point in road]
+    ys = [point[1] for road in roads for point in road]
+    for house in houses:
+        xs.extend((house.x, house.x + house.w))
+        ys.extend((house.y, house.y + house.h))
+    margin = max(house.w for house in houses)
+    return (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+
+
+TUFT_CELL = 0.34
+
+
+def _tile_hash(ix: int, iy: int) -> int:
+    return (ix * 374761393 + iy * 668265263) & 1023
+
+
+def tuft_blades(ix: int, iy: int) -> tuple[tuple[float, float, float, float], ...]:
+    """A few short blades on a flat field. Empty when this cell stays plain."""
+    kind = _tile_hash(ix, iy)
+    if kind % 3 == 2:
+        return ()
+    ox = (kind % 7) * 0.016
+    oy = ((kind // 3) % 5) * 0.018
+    x = ix * TUFT_CELL + 0.05 + ox
+    y = iy * TUFT_CELL + 0.04 + oy
+    return ((x, y, 0.03, 0.055), (x + 0.038, y + 0.014, 0.026, 0.046))
+
+
+def ground_color(wx: float, wy: float, shore: tuple[float, float, float, float]) -> tuple[int, int, int]:
+    x0, y0, x1, y1 = shore
+    if not (x0 <= wx <= x1 and y0 <= wy <= y1):
+        return WATER
+    ix = math.floor(wx / TUFT_CELL)
+    iy = math.floor(wy / TUFT_CELL)
+    for bx, by, bw, bh in tuft_blades(ix, iy):
+        if bx <= wx <= bx + bw and by <= wy <= by + bh:
+            return TUFT
+    return GRASS
+
+
+def _dress_ground(
+    buf: bytearray,
+    x: float,
+    y: float,
+    theta: float,
+    shore: tuple[float, float, float, float],
+) -> None:
+    x0, y0, x1, y1 = shore
+    c = math.cos(theta)
+    s = math.sin(theta)
+    scale_v = (IMAGE_H / 2.0) / _TAN_V
+    scale_u = _TAN_H / (IMAGE_W / 2.0)
+    for row in range(IMAGE_H):
+        denom = (row + 0.5) - IMAGE_H / 2.0
+        if denom <= 1.0:
+            continue
+        forward = CAMERA_HEIGHT_M * scale_v / denom
+        base = row * IMAGE_W * 3
+        for col in range(IMAGE_W):
+            i = base + col * 3
+            if buf[i] != GRASS[0] or buf[i + 1] != GRASS[1] or buf[i + 2] != GRASS[2]:
+                continue
+            left = (col + 0.5 - IMAGE_W / 2.0) * forward * scale_u
+            wx = x + forward * c - left * s
+            wy = y + forward * s + left * c
+            color = ground_color(wx, wy, (x0, y0, x1, y1))
+            if color == GRASS:
+                continue
+            buf[i] = color[0]
+            buf[i + 1] = color[1]
+            buf[i + 2] = color[2]
 
 
 def _fill(buf: bytearray, color: tuple[int, int, int]) -> None:
@@ -459,47 +589,60 @@ def bmp_bytes(rgb: bytes, width: int, height: int) -> bytes:
 
 class City:
     def __init__(self) -> None:
-        self.width = 16.0
-        self.height = 11.0
-        self.start_x = 1.8
-        self.start_y = 2.0
+        self.width = 13.0
+        self.height = 10.0
+        self.start_x = 5.2
+        self.start_y = 4.2
         self.start_theta = 0.0
-        streets = (
-            (1.2, 2.0, 12.6, 2.0),
-            (4.2, 2.0, 4.2, 8.4),
-            (4.2, 5.2, 12.6, 5.2),
-            (9.4, 2.0, 9.4, 5.2),
-            (4.2, 8.4, 9.4, 8.4),
-        )
-        arc_center = (9.4, 5.2)
-        arc_radius = 3.2
-        arc_line = _arc_points(*arc_center, arc_radius, 0.0, math.pi / 2.0, 16)
-        self.roads = [_street(*street) for street in streets]
-        self.roads.append(_arc_road(*arc_center, arc_radius, 0.0, math.pi / 2.0))
+        left_x, mid_y = 1.8, 4.2
+        upper_y, top_y = 6.0, 8.0
+        inner_x, cross_x = 4.4, 6.4
+        right_x, spur_x = 9.4, 10.5
+        corner = 0.95
+        right_mouth = 6.9
+        self._ribbons = [
+            _straight(left_x + corner, top_y, right_x - corner, top_y),
+            _bend(left_x + corner, top_y - corner, corner, math.pi, math.pi / 2.0),
+            _straight(left_x, top_y - corner, left_x, mid_y),
+            _bend(right_x - corner, top_y - corner, corner, math.pi / 2.0, 0.0),
+            _straight(right_x, top_y - corner, right_x, mid_y),
+            _straight(left_x, upper_y, right_x, upper_y),
+            _straight(left_x, mid_y, spur_x, mid_y),
+            _straight(inner_x, mid_y, inner_x, upper_y),
+            _straight(cross_x, upper_y, cross_x, mid_y - 1.15),
+            _bend((left_x + inner_x) / 2.0, mid_y, (inner_x - left_x) / 2.0, math.pi, math.tau),
+            _bend((right_x + right_mouth) / 2.0, mid_y, (right_x - right_mouth) / 2.0, 0.0, -math.pi),
+            _straight(spur_x, mid_y, spur_x, mid_y - 1.5),
+        ]
+        self.roads = [_ribbon_polygon(_extended(ribbon, 0.22)) for ribbon in self._ribbons]
         self.houses = (
-            House("westblock", 1.55, 2.85, 1.7, 1.45, (196, 92, 74)),
-            House("mitte", 5.15, 2.75, 2.5, 1.55, (212, 160, 54)),
-            House("nordblock", 5.2, 6.05, 2.9, 1.45, (74, 116, 168)),
-            House("ostblock", 10.15, 2.8, 1.7, 1.45, (150, 112, 74)),
-            House("sued", 5.3, 0.25, 2.2, 0.9, (120, 116, 96)),
-            House("kurve", 13.35, 6.3, 1.15, 1.45, (184, 96, 62)),
+            House("westblock", 4.95, 4.75, 0.85, 0.68, (196, 92, 74)),
+            House("mitte", 2.35, 4.72, 1.5, 0.72, (212, 160, 54)),
+            House("nordblock", 4.95, 6.55, 0.85, 0.8, (74, 116, 168)),
+            House("ostblock", 7.05, 4.74, 1.55, 0.7, (150, 112, 74)),
+            House("sued", 2.9, 3.48, 0.4, 0.24, (120, 116, 96)),
+            House("kurve", 7.95, 3.5, 0.4, 0.22, (184, 96, 62)),
         )
-        self.edges: list[Segment] = []
-        self.lanes: list[Segment] = []
-        arc = (*arc_center, arc_radius)
-        for index, (x0, y0, x1, y1) in enumerate(streets):
-            self.edges.extend(_gap_edges(_side_edges(x0, y0, x1, y1), streets, index, arc))
-            self.lanes.extend(_dashes(x0, y0, x1, y1))
-        self.edges.extend(
-            _gap_edges(_chain(_arc_points(*arc_center, arc_radius + ROAD_W / 2.0, 0.0, math.pi / 2.0, 16)), streets, -2, arc)
-        )
-        self.edges.extend(
-            _gap_edges(_chain(_arc_points(*arc_center, arc_radius - ROAD_W / 2.0, 0.0, math.pi / 2.0, 16)), streets, -2, arc)
-        )
-        self.lanes.extend(_dashes_along(arc_line))
-        self._spots = ((3.3, 2.0), (7.1, 2.0), (4.2, 3.6), (11.1, 5.2), (12.03, 7.01))
+        self.edges = []
+        self.lanes = []
+        for index, ribbon in enumerate(self._ribbons):
+            left = _offset_side(ribbon, 1.0)
+            right = _offset_side(ribbon, -1.0)
+            sides = _chain(left) + _chain(right)
+            self.edges.extend(_gap_edges(sides, self._ribbons, index))
+            if not _near_ribbon(ribbon[0][0], ribbon[0][1], self._ribbons, index, ROAD_W / 2.0 + 0.08):
+                self.edges.append(Segment(left[0][0], left[0][1], right[0][0], right[0][1]))
+            if not _near_ribbon(ribbon[-1][0], ribbon[-1][1], self._ribbons, index, ROAD_W / 2.0 + 0.08):
+                self.edges.append(Segment(left[-1][0], left[-1][1], right[-1][0], right[-1][1]))
+            for mark in _dashes_along(ribbon):
+                mid_x = (mark.x0 + mark.x1) / 2.0
+                mid_y_mark = (mark.y0 + mark.y1) / 2.0
+                if not _near_ribbon(mid_x, mid_y_mark, self._ribbons, index, ROAD_W * 0.8):
+                    self.lanes.append(mark)
+        self._spots = ((7.15, 4.2), (3.0, 4.2), (4.4, 5.05), (7.6, 6.0), (8.15, 2.95))
         self.clutter: list[House] = []
         self._rects = [house.bounds for house in self.houses]
+        self.shore = _shore(self.roads, self.houses)
 
     def set_clutter(self, enabled: bool) -> None:
         if enabled:
@@ -574,6 +717,7 @@ class City:
         faces.sort(key=lambda item: item[0], reverse=True)
         for _dist, poly, color in faces:
             _fill_polygon(buf, poly, color)
+        _dress_ground(buf, x, y, theta, self.shore)
         return bytes(buf)
 
     def render_bmp(self, x: float, y: float, theta: float) -> bytes:
@@ -678,7 +822,13 @@ class City:
             "width": self.width,
             "height": self.height,
             "start": {"x": self.start_x, "y": self.start_y, "theta": self.start_theta},
-            "view": {"width": 3.2, "height": 2.2},
+            "view": {"width": 1.9, "height": 1.3},
+            "shore": {
+                "x": self.shore[0],
+                "y": self.shore[1],
+                "w": self.shore[2] - self.shore[0],
+                "h": self.shore[3] - self.shore[1],
+            },
             "roads": [{"points": [{"x": px, "y": py} for px, py in road]} for road in self.roads],
             "edges": [{"x0": edge.x0, "y0": edge.y0, "x1": edge.x1, "y1": edge.y1} for edge in self.edges],
             "lanes": [{"x0": lane.x0, "y0": lane.y0, "x1": lane.x1, "y1": lane.y1} for lane in self.lanes],

@@ -17,8 +17,12 @@ from nav_msgs.msg import Odometry
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image, Imu, JointState, LaserScan
+from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
+
+from robot_tf import joint_quaternion, load_description
 
 from city import (
     IMAGE_H,
@@ -56,6 +60,15 @@ class CanvasTwinNode(Node):
         self._image_pub = self.create_publisher(Image, "camera/image_raw", 10)
         self._imu_pub = self.create_publisher(Imu, "imu", 10)
         self._tf = TransformBroadcaster(self)
+        self._urdf, self._joints = load_description()
+        description_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._description_pub = self.create_publisher(String, "robot_description", description_qos)
+        self._publish_description()
+        self.create_timer(2.0, self._publish_description)
         self._sensor_tick = 0
         self._timer = self.create_timer(self._dt, self._tick)
         self.sync()
@@ -184,7 +197,26 @@ class CanvasTwinNode(Node):
         transform.transform.rotation.y = qy
         transform.transform.rotation.z = qz
         transform.transform.rotation.w = qw
-        self._tf.sendTransform(transform)
+        frames = [transform]
+        angles = {
+            "wheel_left_joint": float(self.plant.left_rad),
+            "wheel_right_joint": float(self.plant.right_rad),
+        }
+        for joint in self._joints:
+            qx, qy, qz, qw = joint_quaternion(joint, angles.get(joint.name, 0.0))
+            child = TransformStamped()
+            child.header.stamp = now
+            child.header.frame_id = joint.parent
+            child.child_frame_id = joint.child
+            child.transform.translation.x = joint.x
+            child.transform.translation.y = joint.y
+            child.transform.translation.z = joint.z
+            child.transform.rotation.x = qx
+            child.transform.rotation.y = qy
+            child.transform.rotation.z = qz
+            child.transform.rotation.w = qw
+            frames.append(child)
+        self._tf.sendTransform(frames)
 
         joints = JointState()
         joints.header.stamp = now
@@ -192,6 +224,11 @@ class CanvasTwinNode(Node):
         joints.name = ["wheel_left_joint", "wheel_right_joint"]
         joints.position = [float(self.plant.left_rad), float(self.plant.right_rad)]
         self._joint_pub.publish(joints)
+
+    def _publish_description(self) -> None:
+        message = String()
+        message.data = self._urdf
+        self._description_pub.publish(message)
 
     def _publish_sensors(self) -> None:
         city = self.plant.city

@@ -10,12 +10,14 @@ type Point = { x: number; y: number };
 type Rect = { x: number; y: number; w: number; h: number; color: string };
 type Seg = { x0: number; y0: number; x1: number; y1: number };
 type Road = { points: Point[] };
+type Shore = { x: number; y: number; w: number; h: number };
 type CityMap = {
   start: { x: number; y: number; theta: number };
   roads: Road[];
   edges: Seg[];
   lanes: Seg[];
   houses: Rect[];
+  shore: Shore;
 };
 
 type Readout = {
@@ -78,7 +80,66 @@ function parseCity(data: unknown): CityMap | null {
     edges: segs(record.edges),
     lanes: segs(record.lanes),
     houses: rects(record.houses, true),
+    shore: shoreOf(record.shore),
   };
+}
+
+function shoreOf(value: unknown): Shore {
+  if (!value || typeof value !== "object") return { x: 0, y: 0, w: 0, h: 0 };
+  const box = value as Record<string, unknown>;
+  return { x: num(box.x), y: num(box.y), w: num(box.w), h: num(box.h) };
+}
+
+const TUFT_CELL = 0.34;
+
+function tileKind(ix: number, iy: number) {
+  return (Math.imul(ix, 374761393) + Math.imul(iy, 668265263)) & 1023;
+}
+
+function tuftBlades(ix: number, iy: number) {
+  const kind = tileKind(ix, iy);
+  if (kind % 3 === 2) return [];
+  const ox = (kind % 7) * 0.016;
+  const oy = (Math.floor(kind / 3) % 5) * 0.018;
+  const x = ix * TUFT_CELL + 0.05 + ox;
+  const y = iy * TUFT_CELL + 0.04 + oy;
+  return [
+    { x, y, w: 0.03, h: 0.055 },
+    { x: x + 0.038, y: y + 0.014, w: 0.026, h: 0.046 },
+  ];
+}
+
+function paintGround(
+  ctx: CanvasRenderingContext2D,
+  to: (x: number, y: number) => { x: number; y: number },
+  shore: Shore | null,
+  width: number,
+  height: number,
+) {
+  ctx.fillStyle = "#4098d8";
+  ctx.fillRect(0, 0, width, height);
+  if (!shore || shore.w <= 0) return;
+  const top = to(shore.x, shore.y + shore.h);
+  const bottom = to(shore.x + shore.w, shore.y);
+  ctx.fillStyle = "#74cea7";
+  ctx.fillRect(top.x, top.y, bottom.x - top.x, bottom.y - top.y);
+  ctx.fillStyle = "#49a87a";
+  const x0 = Math.floor(shore.x / TUFT_CELL);
+  const x1 = Math.floor((shore.x + shore.w) / TUFT_CELL);
+  const y0 = Math.floor(shore.y / TUFT_CELL);
+  const y1 = Math.floor((shore.y + shore.h) / TUFT_CELL);
+  for (let ix = x0; ix <= x1; ix += 1) {
+    for (let iy = y0; iy <= y1; iy += 1) {
+      for (const blade of tuftBlades(ix, iy)) {
+        const midX = blade.x + blade.w / 2;
+        const midY = blade.y + blade.h / 2;
+        if (midX < shore.x || midX > shore.x + shore.w || midY < shore.y || midY > shore.y + shore.h) continue;
+        const a = to(blade.x, blade.y + blade.h);
+        const b = to(blade.x + blade.w, blade.y);
+        ctx.fillRect(a.x, a.y, Math.max(2, b.x - a.x), Math.max(3, b.y - a.y));
+      }
+    }
+  }
 }
 
 function syncSize(canvas: HTMLCanvasElement, frame: HTMLDivElement | null) {
@@ -102,6 +163,7 @@ function draw(
   pose: { x: number; y: number; theta: number },
   ranges: Array<number | null> | undefined,
   clutter: Rect[],
+  showRays: boolean,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -110,8 +172,7 @@ function draw(
   const to = (x: number, y: number) => cityScreen(pose.x, pose.y, x, y, width, height);
   const ppm = to(pose.x, pose.y).ppm;
 
-  ctx.fillStyle = "#6a8a4e";
-  ctx.fillRect(0, 0, width, height);
+  paintGround(ctx, to, city?.shore ?? null, width, height);
 
   if (city) {
     ctx.fillStyle = "#3c3b38";
@@ -156,7 +217,7 @@ function draw(
     }
   }
 
-  if (ranges) {
+  if (showRays && ranges) {
     ctx.strokeStyle = "rgba(125, 211, 192, 0.55)";
     ctx.lineWidth = Math.max(1, ppm * 0.008);
     const origin = to(pose.x, pose.y);
@@ -208,7 +269,7 @@ export function CityLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
-  const poseRef = useRef({ x: 1.8, y: 2.0, theta: 0 });
+  const poseRef = useRef({ x: 5.2, y: 4.2, theta: 0 });
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const linkRef = useRef<TwinLink | null>(null);
@@ -221,9 +282,12 @@ export function CityLab() {
   const [image, setImage] = useState<string | null>(null);
   const [drift, setDrift] = useState(false);
   const [clutter, setClutter] = useState(false);
+  const [rays, setRays] = useState(true);
+  const raysRef = useRef(true);
+  raysRef.current = rays;
   const [readout, setReadout] = useState<Readout>({
-    x: 1.8,
-    y: 2.0,
+    x: 5.2,
+    y: 4.2,
     theta: 0,
     linear: 0,
     angular: 0,
@@ -288,7 +352,15 @@ export function CityLab() {
 
   useEffect(() => {
     const step = () => {
-      draw(canvasRef.current, frameRef.current, cityRef.current, poseRef.current, rangesRef.current, clutterRef.current);
+      draw(
+        canvasRef.current,
+        frameRef.current,
+        cityRef.current,
+        poseRef.current,
+        rangesRef.current,
+        clutterRef.current,
+        raysRef.current,
+      );
     };
     step();
     const id = window.setInterval(step, 50);
@@ -305,7 +377,7 @@ export function CityLab() {
   };
 
   const reset = () => {
-    const start = cityRef.current?.start ?? { x: 1.8, y: 2.0, theta: 0 };
+    const start = cityRef.current?.start ?? { x: 5.2, y: 4.2, theta: 0 };
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -326,43 +398,47 @@ export function CityLab() {
             Norden bleibt oben. Der Twin bleibt in der Mitte. Fahren geht nur über /cmd_vel. Häuser halten an, die Fahrspuren sind Farbe.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={drift}
-              disabled={!rosUp}
-              onChange={(event) => {
-                const next = event.target.checked;
-                setDrift(next);
-                sendFlags(next, clutter);
-              }}
-            />
-            Drift
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={clutter}
-              disabled={!rosUp}
-              onChange={(event) => {
-                const next = event.target.checked;
-                setClutter(next);
-                sendFlags(drift, next);
-              }}
-            />
-            Hindernisse
-          </label>
-          <Button type="button" onClick={reset} disabled={!rosUp}>
-            Zurücksetzen
-          </Button>
-        </div>
+        <Button type="button" onClick={reset} disabled={!rosUp}>
+          Zurücksetzen
+        </Button>
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div ref={frameRef} className="h-[28rem] overflow-hidden rounded-lg border border-border bg-[#6a8a4e]">
+        <div ref={frameRef} className="h-[28rem] overflow-hidden rounded-lg border border-border bg-[#4098d8]">
           <canvas ref={canvasRef} className="h-full w-full" />
         </div>
         <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={drift}
+                disabled={!rosUp}
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setDrift(next);
+                  sendFlags(next, clutter);
+                }}
+              />
+              Drift
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={clutter}
+                disabled={!rosUp}
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setClutter(next);
+                  sendFlags(drift, next);
+                }}
+              />
+              Hindernisse
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={rays} onChange={(event) => setRays(event.target.checked)} />
+              Lidar-Strahlen
+            </label>
+          </div>
           <div className="overflow-hidden rounded-lg border border-border bg-black">
             {image ? (
               <img
@@ -408,7 +484,8 @@ export function CityLab() {
               : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
           </p>
           <p className="text-xs text-muted-foreground">
-            Sichtfenster {formatDe(CITY_VIEW_W, 1)} m mal {formatDe(CITY_VIEW_H, 1)} m. Topics /scan, /camera/image_raw und /imu.
+            Sichtfenster {formatDe(CITY_VIEW_W, 1)} m mal {formatDe(CITY_VIEW_H, 1)} m. Topics /scan, /camera/image_raw und /imu. In
+            rviz2 Fixed Frame odom, RobotModel auf /robot_description.
           </p>
         </div>
       </div>
