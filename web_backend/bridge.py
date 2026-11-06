@@ -164,6 +164,12 @@ class RobotBridge:
             return {}
         return hub.snapshot()
 
+    def twin_city_view(self) -> dict[str, Any]:
+        hub = self._hub
+        if hub is None:
+            return {}
+        return hub.city_view()
+
     def twin_listen(self) -> queue.Queue[Any]:
         if self._hub is None:
             from twin import TwinHub

@@ -15,7 +15,7 @@ export default function HomePage() {
           </p>
           <Link
             data-start-button
-            href="/auswahl"
+            href="/willkommen"
             className="inline-flex h-14 w-fit items-center justify-center rounded-lg bg-primary px-10 text-lg font-medium text-primary-foreground hover:bg-primary/90"
           >
             Start

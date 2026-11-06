@@ -39,6 +39,7 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
     )
     app.add_exception_handler(RequestValidationError, invalid_body)
     app.add_api_route("/health", health, methods=["GET"])
+    app.add_api_route("/city", city_map, methods=["GET"])
     app.add_api_websocket_route("/ws/twin", twin_socket)
     mount_drive(app)
     return app
@@ -47,6 +48,12 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
 async def invalid_body(request: Request, _exc: RequestValidationError) -> JSONResponse:
     message = "ungültige Umdrehungen" if request.url.path == "/drive" else "ungültige Anfrage"
     return JSONResponse({"ok": False, "message": message}, status_code=422)
+
+
+def city_map() -> dict[str, object]:
+    from city import CITY
+
+    return CITY.to_dict()
 
 
 def health(request: Request) -> dict[str, bool]:
@@ -67,10 +74,22 @@ async def twin_socket(websocket: WebSocket) -> None:
         await websocket.close()
         return
     listen = bridge.twin_listen()
-    reader = asyncio.create_task(_twin_reader(websocket, bridge))
+    session: dict[str, object] = {"city": False, "client": None, "tick": 0}
+    reader = asyncio.create_task(_twin_reader(websocket, bridge, session))
     try:
         while not reader.done():
-            await websocket.send_json({"type": "state", **bridge.twin_snapshot()})
+            payload = {"type": "state", **bridge.twin_snapshot()}
+            if session["city"]:
+                view = getattr(bridge, "twin_city_view", lambda: {})()
+                if isinstance(view, dict) and view:
+                    payload["ranges"] = view.get("ranges")
+                    payload["applied_linear"] = view.get("applied_linear")
+                    payload["applied_angular"] = view.get("applied_angular")
+                    payload["clutter"] = view.get("clutter") or []
+                    session["tick"] = int(session["tick"]) + 1
+                    if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
+                        payload["image"] = view["image"]
+            await websocket.send_json(payload)
             await _send_done(websocket, listen)
             await asyncio.sleep(0.05)
         reader.result()
@@ -79,6 +98,11 @@ async def twin_socket(websocket: WebSocket) -> None:
     finally:
         reader.cancel()
         bridge.twin_unlisten(listen)
+        if session["city"]:
+            submit = getattr(bridge, "twin_submit", None)
+            client = session["client"]
+            if submit is not None:
+                submit({"type": "city", "enter": False, "client": client if isinstance(client, str) else None})
 
 
 async def _send_done(websocket: WebSocket, listen: queue.Queue[object]) -> None:
@@ -90,10 +114,14 @@ async def _send_done(websocket: WebSocket, listen: queue.Queue[object]) -> None:
         await websocket.send_json(message)
 
 
-async def _twin_reader(websocket: WebSocket, bridge: object) -> None:
+async def _twin_reader(websocket: WebSocket, bridge: object, session: dict[str, object]) -> None:
     submit = getattr(bridge, "twin_submit", None)
     while True:
         payload = await websocket.receive_json()
+        if isinstance(payload, dict) and payload.get("type") == "city":
+            session["city"] = bool(payload.get("enter"))
+            client = payload.get("client")
+            session["client"] = client if isinstance(client, str) else None
         if submit is not None and isinstance(payload, dict):
             submit(payload)
 

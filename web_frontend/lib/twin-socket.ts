@@ -1,4 +1,4 @@
-const ROBOT_API = process.env.NEXT_PUBLIC_ROBOT_API ?? "http://127.0.0.1:8000";
+export const ROBOT_API = process.env.NEXT_PUBLIC_ROBOT_API ?? "http://127.0.0.1:8000";
 
 export type TwinGoal = { x: number; y: number; theta: number };
 
@@ -13,6 +13,11 @@ export type TwinState = {
   busy: boolean;
   generation: number;
   owner: string | null;
+  ranges?: Array<number | null>;
+  image?: string;
+  appliedLinear?: number;
+  appliedAngular?: number;
+  clutter?: Array<{ x: number; y: number; w: number; h: number; color: string }>;
 };
 
 export type TwinDone = {
@@ -54,6 +59,7 @@ function asState(data: Record<string, unknown>): TwinState | null {
       parsed = { x: point.x, y: point.y, theta: point.theta };
     }
   }
+  const ranges = asRanges(data.ranges);
   return {
     x: data.x,
     y: data.y,
@@ -65,7 +71,29 @@ function asState(data: Record<string, unknown>): TwinState | null {
     busy: data.busy === true,
     generation: typeof data.generation === "number" ? data.generation : 0,
     owner: typeof data.owner === "string" ? data.owner : null,
+    ranges,
+    image: typeof data.image === "string" ? data.image : undefined,
+    appliedLinear: typeof data.applied_linear === "number" ? data.applied_linear : undefined,
+    appliedAngular: typeof data.applied_angular === "number" ? data.applied_angular : undefined,
+    clutter: asBoxes(data.clutter),
   };
+}
+
+function asBoxes(value: unknown): Array<{ x: number; y: number; w: number; h: number; color: string }> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const box = item as Record<string, unknown>;
+    if (typeof box.x !== "number" || typeof box.y !== "number" || typeof box.w !== "number" || typeof box.h !== "number") {
+      return [];
+    }
+    return [{ x: box.x, y: box.y, w: box.w, h: box.h, color: typeof box.color === "string" ? box.color : "#e87820" }];
+  });
+}
+
+function asRanges(value: unknown): Array<number | null> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((item) => (typeof item === "number" && Number.isFinite(item) ? item : null));
 }
 
 function asDone(data: Record<string, unknown>): TwinDone | null {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TwinStamp } from "@/components/logo-mark";
 import { useCompletedKeys } from "@/components/lesson-progress";
-import { lessonHref, type Lesson } from "@/lib/curriculum";
+import { lessonHref, nav2Sections, type Lesson, type Nav2SectionId } from "@/lib/curriculum";
 import { lessonProgressKey } from "@/lib/progress";
 
 function LessonRow({
@@ -47,18 +47,29 @@ function lessonDetail(lesson: Lesson, showSurface: boolean) {
     : lesson.summary;
 }
 
-export function LessonIndex({
+function lessonGroups(lessons: Lesson[]) {
+  const groups: { section?: Nav2SectionId; lessons: Lesson[] }[] = [];
+  for (const lesson of lessons) {
+    const last = groups[groups.length - 1];
+    if (last && last.section === lesson.section) last.lessons.push(lesson);
+    else groups.push({ section: lesson.section, lessons: [lesson] });
+  }
+  return groups;
+}
+
+function LessonColumns({
   lessons,
   currentId,
-  showSurface = false,
-  columns = 2,
+  showSurface,
+  columns,
+  completed,
 }: {
   lessons: Lesson[];
   currentId?: string;
-  showSurface?: boolean;
-  columns?: 1 | 2;
+  showSurface: boolean;
+  columns: 1 | 2;
+  completed: string[];
 }) {
-  const completed = useCompletedKeys();
   const columnsOfLessons =
     columns === 2
       ? [lessons.slice(0, Math.ceil(lessons.length / 2)), lessons.slice(Math.ceil(lessons.length / 2))]
@@ -83,6 +94,72 @@ export function LessonIndex({
           ))}
         </ol>
       ))}
+    </div>
+  );
+}
+
+export function LessonIndex({
+  lessons,
+  currentId,
+  showSurface = false,
+  columns = 2,
+  headingLevel = 2,
+}: {
+  lessons: Lesson[];
+  currentId?: string;
+  showSurface?: boolean;
+  columns?: 1 | 2;
+  headingLevel?: 2 | 3;
+}) {
+  const completed = useCompletedKeys();
+  const groups = lessonGroups(lessons);
+  const grouped = groups.some((group) => group.section);
+  if (!grouped) {
+    return (
+      <LessonColumns
+        lessons={lessons}
+        currentId={currentId}
+        showSurface={showSurface}
+        columns={columns}
+        completed={completed}
+      />
+    );
+  }
+
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+
+  return (
+    <div className="flex flex-col gap-8">
+      {groups.map((group) => {
+        const meta = nav2Sections.find((section) => section.id === group.section);
+        return (
+          <section key={group.section ?? "plain"} className="flex flex-col gap-2">
+            {meta ? (
+              <div className="px-2">
+                <Heading
+                  className={
+                    headingLevel === 2
+                      ? "font-heading text-xl font-semibold tracking-tight text-heading"
+                      : "text-sm font-medium text-heading"
+                  }
+                >
+                  {meta.title}
+                </Heading>
+                {columns === 2 ? (
+                  <p className="text-sm leading-6 text-muted-foreground">{meta.description}</p>
+                ) : null}
+              </div>
+            ) : null}
+            <LessonColumns
+              lessons={group.lessons}
+              currentId={currentId}
+              showSurface={showSurface}
+              columns={columns}
+              completed={completed}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }

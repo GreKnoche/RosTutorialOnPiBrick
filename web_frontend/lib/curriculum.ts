@@ -1,4 +1,4 @@
-import type { Crumb, Curriculum, Lesson, TrackId, TrackMeta } from "@/lib/types";
+import type { Crumb, Curriculum, Lesson, Nav2SectionId, TrackId, TrackMeta } from "@/lib/types";
 
 export type {
   Crumb,
@@ -6,9 +6,28 @@ export type {
   LabKind,
   Lesson,
   LessonStatus,
+  Nav2SectionId,
   TrackId,
   TrackMeta,
 } from "@/lib/types";
+
+export const nav2Sections: { id: Nav2SectionId; title: string; description: string }[] = [
+  {
+    id: "basics",
+    title: "Basics",
+    description: "Ein Weg vom Ziel bis zum Fahrbefehl, mit einer Klasse pro Rolle.",
+  },
+  {
+    id: "plugins",
+    title: "Plugins",
+    description: "Dieselbe Rolle, eine andere Klasse. Der Server und das Blatt bleiben.",
+  },
+  {
+    id: "beside",
+    title: "Außerhalb",
+    description: "Server und Filter, die neben Planen und Fahren sitzen.",
+  },
+];
 
 const curriculum: Curriculum = {
   tracks: [
@@ -26,7 +45,8 @@ const curriculum: Curriculum = {
     {
       id: "nav2",
       title: "Nav2",
-      description: "Navigation mit Nav2 mittels Verhaltensbaum.",
+      description:
+        "Zuerst ein laufender Weg, dann austauschbare Plugins, dann die Server außerhalb.",
     },
   ],
   lessons: [
@@ -196,6 +216,7 @@ const curriculum: Curriculum = {
       summary:
         "Ein kurzer Recovery-Baum fährt gegen ein Hindernis, setzt zurück und plant den Weg herum zum Ziel.",
       track: "nav2",
+      section: "basics",
       lab: "none",
     },
     {
@@ -207,6 +228,7 @@ const curriculum: Curriculum = {
       summary:
         "NavFn breitet sich vom Ziel über die Costmap aus. Der Pfad folgt dem Gefälle um den Block. Der Planer fährt nicht.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["Costmap", "Dijkstra", "NavFn"],
     },
@@ -219,6 +241,7 @@ const curriculum: Curriculum = {
       summary:
         "Du verbindest PipelineSequence und RecoveryNode, damit Nav2 einen Pfad plant, ihm folgt und bei einem Fehler mit BackUp gezielt reagiert.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["Behavior Tree", "Tick", "PipelineSequence", "RecoveryNode"],
     },
@@ -231,6 +254,7 @@ const curriculum: Curriculum = {
       summary:
         "Du verfolgst, wie Behavior-Tree-Blätter über Server, Plugins und das Blackboard zusammenarbeiten.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["Plugin", "Blackboard"],
     },
@@ -243,6 +267,7 @@ const curriculum: Curriculum = {
       summary:
         "NavFn legt den Pfad um den Block. Regulated Pure Pursuit fährt ihn mit Vorausschau, Drehen auf der Stelle und langsamerer Kurve.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["Pure Pursuit", "Lookahead"],
     },
@@ -254,6 +279,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_map_server",
       summary: "Der Map Server liest die Karte und veröffentlicht sie. Die Costmap sitzt danach darauf.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["Map Server"],
     },
@@ -266,6 +292,7 @@ const curriculum: Curriculum = {
       summary:
         "AMCL verteilt Partikel über die Karte und gewichtet sie mit dem Laserscan. Die Pose ist dann nicht mehr nur Odometrie.",
       track: "nav2",
+      section: "basics",
       lab: "none",
       taughtTerms: ["AMCL"],
     },
@@ -278,9 +305,56 @@ const curriculum: Curriculum = {
       summary:
         "Die Costmap legt Kosten auf die Karte. Freie Zellen bleiben billig, Hindernisse und ihr Abstand werden teuer.",
       track: "nav2",
+      section: "basics",
       lab: "none",
     },
     {
+      id: "12",
+      slug: "smoother",
+      title: "nav2_smoother – Der Server glättet den Pfad",
+      status: "ready",
+      nav2_surface: "nav2_smoother",
+      summary: "Der Smoother-Server nimmt den Pfad des Planers und gibt eine geglättete Version zurück.",
+      track: "nav2",
+      section: "basics",
+      lab: "none",
+      taughtTerms: ["Smoother", "SimpleSmoother"],
+    },
+    {
+      id: "19",
+      slug: "behaviors",
+      title: "nav2_behaviors – BackUp, Spin und Warten",
+      status: "stub",
+      nav2_surface: "nav2_behaviors",
+      summary: "Der Behavior Server hält die Recovery-Plugins. BackUp und Spin laufen hier, nicht im Planer.",
+      track: "nav2",
+      section: "basics",
+      lab: "none",
+    },
+    {
+      id: "25",
+      slug: "lifecycle",
+      title: "nav2_lifecycle_manager – Server in Reihenfolge starten",
+      status: "stub",
+      nav2_surface: "nav2_lifecycle_manager",
+      summary:
+        "Der Lifecycle Manager schaltet die Nav2-Server von configure nach activate, in der Reihenfolge der Launch-Datei.",
+      track: "nav2",
+      section: "basics",
+      lab: "none",
+    },
+    {
+      id: "26",
+      slug: "bringup",
+      title: "nav2_bringup – Den Stack starten",
+      status: "stub",
+      nav2_surface: "nav2_bringup",
+      summary: "nav2_bringup startet Lokalisierung und Navigation zusammen, mit Parametern und dem Lifecycle Manager.",
+      track: "nav2",
+      section: "basics",
+      lab: "none",
+      taughtTerms: ["Bringup"],
+    },    {
       id: "09",
       slug: "voxel-grid",
       title: "nav2_voxel_grid – Hindernisse in der Höhe",
@@ -289,6 +363,7 @@ const curriculum: Curriculum = {
       summary:
         "Das Voxel-Grid hält Hindernisse über dem Boden, damit die lokale Costmap nicht nur die Ebene sieht.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["Voxel-Grid"],
     },
@@ -300,6 +375,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_smac_planner",
       summary: "SMAC sucht einen Pfad, der zur Drehung des Roboters passt. NavFn sucht nur die billigsten Zellen.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["SMAC"],
     },
@@ -311,19 +387,9 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_theta_star_planner",
       summary: "Theta* sucht über die Costmap und zieht längere freie Sichten. Der Pfad hat weniger Ecken als bei NavFn.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["Theta*"],
-    },
-    {
-      id: "12",
-      slug: "smoother",
-      title: "nav2_smoother – Der Server glättet den Pfad",
-      status: "ready",
-      nav2_surface: "nav2_smoother",
-      summary: "Der Smoother-Server nimmt den Pfad des Planers und gibt eine geglättete Version zurück.",
-      track: "nav2",
-      lab: "none",
-      taughtTerms: ["Smoother", "SimpleSmoother"],
     },
     {
       id: "13",
@@ -334,6 +400,7 @@ const curriculum: Curriculum = {
       summary:
         "Der Constrained Smoother rundet den Pfad und hält Abstand zu teuren Zellen und zur Kinematik des Roboters.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
     },
     {
@@ -344,6 +411,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_dwb_controller",
       summary: "DWB wirft kurze Trajektorien voraus und bewertet sie. Die beste wird zum Fahrbefehl.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["DWB"],
     },
@@ -356,6 +424,7 @@ const curriculum: Curriculum = {
       summary:
         "MPPI würfelt viele Steuerfolgen, gewichtet die brauchbaren und mittelt sie zum nächsten Fahrbefehl.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["MPPI"],
     },
@@ -367,6 +436,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_graceful_controller",
       summary: "Der Graceful Controller fährt die letzte Strecke so, dass Position und Richtung am Ziel zusammenpassen.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["Graceful Controller"],
     },
@@ -378,6 +448,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_rotation_shim_controller",
       summary: "Der Rotation Shim dreht den Roboter auf den Pfad, bevor der eigentliche Controller die Fahrt übernimmt.",
       track: "nav2",
+      section: "plugins",
       lab: "none",
       taughtTerms: ["Rotation Shim"],
     },
@@ -389,18 +460,9 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_route",
       summary: "Der Route Server folgt Knoten und Kanten eines Graphen. Er sucht nicht frei durch die Costmap.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Route"],
-    },
-    {
-      id: "19",
-      slug: "behaviors",
-      title: "nav2_behaviors – BackUp, Spin und Warten",
-      status: "stub",
-      nav2_surface: "nav2_behaviors",
-      summary: "Der Behavior Server hält die Recovery-Plugins. BackUp und Spin laufen hier, nicht im Planer.",
-      track: "nav2",
-      lab: "none",
     },
     {
       id: "20",
@@ -410,6 +472,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_velocity_smoother",
       summary: "Der Velocity Smoother begrenzt, wie schnell sich /cmd_vel ändern darf, bevor der Befehl die Räder erreicht.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Velocity Smoother"],
     },
@@ -421,6 +484,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_collision_monitor",
       summary: "Der Collision Monitor sieht den Scan direkt und bremst, bevor die Costmap das Hindernis trägt.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Collision Monitor"],
     },
@@ -432,6 +496,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_waypoint_follower",
       summary: "Der Waypoint Follower schickt ein Ziel nach dem anderen an den Navigator.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Waypoint Follower"],
     },
@@ -443,6 +508,7 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_docking",
       summary: "Navigation bringt den Roboter in die Nähe. Der Docking Server fährt die letzte Strecke an die Station.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Docking"],
     },
@@ -454,30 +520,9 @@ const curriculum: Curriculum = {
       nav2_surface: "nav2_following",
       summary: "Der Following Server hält Abstand zu einem erkannten Objekt und fährt hinterher.",
       track: "nav2",
+      section: "beside",
       lab: "none",
       taughtTerms: ["Following"],
-    },
-    {
-      id: "25",
-      slug: "lifecycle",
-      title: "nav2_lifecycle_manager – Server in Reihenfolge starten",
-      status: "stub",
-      nav2_surface: "nav2_lifecycle_manager",
-      summary:
-        "Der Lifecycle Manager schaltet die Nav2-Server von configure nach activate, in der Reihenfolge der Launch-Datei.",
-      track: "nav2",
-      lab: "none",
-    },
-    {
-      id: "26",
-      slug: "bringup",
-      title: "nav2_bringup – Den Stack starten",
-      status: "stub",
-      nav2_surface: "nav2_bringup",
-      summary: "nav2_bringup startet Lokalisierung und Navigation zusammen, mit Parametern und dem Lifecycle Manager.",
-      track: "nav2",
-      lab: "none",
-      taughtTerms: ["Bringup"],
     },
   ],
 };

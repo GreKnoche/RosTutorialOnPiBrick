@@ -95,6 +95,7 @@ export function LessonPage({
             currentId={lesson.id}
             showSurface={lesson.track === "nav2"}
             columns={1}
+            headingLevel={3}
           />
         </aside>
       </div>

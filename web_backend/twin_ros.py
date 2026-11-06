@@ -1,7 +1,13 @@
-"""ROS shell around CanvasPlant: /cmd_vel and /goal_pose in, /odom and TF out."""
+"""ROS shell around CanvasPlant: /cmd_vel and /goal_pose in, /odom and TF out.
+
+The city lab also publishes /scan, /camera/image_raw, and /imu. Those three
+stay quiet until a lab page holds the city, so a lesson keeps the old graph.
+"""
 
 from __future__ import annotations
 
+import base64
+import math
 from collections import deque
 
 from brick_core.chassis import Chassis, load_chassis
@@ -11,9 +17,19 @@ from nav_msgs.msg import Odometry
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import Image, Imu, JointState, LaserScan
 from tf2_ros import TransformBroadcaster
 
+from city import (
+    IMAGE_H,
+    IMAGE_W,
+    RANGE_MAX_M,
+    RANGE_MIN_M,
+    SCAN_COUNT,
+    SCAN_INCREMENT,
+    SCAN_MIN,
+    bmp_bytes,
+)
 from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message
 
 
@@ -36,7 +52,11 @@ class CanvasTwinNode(Node):
         self._odom_pub = self.create_publisher(Odometry, "odom", 10)
         self._joint_pub = self.create_publisher(JointState, "joint_states", 10)
         self._cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
+        self._scan_pub = self.create_publisher(LaserScan, "scan", 10)
+        self._image_pub = self.create_publisher(Image, "camera/image_raw", 10)
+        self._imu_pub = self.create_publisher(Imu, "imu", 10)
         self._tf = TransformBroadcaster(self)
+        self._sensor_tick = 0
         self._timer = self.create_timer(self._dt, self._tick)
         self.sync()
         self.get_logger().info(
@@ -89,6 +109,11 @@ class CanvasTwinNode(Node):
     def sync(self, result: ApplyResult | None = None) -> None:
         self._publish_model()
         self._publish_cmd()
+        if self.plant.city is not None:
+            self._publish_sensors()
+        else:
+            self._sensor_tick = 0
+            self.hub.clear_city()
         self.hub.store(self.plant.sample())
         if result is not None and result.done is not None:
             self.hub.emit_done(done_message(result))
@@ -144,8 +169,9 @@ class CanvasTwinNode(Node):
         odom.pose.pose.orientation.y = qy
         odom.pose.pose.orientation.z = qz
         odom.pose.pose.orientation.w = qw
-        odom.twist.twist.linear.x = float(self.plant.command.linear)
-        odom.twist.twist.angular.z = float(self.plant.command.angular)
+        motion = self.plant.applied if self.plant.city is not None else self.plant.command
+        odom.twist.twist.linear.x = float(motion.linear)
+        odom.twist.twist.angular.z = float(motion.angular)
         self._odom_pub.publish(odom)
 
         transform = TransformStamped()
@@ -166,3 +192,61 @@ class CanvasTwinNode(Node):
         joints.name = ["wheel_left_joint", "wheel_right_joint"]
         joints.position = [float(self.plant.left_rad), float(self.plant.right_rad)]
         self._joint_pub.publish(joints)
+
+    def _publish_sensors(self) -> None:
+        city = self.plant.city
+        if city is None:
+            return
+        now = self.get_clock().now().to_msg()
+        pose = self.plant.odom.pose
+        ranges = city.scan(pose.x, pose.y, pose.theta)
+        scan = LaserScan()
+        scan.header.stamp = now
+        scan.header.frame_id = "base_link"
+        scan.angle_min = SCAN_MIN
+        scan.angle_max = SCAN_MIN + (SCAN_COUNT - 1) * SCAN_INCREMENT
+        scan.angle_increment = SCAN_INCREMENT
+        scan.range_min = RANGE_MIN_M
+        scan.range_max = RANGE_MAX_M
+        scan.ranges = [float(item) for item in ranges]
+        self._scan_pub.publish(scan)
+
+        imu = Imu()
+        imu.header.stamp = now
+        imu.header.frame_id = "gyro_link"
+        qx, qy, qz, qw = yaw_to_quaternion(pose.theta)
+        imu.orientation.x = qx
+        imu.orientation.y = qy
+        imu.orientation.z = qz
+        imu.orientation.w = qw
+        imu.orientation_covariance[0] = 0.1
+        imu.orientation_covariance[4] = 0.1
+        imu.orientation_covariance[8] = 0.02
+        imu.angular_velocity.z = float(self.plant.applied.angular)
+        imu.angular_velocity_covariance[8] = 0.05
+        imu.linear_acceleration.x = float(self.plant.linear_accel)
+        imu.linear_acceleration_covariance[0] = 0.1
+        self._imu_pub.publish(imu)
+
+        self._sensor_tick += 1
+        image_b64 = None
+        if self._sensor_tick % 2 == 0:
+            frame = Image()
+            frame.header.stamp = now
+            frame.header.frame_id = "camera_link"
+            frame.height = IMAGE_H
+            frame.width = IMAGE_W
+            frame.encoding = "rgb8"
+            frame.is_bigendian = 0
+            frame.step = IMAGE_W * 3
+            rgb = city.render(pose.x, pose.y, pose.theta)
+            frame.data = rgb
+            self._image_pub.publish(frame)
+            image_b64 = base64.b64encode(bmp_bytes(rgb, IMAGE_W, IMAGE_H)).decode("ascii")
+        self.hub.store_city(
+            [None if not math.isfinite(item) else float(item) for item in ranges],
+            float(self.plant.applied.linear),
+            float(self.plant.applied.angular),
+            image_b64,
+            city.clutter_dicts(),
+        )

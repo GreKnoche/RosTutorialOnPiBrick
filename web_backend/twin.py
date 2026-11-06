@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import math
 import queue
+import random
 import threading
 from dataclasses import dataclass
 
 from brick_core.chassis import Chassis
 from brick_core.controller import PosePursuitController
-from brick_core.geometry import Pose2D, Twist2D
+from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
+
+from city import CITY, foot_radius
 
 TICK_HZ = 20.0
 
@@ -107,6 +110,12 @@ class CanvasPlant:
         self._hold = Twist2D()
         self._queue: list[Segment] = []
         self._left = 0.0
+        self.city = None
+        self.city_holder: str | None = None
+        self.drift = False
+        self._drift_rng = random.Random()
+        self.applied = Twist2D()
+        self.linear_accel = 0.0
         self.odom.update(0.0, 0.0, 0.0)
 
     def set_chassis(self, wheel_radius_m: float, wheel_separation_m: float) -> None:
@@ -126,12 +135,40 @@ class CanvasPlant:
         self.right_rad = 0.0
         self.odom.update(0.0, 0.0, 0.0)
         self.command = Twist2D()
+        self.applied = Twist2D()
+        self.linear_accel = 0.0
         self.goal = None
         self.reached = False
         self._mode = "idle"
         self._hold = Twist2D()
         self._queue = []
         self._left = 0.0
+
+    def enter_city(self, client: str | None) -> None:
+        self.city_holder = client if isinstance(client, str) else None
+        self.city = CITY
+        self.drift = False
+        self.city.set_clutter(False)
+        self.reset(CITY.start_x, CITY.start_y, CITY.start_theta)
+
+    def leave_city(self, client: str | None) -> None:
+        if self.city is None:
+            return
+        if self.city_holder is not None and client != self.city_holder:
+            return
+        self.drift = False
+        self.city.set_clutter(False)
+        self.city = None
+        self.city_holder = None
+        self.reset(0.0, 0.0, 0.0)
+
+    def set_flags(self, drift: object, clutter: object) -> None:
+        if self.city is None:
+            return
+        if drift is not None:
+            self.drift = bool(drift)
+        if clutter is not None:
+            self.city.set_clutter(bool(clutter))
 
     def command_twist(self, linear: float, angular: float) -> None:
         self._mode = "teleop"
@@ -175,6 +212,8 @@ class CanvasPlant:
         self._hold = Twist2D()
         self.goal = None
         self.command = Twist2D()
+        self.applied = Twist2D()
+        self.linear_accel = 0.0
         self.owner = None
         self.drive_seq = None
 
@@ -189,12 +228,16 @@ class CanvasPlant:
                 self.reached = True
                 self._mode = "idle"
                 self.command = Twist2D()
+                self.applied = Twist2D()
+                self.linear_accel = 0.0
             return None
         if self._mode == "teleop":
             self._apply(self._hold, dt)
             return None
         if self._mode != "drive":
             self.command = Twist2D()
+            self.applied = Twist2D()
+            self.linear_accel = 0.0
             return None
 
         remaining = dt
@@ -214,6 +257,8 @@ class CanvasPlant:
                 continue
             self._mode = "idle"
             self.command = Twist2D()
+            self.applied = Twist2D()
+            self.linear_accel = 0.0
             return [self._pose()]
         return None
 
@@ -248,15 +293,37 @@ class CanvasPlant:
         self._queue = []
         self._left = 0.0
         self.command = Twist2D()
+        self.applied = Twist2D()
+        self.linear_accel = 0.0
         return poses
 
     def _apply(self, twist: Twist2D, dt: float) -> None:
+        before = self._pose()
         left_w, right_w = self.chassis.wheel_speeds_from_twist(twist.linear, twist.angular)
         self.left_rad += left_w * dt
         self.right_rad += right_w * dt
         self.odom.update(self.left_rad, self.right_rad, dt)
+        if self.drift and self.city is not None and abs(twist.linear) > 1e-4:
+            wobble = (self._drift_rng.random() * 2.0 - 1.0) * 0.05
+            self.odom.pose.theta = wrap_angle(self.odom.pose.theta + (0.25 + wobble) * twist.linear * dt)
         linear, angular = self.chassis.twist_from_wheel_speeds(left_w, right_w)
         self.command = Twist2D(linear, angular)
+        self._collide(before, dt)
+
+    def _collide(self, before: Pose2D, dt: float) -> None:
+        if self.city is None or dt <= 0.0:
+            self.applied = Twist2D(self.command.linear, self.command.angular)
+            self.linear_accel = 0.0
+            return
+        self.city.resolve(self.odom.pose, foot_radius())
+        after = self.odom.pose
+        dtheta = wrap_angle(after.theta - before.theta)
+        mid = before.theta + 0.5 * dtheta
+        ds = (after.x - before.x) * math.cos(mid) + (after.y - before.y) * math.sin(mid)
+        linear = ds / dt
+        angular = dtheta / dt
+        self.linear_accel = (linear - self.applied.linear) / dt
+        self.applied = Twist2D(linear, angular)
 
     def _pose(self) -> Pose2D:
         pose = self.odom.pose
@@ -316,6 +383,20 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
     client = payload.get("client")
     client_id = client if isinstance(client, str) else None
     seq = payload.get("seq")
+    if kind == "city":
+        if bool(payload.get("enter")):
+            plant.enter_city(client_id)
+        else:
+            plant.leave_city(client_id)
+        return ApplyResult()
+    if kind == "flags":
+        if plant.city is not None and client_id == plant.city_holder:
+            plant.set_flags(payload.get("drift") if "drift" in payload else None, payload.get("clutter") if "clutter" in payload else None)
+        return ApplyResult()
+    if plant.city is not None and kind in {"twist", "goal", "drive"}:
+        return ApplyResult()
+    if kind == "reset" and plant.city is not None and client_id != plant.city_holder:
+        return ApplyResult()
     if kind == "chassis":
         _apply_chassis(plant, payload)
         return ApplyResult()
@@ -355,6 +436,7 @@ class TwinHub:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._sample = sample_dict(TwinSample())
+        self._city_view: dict[str, object] = {}
         self._listeners: list[queue.Queue[dict[str, object]]] = []
 
     def store(self, sample: TwinSample) -> None:
@@ -365,6 +447,37 @@ class TwinHub:
     def snapshot(self) -> dict[str, object]:
         with self._lock:
             return dict(self._sample)
+
+    def store_city(
+        self,
+        ranges: list[float | None],
+        applied_linear: float,
+        applied_angular: float,
+        image: str | None,
+        clutter: list[dict[str, object]] | None = None,
+    ) -> None:
+        with self._lock:
+            view = dict(self._city_view)
+            view["ranges"] = list(ranges)
+            view["applied_linear"] = applied_linear
+            view["applied_angular"] = applied_angular
+            if clutter is not None:
+                view["clutter"] = clutter
+            if image is not None:
+                view["image"] = image
+            self._city_view = view
+
+    def clear_city(self) -> None:
+        with self._lock:
+            self._city_view = {}
+
+    def city_view(self) -> dict[str, object]:
+        with self._lock:
+            view = dict(self._city_view)
+        ranges = view.get("ranges")
+        if isinstance(ranges, list):
+            view["ranges"] = list(ranges)
+        return view
 
     def listen(self) -> queue.Queue[dict[str, object]]:
         box: queue.Queue[dict[str, object]] = queue.Queue()

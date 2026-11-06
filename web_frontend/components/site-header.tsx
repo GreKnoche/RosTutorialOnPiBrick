@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/logo-mark";
 
 const links = [
-  { href: "/lernpfade", label: "Start" },
+  { href: "/willkommen", label: "Start" },
   { href: "/autonom", label: "Autonom" },
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
+  { href: "/labor", label: "Labor" },
 ];
 
 function linkActive(href: string, pathname: string) {
@@ -26,7 +27,7 @@ export function SiteHeader() {
           <BrandLogo className="size-11" />
           <span className="text-lg tracking-tight">EV3-Nav2-Labor</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
+        <nav className="flex flex-wrap items-center justify-end gap-1 text-sm">
           {links.map((link) => (
             <Link
               key={link.href}

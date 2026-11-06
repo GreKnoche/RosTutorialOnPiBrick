@@ -6,6 +6,7 @@ does not see the command.
 
 from __future__ import annotations
 
+import math
 import queue
 import time
 from collections.abc import Callable
@@ -131,6 +132,74 @@ def test_browser_twist_arrives_on_cmd_vel_and_odom(monkeypatch: pytest.MonkeyPat
 
         assert any(_close(linear, angular) for linear, angular in twists)
         assert any(x > 0.01 for x in poses)
+    finally:
+        if executor is not None:
+            executor.shutdown()
+        if listener is not None:
+            listener.destroy_node()
+        if twin is not None:
+            twin.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("sensor_msgs.msg")
+    from brick_core.geometry import yaw_from_quaternion
+    from sensor_msgs.msg import Image, Imu, LaserScan
+
+    monkeypatch.setenv("ROS_DOMAIN_ID", "92")
+    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
+    if rclpy.ok():
+        pytest.skip("rclpy is already running")
+
+    rclpy.init()
+    twin: CanvasTwinNode | None = None
+    listener: Node | None = None
+    executor: SingleThreadedExecutor | None = None
+    try:
+        twin = CanvasTwinNode(TwinHub())
+        listener = Node("hear_city_sensors")
+        scans: list[list[float]] = []
+        scan_frames: list[str] = []
+        yaws: list[float] = []
+        images: list[tuple[int, int, str]] = []
+
+        def on_scan(msg: LaserScan) -> None:
+            scans.append([float(item) for item in msg.ranges])
+            scan_frames.append(str(msg.header.frame_id))
+
+        def on_imu(msg: Imu) -> None:
+            pose = msg.orientation
+            yaws.append(yaw_from_quaternion(pose.x, pose.y, pose.z, pose.w))
+
+        def on_image(msg: Image) -> None:
+            images.append((int(msg.width), int(msg.height), str(msg.encoding)))
+
+        listener.create_subscription(LaserScan, "scan", on_scan, 10)
+        listener.create_subscription(Imu, "imu", on_imu, 10)
+        listener.create_subscription(Image, "camera/image_raw", on_image, 10)
+        executor = SingleThreadedExecutor()
+        executor.add_node(twin)
+        executor.add_node(listener)
+        quiet = time.monotonic() + 0.4
+        while time.monotonic() < quiet:
+            executor.spin_once(timeout_sec=0.05)
+        assert scans == []
+        assert yaws == []
+        assert images == []
+
+        twin.submit({"type": "city", "enter": True, "client": "labor"})
+        _spin_until(
+            executor,
+            lambda: bool(scans) and bool(yaws) and bool(images),
+            5.0,
+        )
+        finite = [item for item in scans[-1] if math.isfinite(item)]
+        assert finite
+        assert scan_frames[-1] == "base_link"
+        assert images[-1] == (320, 240, "rgb8")
+        assert math.isclose(yaws[-1], twin.plant.odom.pose.theta, abs_tol=1e-4)
     finally:
         if executor is not None:
             executor.shutdown()
