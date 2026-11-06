@@ -82,3 +82,11 @@ Ein Plugin ist eine austauschbare Klasse. Ein Server lädt sie unter einem Namen
 
 Das Blackboard hält gemeinsame Werte im Behavior Tree. Ein Blatt schreibt einen Wert und ein anderes liest ihn.
 
+## Pure Pursuit
+
+Ein Regler, der einen Punkt auf dem Pfad vor dem Roboter ansteuert. Die Drehgeschwindigkeit folgt aus der Lage dieses Punkts.
+
+## Lookahead
+
+Die Strecke vom Roboter bis zu dem Punkt auf dem Pfad, den Pure Pursuit ansteuert. Bei diesem Roboter hängt sie an der aktuellen Geschwindigkeit.
+

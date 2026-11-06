@@ -21,7 +21,7 @@ Der `planner_server` übernimmt die Planung. Bei ihm steht `planner_plugins: Gri
 eyebrow: Das Plugin
 title: Welche Klasse steckt hinter einem Blatt?
 
-Der `planner_server` lädt `GridBased` mit `nav2_navfn_planner::NavfnPlanner`. Diese Klasse steckt hinter dem Planer-Blatt `ComputePathToPose`. Der `controller_server` lädt `FollowPath` mit `nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController`. Diese Klasse steckt hinter dem Fahr-Blatt `FollowPath`. Die Algorithmen von NavFn und Pure Pursuit werden hier nicht erklärt. Dieselben Plugin-Zeilen stehen in der Gazebo-Parameterdatei.
+Der `planner_server` lädt `GridBased` mit `nav2_navfn_planner::NavfnPlanner`. Diese Klasse steckt hinter dem Planer-Blatt `ComputePathToPose`. Der `controller_server` lädt `FollowPath` mit `nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController`. Diese Klasse steckt hinter dem Fahr-Blatt `FollowPath`. Wie der Pfad entsteht und wie daraus die Geschwindigkeit wird, erklärt die nächste Lektion. Dieselben Plugin-Zeilen stehen in der Gazebo-Parameterdatei.
 
 ## leitung
 eyebrow: Blackboard

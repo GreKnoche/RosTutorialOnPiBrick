@@ -7,6 +7,12 @@ import { Bt2Animation } from "@/components/lessons/bt2/animation";
 import { Bt2Lab } from "@/components/lessons/bt2/lab";
 import { PluginsAnimation } from "@/components/lessons/plugins/animation";
 import { PluginsLab } from "@/components/lessons/plugins/lab";
+import { PlanerControllerAnimation } from "@/components/lessons/planer-controller/animation";
+import { PlanerControllerLab } from "@/components/lessons/planer-controller/lab";
+import { SmootherAnimation } from "@/components/lessons/smoother/animation";
+import { SmootherLab } from "@/components/lessons/smoother/lab";
+import { MapServerAnimation } from "@/components/lessons/map-server/animation";
+import { MapServerLab } from "@/components/lessons/map-server/lab";
 import { GyroskopAnimation } from "@/components/lessons/05_gyroskop/animation";
 import { GyroskopLab } from "@/components/lessons/05_gyroskop/lab";
 import { KalibrierungAnimation } from "@/components/lessons/04_kalibrierung/animation";
@@ -40,6 +46,12 @@ const lessonModules: Record<string, LessonModule> = {
   "nav2:planner": { Animation: PlannerAnimation, Lab: PlannerLab },
   "nav2:bt2": { Animation: Bt2Animation, Lab: Bt2Lab },
   "nav2:plugins": { Animation: PluginsAnimation, Lab: PluginsLab },
+  "nav2:planer-controller": {
+    Animation: PlanerControllerAnimation,
+    Lab: PlanerControllerLab,
+  },
+  "nav2:map-server": { Animation: MapServerAnimation, Lab: MapServerLab },
+  "nav2:smoother": { Animation: SmootherAnimation, Lab: SmootherLab },
 };
 
 export function lessonModule(track: string, slug: string) {

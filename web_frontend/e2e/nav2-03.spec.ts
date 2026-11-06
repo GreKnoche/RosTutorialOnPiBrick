@@ -105,9 +105,9 @@ test.describe("nav2/03 Kontrollknoten", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Medium und Hard haben für diese Lektion noch keinen Knoten", async ({ page }) => {
+  test("Medium und Hard laden den Stub für /drive", async ({ page }) => {
     for (const level of ["medium", "hard"] as const) {
-      const errors = watchPage(page, (text) => text.includes("Failed to load resource") && text.includes("404"));
+      const errors = watchPage(page);
       await page.goto(`/nav2/03?stufe=${level}`);
       await expect(page.getByRole("heading", { level: 1, name: "Kontrollknoten" })).toBeVisible();
       await expect(
@@ -115,9 +115,11 @@ test.describe("nav2/03 Kontrollknoten", () => {
           name: level === "medium" ? "Im vorgefertigten Knoten die Aktion aufrufen" : "Den Knoten selbst schreiben",
         }),
       ).toBeVisible();
-      await expect(page.getByText("Für diese Lektion ist noch kein Auftrag hinterlegt.")).toBeVisible();
-      await expect(page.getByText("Knoten nicht gefunden")).toBeVisible();
-      await expect(page.getByRole("textbox", { name: `Knoten nav2_03 ${level}` })).toHaveValue("");
+      await expect(page.getByText("1 m nach Radodometrie")).toBeVisible();
+      const editor = page.getByRole("textbox", { name: `Knoten nav2_03 ${level}` });
+      await expect(editor).not.toHaveValue("");
+      await expect(editor).toHaveValue(/KEY = "nav2_03"/);
+      await expect(page.getByText("Knoten nicht gefunden")).toHaveCount(0);
       expect(errors).toEqual([]);
     }
   });
