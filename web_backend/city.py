@@ -62,6 +62,40 @@ class Segment:
     y1: float
 
 
+@dataclass(frozen=True)
+class Place:
+    id: str
+    x: float
+    y: float
+    theta: float
+
+
+@dataclass(frozen=True)
+class GraphEdge:
+    id: str
+    points: tuple[tuple[float, float], ...]
+    short: bool = False
+
+
+@dataclass(frozen=True)
+class Arch:
+    x: float
+    y: float
+    w: float
+    h: float
+    z0: float
+    z1: float
+    color: tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class Mark:
+    x: float
+    y: float
+    w: float
+    h: float
+
+
 def foot_radius() -> float:
     """Half the body diagonal, so a corner does not sit inside a wall."""
     return 0.5 * math.hypot(BODY_LENGTH_M, BODY_WIDTH_M)
@@ -587,6 +621,34 @@ def bmp_bytes(rgb: bytes, width: int, height: int) -> bytes:
     return header + info + image
 
 
+def _graph(
+    ribbons: list[list[tuple[float, float]]],
+    stem_x: float,
+    mid_y: float,
+) -> tuple[GraphEdge, ...]:
+    names = (
+        "nordrand",
+        "bogen-nw",
+        "west",
+        "bogen-no",
+        "ost",
+        "quer",
+        "stamm",
+        "bogen-sw",
+        "zufahrt",
+        "kehre",
+    )
+    edges: list[GraphEdge] = []
+    for name, points in zip(names, ribbons, strict=True):
+        if name != "stamm":
+            edges.append(GraphEdge(name, tuple(points), False))
+            continue
+        ys = [point[1] for point in points]
+        edges.append(GraphEdge("stamm-nord", ((stem_x, max(ys)), (stem_x, mid_y)), True))
+        edges.append(GraphEdge("stamm-sued", ((stem_x, mid_y), (stem_x, min(ys))), False))
+    return tuple(edges)
+
+
 class City:
     def __init__(self) -> None:
         # Centerlines measured on the reference sheet. 56 px of asphalt is one road width.
@@ -671,6 +733,102 @@ class City:
         self.clutter: list[House] = []
         self._rects = [house.bounds for house in self.houses]
         self.shore = _shore(self.roads, self.houses)
+        self.left_x = left_x
+        self.right_x = right_x
+        self.mid_y = mid_y
+        self.top_y = top_y
+        self.stem_x = stem_x
+        self.ustem_x = ustem_x
+        self.right_u_y = right_u_y
+        self.corner_y = corner_y
+        self.scene = "leer"
+        self.arch_on = False
+        self.dock_on = False
+        self.runner_on = False
+        self.runner_dir = 1.0
+        span = ROAD_W * 0.9
+        self.arch = Arch(
+            ustem_x - span / 2.0,
+            right_u_y + 0.32,
+            span,
+            0.14,
+            0.62,
+            0.8,
+            (72, 78, 88),
+        )
+        mark_w, mark_h = 0.26, 0.1
+        mark_x = self.start_x + 1.7
+        mark_y = mid_y - ROAD_W / 2.0 - mark_h - 0.02
+        self.dock = Mark(mark_x, mark_y, mark_w, mark_h)
+        dock_x = mark_x + mark_w / 2.0
+        self.places = (
+            Place("start", self.start_x, self.start_y, self.start_theta),
+            Place("kreuzung", stem_x, mid_y, math.pi / 2.0),
+            Place("nord", stem_x, top_y, math.pi / 2.0),
+            Place("kehre", right_u_x, right_u_y - u_r, 0.0),
+            Place("kehre-an", ustem_x, right_u_y + 0.85, -math.pi / 2.0),
+            Place("west", left_x, mid_y, math.pi),
+            Place("nordwest", left_x, top_y, 0.0),
+            Place("ost", right_x, mid_y, 0.0),
+            Place("dock", dock_x, mid_y, 0.0),
+        )
+        self.cones = tuple(self._spots)
+        self.graph = _graph(self._ribbons, stem_x, mid_y)
+        self.runner_s = (self.start_x + 0.55) - left_x
+
+    def place(self, name: str) -> Place:
+        for item in self.places:
+            if item.id == name:
+                return item
+        raise KeyError(name)
+
+    def edge(self, name: str) -> GraphEdge:
+        for item in self.graph:
+            if item.id == name:
+                return item
+        raise KeyError(name)
+
+    def set_scene(self, scene: str) -> None:
+        self.scene = scene if scene in {"leer", "kegel", "kehre", "dock"} else "leer"
+        self.set_clutter(self.scene == "kegel")
+        self.arch_on = self.scene == "kehre"
+        self.dock_on = self.scene == "dock"
+        self.runner_on = self.scene == "dock"
+        if self.runner_on:
+            self.runner_s = (self.start_x + 0.55) - self.left_x
+            self.runner_dir = 1.0
+
+    def advance_runner(self, dt: float) -> None:
+        if not self.runner_on or dt <= 0.0:
+            return
+        limit = self.right_x - self.left_x - 0.35
+        self.runner_s += self.runner_dir * 0.22 * dt
+        if self.runner_s > limit:
+            self.runner_s = limit
+            self.runner_dir = -1.0
+        elif self.runner_s < 0.35:
+            self.runner_s = 0.35
+            self.runner_dir = 1.0
+
+    def runner_pose(self) -> tuple[float, float, float]:
+        return (
+            self.left_x + self.runner_s,
+            self.mid_y,
+            0.0 if self.runner_dir > 0.0 else math.pi,
+        )
+
+    def runner_bounds(self) -> tuple[float, float, float, float]:
+        x, y, _theta = self.runner_pose()
+        return (x - 0.08, y - 0.09, x + 0.08, y + 0.09)
+
+    def runner_dict(self) -> dict[str, float | str]:
+        x, y, theta = self.runner_pose()
+        return {"x": x - 0.08, "y": y - 0.09, "w": 0.16, "h": 0.18, "theta": theta, "color": "#ece8d6"}
+
+    def _scan_rects(self) -> list[tuple[float, float, float, float]]:
+        if not self.runner_on:
+            return self._rects
+        return [*self._rects, self.runner_bounds()]
 
     def set_clutter(self, enabled: bool) -> None:
         if enabled:
@@ -704,7 +862,7 @@ class City:
             dist = None
             dx = math.cos(world)
             dy = math.sin(world)
-            for rect in self._rects:
+            for rect in self._scan_rects():
                 hit = ray_rect(x, y, dx, dy, rect, RANGE_MAX_M)
                 if hit is None:
                     continue
@@ -735,13 +893,30 @@ class City:
             poly = _ground_poly(x, y, theta, road)
             if poly is not None:
                 _fill_polygon(buf, poly, ROAD)
+        if self.dock_on:
+            mark = self.dock
+            corners = (
+                (mark.x, mark.y),
+                (mark.x + mark.w, mark.y),
+                (mark.x + mark.w, mark.y + mark.h),
+                (mark.x, mark.y + mark.h),
+            )
+            painted = _ground_poly(x, y, theta, corners)
+            if painted is not None:
+                _fill_polygon(buf, painted, (196, 64, 58))
         for edge in self.edges:
             self._paint_ground_line(buf, x, y, theta, edge, EDGE)
         for lane in self.lanes:
             self._paint_ground_line(buf, x, y, theta, lane, LANE)
         faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
-        for house in (*self.houses, *self.clutter):
+        extras: list[House] = []
+        if self.runner_on:
+            rx, ry, _theta = self.runner_pose()
+            extras.append(House("laeufer", rx - 0.08, ry - 0.09, 0.16, 0.18, (236, 232, 214), 0.55))
+        for house in (*self.houses, *self.clutter, *extras):
             faces.extend(self._house_faces(x, y, theta, house))
+        if self.arch_on:
+            faces.extend(self._arch_faces(x, y, theta))
         faces.sort(key=lambda item: item[0], reverse=True)
         for _dist, poly, color in faces:
             _fill_polygon(buf, poly, color)
@@ -775,6 +950,29 @@ class City:
             if previous is not None:
                 _draw_line(buf, previous[0], previous[1], point[0], point[1], color)
             previous = point
+
+    def _arch_faces(
+        self,
+        x: float,
+        y: float,
+        theta: float,
+    ) -> list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]]:
+        arch = self.arch
+        corners = (
+            (arch.x, arch.y),
+            (arch.x + arch.w, arch.y),
+            (arch.x + arch.w, arch.y + arch.h),
+            (arch.x, arch.y + arch.h),
+        )
+        faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
+        for a, b, shade in ((0, 1, 0.8), (1, 2, 0.7), (2, 3, 0.9), (3, 0, 0.66)):
+            face = self._face(x, y, theta, corners[a], corners[b], arch.z0, arch.z1, _shade(arch.color, shade))
+            if face is not None:
+                faces.append(face)
+        roof = self._roof(x, y, theta, corners, arch.z1, _shade(arch.color, 0.84))
+        if roof is not None:
+            faces.append(roof)
+        return faces
 
     def _house_faces(
         self,
@@ -876,6 +1074,26 @@ class City:
                 {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}
                 for house in self.houses
             ],
+            "places": [
+                {"id": place.id, "x": place.x, "y": place.y, "theta": place.theta} for place in self.places
+            ],
+            "cones": [{"x": px, "y": py} for px, py in self.cones],
+            "graph": [
+                {
+                    "id": edge.id,
+                    "short": edge.short,
+                    "points": [{"x": px, "y": py} for px, py in edge.points],
+                }
+                for edge in self.graph
+            ],
+            "arch": {
+                "x": self.arch.x,
+                "y": self.arch.y,
+                "w": self.arch.w,
+                "h": self.arch.h,
+            },
+            "dock": {"x": self.dock.x, "y": self.dock.y, "w": self.dock.w, "h": self.dock.h},
+            "runner": self.runner_dict(),
         }
 
     def clutter_dicts(self) -> list[dict[str, object]]:

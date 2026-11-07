@@ -293,6 +293,94 @@ class _Door:
         self.payloads.append(payload)
 
 
+def test_places_graph_and_one_layer_per_chapter() -> None:
+    from city_probe import LAYERS, SPECS, payload
+
+    CITY.set_scene("leer")
+    names = {place.id for place in CITY.places}
+    assert {"start", "kreuzung", "nord", "kehre", "dock"} <= names
+    assert len(CITY.cones) == 5
+    short = [edge for edge in CITY.graph if edge.short]
+    assert [edge.id for edge in short] == ["stamm-nord"]
+    assert len(SPECS) == 26
+    layers = {spec.layer for spec in SPECS.values()}
+    assert layers <= LAYERS
+    for kapitel, spec in SPECS.items():
+        body = payload(CITY, kapitel)
+        assert body is not None
+        assert body["layer"] == spec.layer
+        assert body["scene"] in {"leer", "kegel", "kehre", "dock"}
+        assert body["ok"] is True
+    around = payload(CITY, "02")
+    assert around is not None and len(around["path"]) > 4
+    theta = payload(CITY, "11")
+    assert theta is not None and len(theta["path"]) == 2
+    assert len(theta["path"]) < len(around["path"])
+    route = payload(CITY, "18")
+    assert route is not None and route["closed"] == "stamm-nord"
+
+
+def test_the_arch_misses_the_scan_and_the_runner_moves() -> None:
+    CITY.set_scene("leer")
+    arch = CITY.arch
+    x = arch.x + arch.w / 2.0
+    y = arch.y + arch.h + 0.4
+    quiet = CITY.scan(x, y, -math.pi / 2.0)
+    CITY.set_scene("kehre")
+    under = CITY.scan(x, y, -math.pi / 2.0)
+    assert under == quiet
+    CITY.set_scene("dock")
+    before = CITY.runner_pose()[0]
+    CITY.advance_runner(1.0)
+    after = CITY.runner_pose()[0]
+    assert after > before
+    pose = CITY.runner_pose()
+    ranges = CITY.scan(pose[0] - 0.4, pose[1], 0.0)
+    assert min(item for item in ranges if math.isfinite(item)) < 0.5
+    dock = CITY.dock
+    sample_x = dock.x + dock.w / 2.0
+    sample_y = dock.y + dock.h / 2.0
+    from city import push_circle
+
+    moved_x, moved_y = push_circle(sample_x, sample_y, 0.02, CITY._rects)
+    assert math.isclose(moved_x, sample_x, abs_tol=1e-6)
+    assert math.isclose(moved_y, sample_y, abs_tol=1e-6)
+    frame = CITY.render(pose[0] - 0.8, pose[1], 0.0)
+    assert len(frame) == IMAGE_W * IMAGE_H * 3
+    CITY.set_scene("leer")
+
+
+def test_a_probe_sets_the_scene_and_the_route_serves_it() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
+    apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "01"})
+    assert CITY.scene == "kegel"
+    assert len(CITY.clutter) == 5
+    apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "07"})
+    assert plant.odom.pose.y > CITY.start_y + 0.4
+    apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "09"})
+    assert CITY.arch_on is True
+    assert CITY.scene == "kehre"
+    apply_message(plant, {"type": "city", "enter": False, "client": "labor"})
+    assert CITY.scene == "leer"
+
+    class Bridge:
+        robot_ready = False
+
+        def call(self, left: float, right: float, timeout_sec: float = 95.0) -> None:
+            raise AssertionError(left)
+
+    with TestClient(create_app(Bridge())) as client:  # type: ignore[arg-type]
+        body = client.get("/city").json()
+        probe = client.get("/city/probe/21").json()
+        missing = client.get("/city/probe/99")
+    assert any(place["id"] == "nord" for place in body["places"])
+    assert any(edge["short"] for edge in body["graph"])
+    assert probe["judge"] == "scan"
+    assert probe["scene"] == "kegel"
+    assert missing.status_code == 404
+
+
 def test_only_the_lab_socket_receives_the_camera() -> None:
     bridge = _Door()
     with TestClient(create_app(bridge)) as client:  # type: ignore[arg-type]

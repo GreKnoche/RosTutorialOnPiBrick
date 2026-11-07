@@ -2,7 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { paintProbe } from "@/lib/city-layer";
+import {
+  emptyMemory,
+  parseProbe,
+  probeStatus,
+  type CityProbe,
+  type ProbeMemory,
+} from "@/lib/city-probe";
 import { CITY_VIEW_H, CITY_VIEW_W, SCAN_MIN, SCAN_STEP, cityScreen, clampZoom } from "@/lib/city-view";
+import { getLessonById } from "@/lib/curriculum";
 import { formatDe } from "@/lib/format";
 import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
 
@@ -11,6 +20,7 @@ type Rect = { x: number; y: number; w: number; h: number; color: string };
 type Seg = { x0: number; y0: number; x1: number; y1: number };
 type Road = { points: Point[] };
 type Shore = { x: number; y: number; w: number; h: number };
+type GraphEdge = { id: string; short: boolean; points: Point[] };
 type CityMap = {
   start: { x: number; y: number; theta: number };
   roads: Road[];
@@ -18,6 +28,11 @@ type CityMap = {
   lanes: Seg[];
   houses: Rect[];
   shore: Shore;
+  graph: GraphEdge[];
+  arch: Rect | null;
+  dock: Rect | null;
+  runner: Rect | null;
+  cones: Point[];
 };
 
 type Readout = {
@@ -81,7 +96,36 @@ function parseCity(data: unknown): CityMap | null {
     lanes: segs(record.lanes),
     houses: rects(record.houses, true),
     shore: shoreOf(record.shore),
+    graph: graphOf(record.graph),
+    arch: rects(record.arch ? [record.arch] : [], false)[0] ?? null,
+    dock: rects(record.dock ? [record.dock] : [], false)[0] ?? null,
+    runner: rects(record.runner ? [record.runner] : [], false)[0] ?? null,
+    cones: pointsOf(record.cones),
   };
+}
+
+function pointsOf(value: unknown): Point[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const spot = item as Record<string, unknown>;
+    return [{ x: num(spot.x), y: num(spot.y) }];
+  });
+}
+
+function graphOf(value: unknown): GraphEdge[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const edge = item as Record<string, unknown>;
+    if (typeof edge.id !== "string" || !Array.isArray(edge.points)) return [];
+    const points = edge.points.flatMap((point) => {
+      if (!point || typeof point !== "object") return [];
+      const spot = point as Record<string, unknown>;
+      return [{ x: num(spot.x), y: num(spot.y) }];
+    });
+    return points.length >= 2 ? [{ id: edge.id, short: edge.short === true, points }] : [];
+  });
 }
 
 function shoreOf(value: unknown): Shore {
@@ -215,6 +259,8 @@ function draw(
   clutter: Rect[],
   showRays: boolean,
   zoom: number,
+  probe: CityProbe | null,
+  runner: Rect | null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -257,7 +303,11 @@ function draw(
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
-    const blocks = [...city.houses, ...clutter];
+    const cones =
+      probe?.scene === "kegel" && clutter.length === 0
+        ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#e87820" }))
+        : [];
+    const blocks = [...city.houses, ...clutter, ...cones];
     for (const house of blocks) {
       const a = to(house.x, house.y + house.h);
       const b = to(house.x + house.w, house.y);
@@ -277,6 +327,10 @@ function draw(
       }
     }
     ctx.stroke();
+  }
+
+  if (probe && city) {
+    paintProbe(ctx, to, ppm, probe, city.graph, city.arch, city.dock, runner);
   }
 
   if (showRays && ranges) {
@@ -327,7 +381,7 @@ function draw(
   ctx.textAlign = "start";
 }
 
-export function CityLab() {
+export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
@@ -347,6 +401,15 @@ export function CityLab() {
   const [rays, setRays] = useState(true);
   const raysRef = useRef(true);
   raysRef.current = rays;
+  const probeRef = useRef<CityProbe | null>(null);
+  const titleRef = useRef("");
+  const runnerRef = useRef<Rect | null>(null);
+  const memoryRef = useRef<ProbeMemory>(emptyMemory());
+  const motionRef = useRef({ linear: 0, angular: 0 });
+  const kapitelRef = useRef(kapitel);
+  kapitelRef.current = kapitel;
+  const [probe, setProbe] = useState<CityProbe | null>(null);
+  const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
@@ -386,13 +449,21 @@ export function CityLab() {
       onConnection(up) {
         if (generation.current !== token) return;
         setRosUp(up);
-        if (up) linkRef.current?.send({ type: "city", enter: true, client: session });
+        if (up) {
+          linkRef.current?.send({ type: "city", enter: true, client: session });
+          const id = kapitelRef.current;
+          if (id) linkRef.current?.send({ type: "probe", client: session, kapitel: id });
+        }
       },
       onState(sample: TwinState) {
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
+        motionRef.current = { linear: sample.linear, angular: sample.angular };
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
+        runnerRef.current = sample.runner
+          ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
+          : null;
         if (sample.image) setImage(sample.image);
         setReadout({
           x: sample.x,
@@ -426,7 +497,24 @@ export function CityLab() {
         clutterRef.current,
         raysRef.current,
         zoomRef.current,
+        probeRef.current,
+        runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null),
       );
+      const current = probeRef.current;
+      if (current) {
+        const runner = runnerRef.current;
+        const report = probeStatus(
+          current,
+          poseRef.current,
+          motionRef.current.linear,
+          motionRef.current.angular,
+          rangesRef.current,
+          runner ? { x: runner.x + runner.w / 2, y: runner.y + runner.h / 2 } : null,
+          memoryRef.current,
+          titleRef.current,
+        );
+        setStatusText((previous) => (previous === report.text ? previous : report.text));
+      }
     };
     step();
     const id = window.setInterval(step, 50);
@@ -442,6 +530,45 @@ export function CityLab() {
     };
   }, [mapUp]);
 
+  const lesson = kapitel ? getLessonById("nav2", kapitel) : undefined;
+  titleRef.current = lesson?.title ?? kapitel ?? "";
+
+  useEffect(() => {
+    memoryRef.current = emptyMemory();
+    setStatusText("");
+    if (!kapitel) {
+      probeRef.current = null;
+      setProbe(null);
+      return;
+    }
+    let cancel = false;
+    fetch(`${ROBOT_API}/city/probe/${kapitel}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        const next = parseProbe(data);
+        if (cancel) return;
+        probeRef.current = next;
+        setProbe(next);
+        if (next && !havePose.current) {
+          poseRef.current = { x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 };
+          setReadout((current) => ({ ...current, x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, [kapitel]);
+
+  useEffect(() => {
+    if (!rosUp) return;
+    linkRef.current?.send({
+      type: "probe",
+      client: sessionRef.current,
+      kapitel: kapitel ?? "",
+    });
+  }, [kapitel, rosUp]);
+
   const sendFlags = (nextDrift: boolean, nextClutter: boolean) => {
     linkRef.current?.send({
       type: "flags",
@@ -452,7 +579,11 @@ export function CityLab() {
   };
 
   const reset = () => {
-    const start = cityRef.current?.start ?? { x: 2.45, y: 5.55, theta: 0 };
+    memoryRef.current = emptyMemory();
+    const origin = probeRef.current?.start;
+    const start = origin
+      ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
+      : (cityRef.current?.start ?? { x: 2.45, y: 5.55, theta: 0 });
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -472,6 +603,16 @@ export function CityLab() {
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             Norden bleibt oben. Der Twin bleibt in der Mitte. Fahren geht nur über /cmd_vel. Häuser halten an, die Fahrspuren sind Farbe.
           </p>
+          {probe ? (
+            <div className="mt-3 max-w-xl rounded-lg border border-border bg-card px-3 py-3 text-sm">
+              <p className="font-mono text-xs text-muted-foreground">
+                {probe.kapitel}
+                {lesson ? ` · ${lesson.title}` : ""}
+              </p>
+              <p className="mt-1">{probe.task}</p>
+              <p className="mt-2 text-muted-foreground">{statusText || probe.task}</p>
+            </div>
+          ) : null}
         </div>
         <Button type="button" onClick={reset} disabled={!rosUp}>
           Zurücksetzen
@@ -510,8 +651,8 @@ export function CityLab() {
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={clutter}
-                disabled={!rosUp}
+                checked={probe ? probe.scene === "kegel" : clutter}
+                disabled={!rosUp || probe !== null}
                 onChange={(event) => {
                   const next = event.target.checked;
                   setClutter(next);

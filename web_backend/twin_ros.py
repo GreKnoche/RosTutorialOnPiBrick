@@ -286,4 +286,10 @@ class CanvasTwinNode(Node):
             float(self.plant.applied.angular),
             image_b64,
             city.clutter_dicts(),
+            {
+                "scene": city.scene,
+                "arch": city.arch_on,
+                "dock": city.dock_on,
+                "runner": city.runner_dict() if city.runner_on else None,
+            },
         )

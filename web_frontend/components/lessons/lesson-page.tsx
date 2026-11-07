@@ -64,6 +64,7 @@ export function LessonPage({
           </section>
           {active && copy ? (
             <LessonBody
+              lesson={lesson}
               active={active}
               copy={copy}
               nextHref={nextHref}
@@ -82,6 +83,7 @@ export function LessonPage({
                 lessonId={lesson.id}
                 showTopics={lesson.track !== "autonom"}
               />
+              {lesson.track === "nav2" ? <CityProbeLink id={lesson.id} /> : null}
             </>
           )}
           {level !== "beginner" ? <LevelTask lesson={lesson} level={level} /> : null}
@@ -112,12 +114,14 @@ export function LessonPage({
 }
 
 function LessonBody({
+  lesson,
   active,
   copy,
   nextHref,
   level,
   terms,
 }: {
+  lesson: Lesson;
   active: LessonModule;
   copy: LessonCopy;
   nextHref?: string;
@@ -132,6 +136,18 @@ function LessonBody({
       {terms.length > 0 ? <GlossarySpoiler terms={terms} /> : null}
       <Animation title={copy.animationTitle} />
       <Lab copy={copy} nextHref={nextHref} level={level} />
+      {lesson.track === "nav2" ? <CityProbeLink id={lesson.id} /> : null}
     </>
+  );
+}
+
+function CityProbeLink({ id }: { id: string }) {
+  return (
+    <p className="max-w-2xl text-sm leading-7">
+      Die Stadtprobe prüft dasselbe Kriterium an einem festen Ort.{" "}
+      <Link href={`/labor?kapitel=${id}`} className="font-medium text-heading underline-offset-4 hover:underline">
+        Im Stadtlabor öffnen
+      </Link>
+    </p>
   );
 }

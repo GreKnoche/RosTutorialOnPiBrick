@@ -112,6 +112,7 @@ class CanvasPlant:
         self._left = 0.0
         self.city = None
         self.city_holder: str | None = None
+        self.probe: str | None = None
         self.drift = False
         self._drift_rng = random.Random()
         self.applied = Twist2D()
@@ -148,7 +149,8 @@ class CanvasPlant:
         self.city_holder = client if isinstance(client, str) else None
         self.city = CITY
         self.drift = False
-        self.city.set_clutter(False)
+        self.probe = None
+        self.city.set_scene("leer")
         self.reset(CITY.start_x, CITY.start_y, CITY.start_theta)
 
     def leave_city(self, client: str | None) -> None:
@@ -157,7 +159,8 @@ class CanvasPlant:
         if self.city_holder is not None and client != self.city_holder:
             return
         self.drift = False
-        self.city.set_clutter(False)
+        self.probe = None
+        self.city.set_scene("leer")
         self.city = None
         self.city_holder = None
         self.reset(0.0, 0.0, 0.0)
@@ -217,8 +220,21 @@ class CanvasPlant:
         self.owner = None
         self.drive_seq = None
 
+    def set_probe(self, kapitel: object) -> None:
+        if self.city is None:
+            return
+        from city_probe import scene_of, start_pose
+
+        name = kapitel if isinstance(kapitel, str) else ""
+        self.probe = name or None
+        self.city.set_scene(scene_of(name))
+        x, y, theta = start_pose(self.city, name)
+        self.reset(x, y, theta)
+
     def step(self, dt: float) -> list[Pose2D] | None:
         """Integrate ``dt`` seconds. A list means a scripted drive finished."""
+        if self.city is not None and dt > 0.0:
+            self.city.advance_runner(dt)
         if dt <= 0.0:
             return None
         if self._mode == "goal" and self.goal is not None:
@@ -393,6 +409,10 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
         if plant.city is not None and client_id == plant.city_holder:
             plant.set_flags(payload.get("drift") if "drift" in payload else None, payload.get("clutter") if "clutter" in payload else None)
         return ApplyResult()
+    if kind == "probe":
+        if plant.city is not None and client_id == plant.city_holder:
+            plant.set_probe(payload.get("kapitel"))
+        return ApplyResult()
     if plant.city is not None and kind in {"twist", "goal", "drive"}:
         return ApplyResult()
     if kind == "reset" and plant.city is not None and client_id != plant.city_holder:
@@ -455,6 +475,7 @@ class TwinHub:
         applied_angular: float,
         image: str | None,
         clutter: list[dict[str, object]] | None = None,
+        props: dict[str, object] | None = None,
     ) -> None:
         with self._lock:
             view = dict(self._city_view)
@@ -465,6 +486,8 @@ class TwinHub:
                 view["clutter"] = clutter
             if image is not None:
                 view["image"] = image
+            if props:
+                view.update(props)
             self._city_view = view
 
     def clear_city(self) -> None:

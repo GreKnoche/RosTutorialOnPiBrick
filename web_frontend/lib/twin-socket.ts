@@ -18,6 +18,10 @@ export type TwinState = {
   appliedLinear?: number;
   appliedAngular?: number;
   clutter?: Array<{ x: number; y: number; w: number; h: number; color: string }>;
+  scene?: string;
+  arch?: boolean;
+  dock?: boolean;
+  runner?: { x: number; y: number; w: number; h: number; theta: number } | null;
 };
 
 export type TwinDone = {
@@ -76,6 +80,10 @@ function asState(data: Record<string, unknown>): TwinState | null {
     appliedLinear: typeof data.applied_linear === "number" ? data.applied_linear : undefined,
     appliedAngular: typeof data.applied_angular === "number" ? data.applied_angular : undefined,
     clutter: asBoxes(data.clutter),
+    scene: typeof data.scene === "string" ? data.scene : undefined,
+    arch: data.arch === true,
+    dock: data.dock === true,
+    runner: asRunner(data.runner),
   };
 }
 
@@ -89,6 +97,21 @@ function asBoxes(value: unknown): Array<{ x: number; y: number; w: number; h: nu
     }
     return [{ x: box.x, y: box.y, w: box.w, h: box.h, color: typeof box.color === "string" ? box.color : "#e87820" }];
   });
+}
+
+function asRunner(value: unknown): { x: number; y: number; w: number; h: number; theta: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const box = value as Record<string, unknown>;
+  if (typeof box.x !== "number" || typeof box.y !== "number" || typeof box.w !== "number" || typeof box.h !== "number") {
+    return null;
+  }
+  return {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    theta: typeof box.theta === "number" ? box.theta : 0,
+  };
 }
 
 function asRanges(value: unknown): Array<number | null> | undefined {
@@ -127,11 +150,11 @@ export function openTwin(handlers: Handlers): TwinLink {
     const next = new WebSocket(twinUrl());
     socket = next;
     next.onopen = () => {
-      handlers.onConnection(true);
       const queued = pending.splice(0, pending.length);
       for (const text of queued) {
         if (next.readyState === WebSocket.OPEN) next.send(text);
       }
+      handlers.onConnection(true);
     };
     next.onmessage = (event) => {
       let data: unknown;

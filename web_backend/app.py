@@ -6,7 +6,7 @@ import asyncio
 import queue
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -40,6 +40,7 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
     app.add_exception_handler(RequestValidationError, invalid_body)
     app.add_api_route("/health", health, methods=["GET"])
     app.add_api_route("/city", city_map, methods=["GET"])
+    app.add_api_route("/city/probe/{kapitel}", city_probe, methods=["GET"])
     app.add_api_websocket_route("/ws/twin", twin_socket)
     mount_drive(app)
     return app
@@ -54,6 +55,16 @@ def city_map() -> dict[str, object]:
     from city import CITY
 
     return CITY.to_dict()
+
+
+def city_probe(kapitel: str) -> dict[str, object]:
+    from city import CITY
+    from city_probe import payload
+
+    body = payload(CITY, kapitel)
+    if body is None:
+        raise HTTPException(status_code=404, detail="keine Stadtprobe")
+    return body
 
 
 def health(request: Request) -> dict[str, bool]:
@@ -86,6 +97,10 @@ async def twin_socket(websocket: WebSocket) -> None:
                     payload["applied_linear"] = view.get("applied_linear")
                     payload["applied_angular"] = view.get("applied_angular")
                     payload["clutter"] = view.get("clutter") or []
+                    payload["scene"] = view.get("scene")
+                    payload["arch"] = bool(view.get("arch"))
+                    payload["dock"] = bool(view.get("dock"))
+                    payload["runner"] = view.get("runner")
                     session["tick"] = int(session["tick"]) + 1
                     if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
                         payload["image"] = view["image"]
