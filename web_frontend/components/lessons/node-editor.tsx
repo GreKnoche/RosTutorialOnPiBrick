@@ -96,7 +96,7 @@ export function NodeEditor({
         onChange={(event) => setSource(event.target.value)}
         onKeyDown={onKeyDown}
         spellCheck={false}
-        className="min-h-[28rem] w-full resize-y rounded-lg border border-border bg-card p-3 font-mono text-xs leading-6 text-foreground"
+        className="min-h-[28rem] w-full resize-y rounded-lg border border-border bg-card p-3 font-mono text-[0.65rem] leading-5 text-foreground"
       />
       {status ? <p className="text-sm leading-6">{status}</p> : null}
     </div>

@@ -19,7 +19,7 @@ export function MarkdownBlock({
   const components: Components = {
     p: ({ children }) => <p className={paragraph}>{children}</p>,
     pre: ({ children }) => (
-      <pre className="max-w-2xl overflow-x-auto rounded-md border border-border bg-card p-3 font-mono text-xs leading-5">
+      <pre className="max-w-2xl overflow-x-auto rounded-md border border-border bg-card p-3 font-mono text-[0.65rem] leading-5">
         {children}
       </pre>
     ),

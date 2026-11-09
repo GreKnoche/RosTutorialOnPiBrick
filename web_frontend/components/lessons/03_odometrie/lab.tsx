@@ -202,7 +202,7 @@ export function OdometrieLab({
                   setSource(event.target.value);
                   run.session.clearFinished();
                 }}
-                className="min-h-52 w-full resize-y rounded-md bg-background px-3 py-2 font-mono text-sm leading-6 ring-1 ring-foreground/15"
+                className="min-h-52 w-full resize-y rounded-md bg-background px-3 py-2 font-mono text-[0.65rem] leading-5 ring-1 ring-foreground/15"
               />
             </label>
             <p className="text-sm leading-6">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const SOURCE = `"""Wegpunkte. Der Rest des Stacks läuft schon."""
+const SOURCE = `"""Wegpunkten folgen. Sammle alle Melonen."""
 
 import math
 
@@ -12,9 +12,9 @@ from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-# Hier die Punkte eintragen: x, y in Metern, theta in rad. Frame odom.
+# Rechtsklick auf der Karte kopiert (x, y, 0.0). Alle Melonen hier einfügen.
 POINTS = [
-    (2.45, 5.55, 0.0),
+    # (1.4, 5.59, 0.0),
 ]
 
 
@@ -67,8 +67,12 @@ if __name__ == "__main__":
 function readPoints(source: string): Array<[number, number, number]> | null {
   const block = source.match(/POINTS\s*=\s*\[([\s\S]*?)\]/);
   if (!block) return null;
+  const body = block[1]
+    .split("\n")
+    .map((line) => line.replace(/#.*$/, ""))
+    .join("\n");
   const triples = [
-    ...block[1].matchAll(
+    ...body.matchAll(
       /\(\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*\)/g,
     ),
   ];
@@ -78,13 +82,13 @@ function readPoints(source: string): Array<[number, number, number]> | null {
 
 export function WaypointNode() {
   const [source, setSource] = useState(SOURCE);
-  const [note, setNote] = useState("Der Rest läuft schon. Trag die Punkte ein.");
+  const [note, setNote] = useState("Rechtsklick kopiert einen Punkt. Füg die Melonen in POINTS ein.");
   const [busy, setBusy] = useState(false);
 
   async function drive(text = source) {
     const points = readPoints(text);
     if (!points) {
-      setNote("POINTS braucht mindestens einen Punkt, zum Beispiel (2.45, 5.55, 0.0).");
+      setNote("POINTS braucht mindestens einen Punkt, zum Beispiel (1.4, 5.59, 0.0).");
       return;
     }
     setBusy(true);
@@ -107,7 +111,7 @@ export function WaypointNode() {
   }
 
   return (
-    <section className="mt-6 flex flex-col gap-3">
+    <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">waypoint_lesson</h2>
         <button
@@ -124,7 +128,7 @@ export function WaypointNode() {
         onChange={(event) => setSource(event.target.value)}
         spellCheck={false}
         aria-label="ROS-Knoten"
-        className="min-h-80 w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-sm leading-6 text-[#f4efe4]"
+        className="min-h-[36rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
       />
       <p className="text-sm text-muted-foreground">{note}</p>
     </section>

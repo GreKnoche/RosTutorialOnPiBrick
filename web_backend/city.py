@@ -384,6 +384,11 @@ def _shade(color: tuple[int, int, int], scale: float) -> tuple[int, int, int]:
     return tuple(max(0, min(255, int(channel * scale))) for channel in color)  # type: ignore[return-value]
 
 
+# Lawn on the map, wider than the houses: from x=-7 west to x=18 east.
+SHORE_X0 = -7.0
+SHORE_X1 = 18.0
+
+
 def _shore(
     roads: list[list[tuple[float, float]]],
     houses: tuple[House, ...],
@@ -394,7 +399,8 @@ def _shore(
         xs.extend((house.x, house.x + house.w))
         ys.extend((house.y, house.y + house.h))
     margin = max(house.w for house in houses)
-    return (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+    x0, y0, x1, y1 = (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+    return (min(x0, SHORE_X0), y0, max(x1, SHORE_X1), y1)
 
 
 TUFT_CELL = 0.34

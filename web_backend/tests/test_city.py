@@ -195,9 +195,11 @@ def test_city_route_returns_the_same_map() -> None:
     assert body["start"] == {"x": CITY.start_x, "y": CITY.start_y, "theta": 0.0}
     assert body["view"] == {"width": 1.9, "height": 1.3}
     margin = max(house.w for house in CITY.houses)
-    xs = [point[0] for road in CITY.roads for point in road]
-    xs.extend(edge for house in CITY.houses for edge in (house.x, house.x + house.w))
-    assert math.isclose(body["shore"]["x"], min(xs) - margin, abs_tol=1e-6)
+    ys = [point[1] for road in CITY.roads for point in road]
+    ys.extend(edge for house in CITY.houses for edge in (house.y, house.y + house.h))
+    assert math.isclose(body["shore"]["x"], -7.0, abs_tol=1e-6)
+    assert math.isclose(body["shore"]["x"] + body["shore"]["w"], 18.0, abs_tol=1e-6)
+    assert math.isclose(body["shore"]["y"], min(ys) - margin, abs_tol=1e-6)
     assert len(body["houses"]) == len(CITY.houses)
     assert len(body["lanes"]) > 0
     assert body["houses"][1]["color"] == "#d4a036"

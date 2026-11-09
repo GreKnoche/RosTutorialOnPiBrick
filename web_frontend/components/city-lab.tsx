@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paintProbe } from "@/lib/city-layer";
@@ -20,8 +20,10 @@ import {
   cityPpm,
   cityScreen,
   clampZoom,
+  lookForTopRight,
 } from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
+import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { TRACK_CAR } from "@/lib/track-car";
 import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
 
@@ -292,6 +294,35 @@ function syncSize(canvas: HTMLCanvasElement, frame: HTMLDivElement | null) {
   return { width, height };
 }
 
+function drawMelon(ctx: CanvasRenderingContext2D, x: number, y: number, ppm: number) {
+  const r = Math.max(8, ppm * 0.11);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#1f8a3e";
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#145c28";
+  ctx.lineWidth = Math.max(1.5, r * 0.16);
+  ctx.stroke();
+  ctx.fillStyle = "#e23d4a";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1c1404";
+  for (const [sx, sy] of [
+    [-0.22, 0.02],
+    [0.2, 0.14],
+    [0.02, -0.28],
+    [-0.06, 0.3],
+  ] as const) {
+    ctx.beginPath();
+    ctx.ellipse(sx * r, sy * r, r * 0.07, r * 0.12, sx, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function draw(
   canvas: HTMLCanvasElement | null,
   frame: HTMLDivElement | null,
@@ -304,6 +335,7 @@ function draw(
   probe: CityProbe | null,
   runner: Rect | null,
   look: { x: number; y: number } | null,
+  melons: boolean[] | null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -373,6 +405,14 @@ function draw(
     ctx.stroke();
   }
 
+  if (melons) {
+    MELONS.forEach(([x, y], index) => {
+      if (!melons[index]) return;
+      const screen = to(x, y);
+      drawMelon(ctx, screen.x, screen.y, ppm);
+    });
+  }
+
   if (probe && city) {
     paintProbe(ctx, to, ppm, probe, city.graph, city.arch, city.dock, runner);
   }
@@ -425,7 +465,15 @@ function draw(
   ctx.textAlign = "start";
 }
 
-export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
+export function CityLab({
+  kapitel = null,
+  notice = null,
+  melons = false,
+}: {
+  kapitel?: string | null;
+  notice?: ReactNode;
+  melons?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
@@ -451,13 +499,17 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
   const motionRef = useRef({ linear: 0, angular: 0 });
   const kapitelRef = useRef(kapitel);
   kapitelRef.current = kapitel;
+  const melonsOnRef = useRef(melons);
+  melonsOnRef.current = melons;
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const zoomRef = useRef(ZOOM_DEFAULT);
   zoomRef.current = zoom;
-  const lookRef = useRef<{ x: number; y: number } | null>(null);
+  const lookRef = useRef<{ x: number; y: number } | null>(lookForTopRight());
   const dragRef = useRef<{ id: number; x: number; y: number; lookX: number; lookY: number } | null>(null);
+  const melonsRef = useRef(freshMelons());
+  const [melonsLeft, setMelonsLeft] = useState(MELONS.length);
   const [mapPin, setMapPin] = useState<MapPin | null>(null);
   const pinTimer = useRef<number | null>(null);
   const [readout, setReadout] = useState<Readout>({
@@ -546,7 +598,16 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
         probeRef.current,
         runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null),
         lookRef.current,
+        kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
       );
+      if (!kapitelRef.current && melonsOnRef.current) {
+        const pose = poseRef.current;
+        const next = takeMelons(melonsRef.current, pose.x, pose.y);
+        if (next !== melonsRef.current) {
+          melonsRef.current = next;
+          setMelonsLeft(next.filter(Boolean).length);
+        }
+      }
       const current = probeRef.current;
       if (current) {
         const runner = runnerRef.current;
@@ -619,6 +680,8 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
 
   const reset = () => {
     memoryRef.current = emptyMemory();
+    melonsRef.current = freshMelons();
+    setMelonsLeft(MELONS.length);
     const origin = probeRef.current?.start;
     const start = origin
       ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
@@ -678,8 +741,15 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
     const sy = event.clientY - rect.top;
     const view = lookRef.current ?? poseRef.current;
     const ppm = cssPpm();
-    const x = view.x + (sx - rect.width / 2) / ppm;
-    const y = view.y - (sy - rect.height / 2) / ppm;
+    let x = view.x + (sx - rect.width / 2) / ppm;
+    let y = view.y - (sy - rect.height / 2) / ppm;
+    if (!kapitel && melonsOnRef.current) {
+      const melon = nearestMelon(x, y);
+      if (melon) {
+        x = melon[0];
+        y = melon[1];
+      }
+    }
     const labelW = 148;
     const left = sx + 12 + labelW > rect.width ? Math.max(4, sx - labelW - 8) : sx + 12;
     const top = sy < 22 ? sy + 12 : sy - 18;
@@ -720,6 +790,12 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
           onPointerCancel={onPanEnd}
           onContextMenu={onMapMenu}
         />
+        {!kapitel && melons ? (
+          <p className="absolute top-3 left-3 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
+            {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${MELONS.length - melonsLeft}/${MELONS.length}`}
+          </p>
+        ) : null}
+        {notice}
         {mapPin ? (
           <span
             className="pointer-events-none absolute z-10 font-mono text-xs whitespace-nowrap text-[#d6f6ff]"

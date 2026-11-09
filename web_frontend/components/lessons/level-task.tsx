@@ -76,7 +76,7 @@ export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" |
         </div>
       ) : null}
       <NodeEditor track={lesson.track} lessonId={lesson.id} level={level} />
-      <p className="font-mono text-xs leading-6">
+      <p className="font-mono text-[0.65rem] leading-5">
         {file}
         <br />
         {command}
@@ -87,19 +87,19 @@ export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" |
           <li>
             Canvas: das Web-Backend ist der Twin auf dieser Seite. Es veröffentlicht /odom und
             nimmt /cmd_vel an, der Knoten bewegt also dieselbe Fläche. Dann{" "}
-            <code className="font-mono text-xs">
+            <code className="font-mono text-[0.65rem]">
               ros2 launch brick_bringup tutorial.launch.py backend:=canvas
             </code>
           </li>
           <li>
             Gazebo:{" "}
-            <code className="font-mono text-xs">
+            <code className="font-mono text-[0.65rem]">
               ros2 launch brick_bringup tutorial.launch.py backend:=gazebo
             </code>
           </li>
           <li>
             Hardware:{" "}
-            <code className="font-mono text-xs">
+            <code className="font-mono text-[0.65rem]">
               ros2 launch brick_bringup tutorial.launch.py backend:=hardware
             </code>
           </li>

@@ -12,11 +12,9 @@ import {
 export function TrackLessons({
   trackId,
   kicker,
-  bare = false,
 }: {
   trackId: TrackId;
   kicker: string;
-  bare?: boolean;
 }) {
   const track = getTrackMeta(trackId);
   const lessons = lessonsForTrack(trackId);
@@ -33,10 +31,10 @@ export function TrackLessons({
           <PathIcon id={trackId} className="size-10" />
           {track?.title ?? trackId}
         </h1>
-        {!bare && track?.description ? (
+        {track?.description ? (
           <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">{track.description}</p>
         ) : null}
-        {!bare && lessons.length > 0 ? (
+        {lessons.length > 0 ? (
           <div className="flex flex-wrap gap-2 text-sm">
             {ready > 0 && <Badge variant="default">{ready} Lektionen verfügbar</Badge>}
             <Badge variant="outline">{lessons.length - ready} Lektionen in Arbeit</Badge>
