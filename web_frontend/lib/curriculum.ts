@@ -356,18 +356,6 @@ const curriculum: Curriculum = {
       section: "basics",
       lab: "none",
       taughtTerms: ["Bringup"],
-    },    {
-      id: "09",
-      slug: "voxel-grid",
-      title: "nav2_voxel_grid – Hindernisse in der Höhe",
-      status: "ready",
-      nav2_surface: "nav2_voxel_grid",
-      summary:
-        "Das Voxel-Grid hält Hindernisse über dem Boden, damit die lokale Costmap nicht nur die Ebene sieht.",
-      track: "nav2",
-      section: "plugins",
-      lab: "none",
-      taughtTerms: ["Voxel-Grid"],
     },
     {
       id: "10",
@@ -501,18 +489,6 @@ const curriculum: Curriculum = {
       section: "beside",
       lab: "none",
       taughtTerms: ["Waypoint Follower"],
-    },
-    {
-      id: "23",
-      slug: "docking",
-      title: "nav2_docking – Die letzte Strecke zur Station",
-      status: "ready",
-      nav2_surface: "nav2_docking",
-      summary: "Navigation bringt den Roboter in die Nähe. Der Docking Server fährt die letzte Strecke an die Station.",
-      track: "nav2",
-      section: "beside",
-      lab: "none",
-      taughtTerms: ["Docking"],
     },
     {
       id: "24",

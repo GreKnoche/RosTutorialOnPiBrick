@@ -30,7 +30,6 @@ SPECS: dict[str, Spec] = {
     "06": Spec("karte", "leer", "karte", "start", "start", "Die schwarzen Zellen decken die Häuser. Die Querstraße bleibt frei."),
     "07": Spec("partikel", "leer", "partikel", "start", "versatz", "Bringe die Pose von der versetzten Stelle auf die Straßenmitte."),
     "08": Spec("kosten", "leer", "kosten", "nord", "start", "Der Pfad hält den Ring um die Häuser."),
-    "09": Spec("kosten", "kehre", "kosten", "kehre", "kehre", "Die Zelle unter dem Bogen ist teuer. Die Karte darunter bleibt frei."),
     "10": Spec("pfad", "kehre", "pfad", "kehre", "kehre", "Der Bogen folgt der Kehre, die der Radabstand fahren kann."),
     "11": Spec("pfad", "leer", "pfad", "ost", "start", "Die Sicht läuft entlang der Querstraße, mit weniger Knicken."),
     "12": Spec("pfad", "leer", "pfad", "end", "start", "Der Bogen an der Kreuzung bleibt außerhalb des Rings."),
@@ -44,7 +43,6 @@ SPECS: dict[str, Spec] = {
     "20": Spec("bahnen", "leer", "bahn", "kreuzung", "start", "Der Schritt auf der Straße ist kürzer als der Sprung."),
     "21": Spec("kosten", "kegel", "scan", "start", "start", "Senke /cmd_vel, solange der Kegel im Scan liegt und die Zelle noch frei ist."),
     "22": Spec("pfad", "leer", "wegpunkte", "nord", "start", "Triff zuerst die Kreuzung, dann das Nordziel."),
-    "23": Spec("pfad", "dock", "dock", "dock", "dock-nah", "Fahre die letzte Zelle bis an die Dock-Marke."),
     "24": Spec("bahnen", "dock", "folge", "dock", "start", "Halte Abstand zum Läufer auf der Querstraße."),
     "25": Spec("karte", "leer", "karte", "start", "start", "Die Karte liegt, sobald der Map Server active ist."),
     "26": Spec("pfad", "leer", "pose", "nord", "start", "Karte, Pose und der Auftrag liegen an. Fahre zum Nordziel."),
@@ -68,9 +66,6 @@ def start_pose(city: City, kapitel: str) -> tuple[float, float, float]:
     if kind == "dock-offen":
         dock = city.place("dock")
         return (dock.x - 0.55, dock.y, 0.5)
-    if kind == "dock-nah":
-        dock = city.place("dock")
-        return (dock.x - 0.32, dock.y, 0.0)
     if kind == "quer":
         return (origin.x, origin.y, math.pi / 2.0)
     return (origin.x, origin.y, origin.theta)
@@ -90,14 +85,13 @@ def payload(city: City, kapitel: str) -> dict[str, object] | None:
     route = _around(city) if spec.layer == "graph" else []
     goal = _goal(city, spec, path)
     start = start_pose(city, kapitel)
-    arch_cell = _arch_cell(city) if kapitel == "09" else None
     return {
         "kapitel": kapitel,
         "task": spec.task,
         "layer": spec.layer,
         "scene": spec.scene,
         "judge": spec.judge,
-        "ok": _ok(city, kapitel, path, tracks, route, cells, arch_cell),
+        "ok": _ok(city, kapitel, path, tracks, route, cells),
         "goal": {"x": goal[0], "y": goal[1], "theta": goal[2]},
         "start": {"x": start[0], "y": start[1], "theta": start[2]},
         "path": [{"x": px, "y": py} for px, py in path],
@@ -108,7 +102,6 @@ def payload(city: City, kapitel: str) -> dict[str, object] | None:
         "closed": "stamm-nord" if spec.layer == "graph" else None,
         "route": [{"x": px, "y": py} for px, py in route],
         "tracks": tracks,
-        "arch_cell": arch_cell,
         "kehre": {"x": city.place("kehre").x, "y": city.place("kehre").y},
         "kreuzung": {"x": city.place("kreuzung").x, "y": city.place("kreuzung").y},
     }
@@ -137,10 +130,9 @@ def _path(city: City, kapitel: str) -> list[tuple[float, float]]:
         return [(city.place("start").x, city.place("start").y), (city.right_x - 0.25, city.mid_y)]
     if kapitel == "12":
         return _fillet(city, 0.5)
-    if kapitel in {"16", "23"}:
+    if kapitel == "16":
         dock = city.place("dock")
-        begin = dock.x - (0.55 if kapitel == "16" else 0.32)
-        return [(begin, dock.y), (dock.x, dock.y)]
+        return [(dock.x - 0.55, dock.y), (dock.x, dock.y)]
     if kapitel in {"22", "26"}:
         start = city.place("start")
         cross = city.place("kreuzung")
@@ -217,16 +209,6 @@ def _cells(city: City) -> list[dict[str, object]]:
     road = city.place("start")
     cells.append({"x": road.x - step / 2.0, "y": road.y - step / 2.0, "s": step, "free": True})
     return cells
-
-
-def _arch_cell(city: City) -> dict[str, float]:
-    step = 0.2
-    arch = city.arch
-    return {
-        "x": arch.x + arch.w / 2.0 - step / 2.0,
-        "y": arch.y + arch.h / 2.0 - step / 2.0,
-        "s": step,
-    }
 
 
 def _particles(city: City) -> tuple[list[tuple[float, float]], tuple[float, float]]:
@@ -347,7 +329,6 @@ def _ok(
     tracks: list[dict[str, object]],
     route: list[tuple[float, float]],
     cells: list[dict[str, object]],
-    arch_cell: dict[str, float] | None,
 ) -> bool:
     if kapitel in {"01", "02", "03", "04", "05", "11", "22", "26"}:
         clear = _clear(path, city.houses, 0.05)
@@ -371,10 +352,6 @@ def _ok(
         house_hit = any(_inside(cell["x"] + 0.1, cell["y"] + 0.1, city.houses) for cell in occupied)
         road = free[0]
         return house_hit and not _inside(float(road["x"]) + 0.1, float(road["y"]) + 0.1, city.houses)
-    if kapitel == "09" and arch_cell is not None:
-        cx = arch_cell["x"] + arch_cell["s"] / 2.0
-        cy = arch_cell["y"] + arch_cell["s"] / 2.0
-        return not _inside(cx, cy, city.houses)
     if kapitel == "18":
         return _clear(route, city.houses, 0.05) and not _uses_short(route, city)
     if kapitel == "20":
@@ -383,7 +360,7 @@ def _ok(
         return bool(chosen) and min(chosen) < max(lengths)
     if kapitel in {"14", "15"}:
         return any(bool(track["chosen"]) for track in tracks) and len(tracks) >= 5
-    if kapitel in {"16", "23"}:
+    if kapitel == "16":
         return len(path) == 2
     return True
 

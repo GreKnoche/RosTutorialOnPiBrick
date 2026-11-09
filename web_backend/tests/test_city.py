@@ -302,7 +302,7 @@ def test_places_graph_and_one_layer_per_chapter() -> None:
     assert len(CITY.cones) == 5
     short = [edge for edge in CITY.graph if edge.short]
     assert [edge.id for edge in short] == ["stamm-nord"]
-    assert len(SPECS) == 26
+    assert len(SPECS) == 24
     layers = {spec.layer for spec in SPECS.values()}
     assert layers <= LAYERS
     for kapitel, spec in SPECS.items():
@@ -358,7 +358,7 @@ def test_a_probe_sets_the_scene_and_the_route_serves_it() -> None:
     assert len(CITY.clutter) == 5
     apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "07"})
     assert plant.odom.pose.y > CITY.start_y + 0.4
-    apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "09"})
+    apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "10"})
     assert CITY.arch_on is True
     assert CITY.scene == "kehre"
     apply_message(plant, {"type": "city", "enter": False, "client": "labor"})

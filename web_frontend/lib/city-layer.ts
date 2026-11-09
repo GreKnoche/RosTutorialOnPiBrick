@@ -60,7 +60,6 @@ function paintCost(ctx: CanvasRenderingContext2D, to: (x: number, y: number) => 
     }
     fillRect(ctx, to, cell, "rgba(251,146,60,0.55)");
   }
-  if (probe.archCell) fillRect(ctx, to, probe.archCell, ORANGE);
 }
 
 function paintParticles(

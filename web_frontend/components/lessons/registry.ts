@@ -17,8 +17,6 @@ import { AmclAnimation } from "@/components/lessons/amcl/animation";
 import { AmclLab } from "@/components/lessons/amcl/lab";
 import { CostmapAnimation } from "@/components/lessons/costmap/animation";
 import { CostmapLab } from "@/components/lessons/costmap/lab";
-import { VoxelGridAnimation } from "@/components/lessons/voxel-grid/animation";
-import { VoxelGridLab } from "@/components/lessons/voxel-grid/lab";
 import { SmacAnimation } from "@/components/lessons/smac/animation";
 import { SmacLab } from "@/components/lessons/smac/lab";
 import { ThetaStarAnimation } from "@/components/lessons/theta-star/animation";
@@ -47,8 +45,6 @@ import { CollisionMonitorAnimation } from "@/components/lessons/collision-monito
 import { CollisionMonitorLab } from "@/components/lessons/collision-monitor/lab";
 import { WaypointFollowerAnimation } from "@/components/lessons/waypoint-follower/animation";
 import { WaypointFollowerLab } from "@/components/lessons/waypoint-follower/lab";
-import { DockingAnimation } from "@/components/lessons/docking/animation";
-import { DockingLab } from "@/components/lessons/docking/lab";
 import { FollowingAnimation } from "@/components/lessons/following/animation";
 import { FollowingLab } from "@/components/lessons/following/lab";
 import { GyroskopAnimation } from "@/components/lessons/05_gyroskop/animation";
@@ -91,7 +87,6 @@ const lessonModules: Record<string, LessonModule> = {
   "nav2:map-server": { Animation: MapServerAnimation, Lab: MapServerLab },
   "nav2:amcl": { Animation: AmclAnimation, Lab: AmclLab },
   "nav2:costmap": { Animation: CostmapAnimation, Lab: CostmapLab },
-  "nav2:voxel-grid": { Animation: VoxelGridAnimation, Lab: VoxelGridLab },
   "nav2:smac": { Animation: SmacAnimation, Lab: SmacLab },
   "nav2:theta-star": { Animation: ThetaStarAnimation, Lab: ThetaStarLab },
   "nav2:smoother": { Animation: SmootherAnimation, Lab: SmootherLab },
@@ -117,7 +112,6 @@ const lessonModules: Record<string, LessonModule> = {
     Animation: WaypointFollowerAnimation,
     Lab: WaypointFollowerLab,
   },
-  "nav2:docking": { Animation: DockingAnimation, Lab: DockingLab },
   "nav2:following": { Animation: FollowingAnimation, Lab: FollowingLab },
   "nav2:lifecycle": { Animation: LifecycleAnimation, Lab: LifecycleLab },
   "nav2:bringup": { Animation: BringupAnimation, Lab: BringupLab },

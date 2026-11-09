@@ -162,12 +162,6 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
     medium: [meter],
     hard: [meter],
   },
-  "nav2:09": {
-    focus:
-      "nav2_voxel_grid hält Hindernisse in der Höhe. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht das Voxel-Grid.",
-    medium: [meter],
-    hard: [meter],
-  },
   "nav2:10": {
     focus:
       "nav2_smac_planner sucht einen fahrbaren Pfad. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht compute_path_to_pose.",
@@ -243,12 +237,6 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
   "nav2:22": {
     focus:
       "nav2_waypoint_follower schickt Ziele nacheinander. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht den Follower.",
-    medium: [meter],
-    hard: [meter],
-  },
-  "nav2:23": {
-    focus:
-      "nav2_docking fährt die letzte Strecke. Diese Aufgabe ruft /drive auf, 1 m nach Radodometrie, nicht den Docking Server.",
     medium: [meter],
     hard: [meter],
   },

@@ -19,7 +19,6 @@ export type CityProbe = {
   closed: string | null;
   route: ProbePoint[];
   tracks: ProbeTrack[];
-  archCell: ProbeCell | null;
   kehre: ProbePoint;
   kreuzung: ProbePoint;
 };
@@ -88,14 +87,6 @@ export function parseProbe(data: unknown): CityProbe | null {
     return null;
   }
   if (scene !== "leer" && scene !== "kegel" && scene !== "kehre" && scene !== "dock") return null;
-  const arch = body.arch_cell;
-  let archCell: ProbeCell | null = null;
-  if (arch && typeof arch === "object") {
-    const cell = arch as Record<string, unknown>;
-    if (typeof cell.x === "number" && typeof cell.y === "number") {
-      archCell = { x: cell.x, y: cell.y, s: num(cell.s, 0.2), free: false };
-    }
-  }
   const cells = Array.isArray(body.cells)
     ? body.cells.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -128,7 +119,6 @@ export function parseProbe(data: unknown): CityProbe | null {
     closed: typeof body.closed === "string" ? body.closed : null,
     route: points(body.route),
     tracks,
-    archCell,
     kehre,
     kreuzung,
   };
