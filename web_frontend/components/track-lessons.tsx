@@ -12,11 +12,9 @@ import {
 export function TrackLessons({
   trackId,
   kicker,
-  showSurface = false,
 }: {
   trackId: TrackId;
   kicker: string;
-  showSurface?: boolean;
 }) {
   const track = getTrackMeta(trackId);
   const lessons = lessonsForTrack(trackId);
@@ -47,7 +45,7 @@ export function TrackLessons({
           )}
         </div>
       </section>
-      <LessonIndex lessons={lessons} showSurface={showSurface} />
+      <LessonIndex lessons={lessons} />
     </div>
   );
 }

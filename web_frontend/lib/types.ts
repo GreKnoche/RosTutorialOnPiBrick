@@ -1,7 +1,6 @@
 export type LessonStatus = "ready" | "stub";
 export type LabKind = "teleop" | "goal" | "none";
 export type TrackId = "autonom" | "ros" | "nav2";
-export type Nav2SectionId = "basics" | "plugins" | "beside";
 
 export type Crumb = { href?: string; label: string };
 
@@ -18,9 +17,7 @@ export type Lesson = {
   status: LessonStatus;
   summary: string;
   track: TrackId;
-  section?: Nav2SectionId;
   lab: LabKind;
-  nav2_surface?: string;
   taughtTerms?: string[];
 };
 

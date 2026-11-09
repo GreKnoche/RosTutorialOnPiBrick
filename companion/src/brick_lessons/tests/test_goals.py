@@ -11,11 +11,11 @@ LEVELS = REPO / "web_frontend" / "lib" / "lesson-levels.ts"
 PACKAGE = Path(__file__).resolve().parents[1] / "brick_lessons"
 
 _LESSON = re.compile(
-    r'\{\s*id:\s*"(\d+)"[^{}]*?track:\s*"(autonom|ros|nav2)"',
+    r'\{\s*id:\s*"(\d+)"[^{}]*?track:\s*"(autonom|ros)"',
     re.S,
 )
 _LEVEL = re.compile(
-    r'"(autonom|ros|nav2):(\d+)":\s*\{(?P<body>.*?)\n  \},',
+    r'"(autonom|ros):(\d+)":\s*\{(?P<body>.*?)\n  \},',
     re.S,
 )
 _CONST = re.compile(

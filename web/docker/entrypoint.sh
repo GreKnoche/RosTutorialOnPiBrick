@@ -10,7 +10,7 @@ cd /ws/web_backend
 back=$!
 
 cd /ws/web_frontend
-/usr/local/bin/node node_modules/next/dist/bin/next start --port 61333 --hostname 127.0.0.1 &
+/usr/local/bin/node node_modules/next/dist/bin/next dev --port 61333 --hostname 127.0.0.1 &
 front=$!
 
 term() {

@@ -10,8 +10,15 @@ import {
   type CityProbe,
   type ProbeMemory,
 } from "@/lib/city-probe";
-import { CITY_VIEW_H, CITY_VIEW_W, SCAN_MIN, SCAN_STEP, cityScreen, clampZoom } from "@/lib/city-view";
-import { getLessonById } from "@/lib/curriculum";
+import {
+  CITY_VIEW_H,
+  CITY_VIEW_W,
+  SCAN_MIN,
+  SCAN_STEP,
+  ZOOM_DEFAULT,
+  cityScreen,
+  clampZoom,
+} from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
 import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
 
@@ -381,7 +388,13 @@ function draw(
   ctx.textAlign = "start";
 }
 
-export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
+export function CityLab({
+  kapitel = null,
+  embedded = false,
+}: {
+  kapitel?: string | null;
+  embedded?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
@@ -395,7 +408,6 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
   const generation = useRef(0);
   const [rosUp, setRosUp] = useState(false);
   const [mapUp, setMapUp] = useState(false);
-  const [image, setImage] = useState<string | null>(null);
   const [drift, setDrift] = useState(false);
   const [clutter, setClutter] = useState(false);
   const [rays, setRays] = useState(true);
@@ -410,8 +422,8 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
   kapitelRef.current = kapitel;
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
-  const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(1);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const zoomRef = useRef(ZOOM_DEFAULT);
   zoomRef.current = zoom;
   const [readout, setReadout] = useState<Readout>({
     x: 2.45,
@@ -464,7 +476,6 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
         runnerRef.current = sample.runner
           ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
           : null;
-        if (sample.image) setImage(sample.image);
         setReadout({
           x: sample.x,
           y: sample.y,
@@ -518,20 +529,12 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
     };
     step();
     const id = window.setInterval(step, 50);
-    const frame = frameRef.current;
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      setZoom((current) => clampZoom(current * (event.deltaY > 0 ? 1 / 1.12 : 1.12)));
-    };
-    frame?.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       window.clearInterval(id);
-      frame?.removeEventListener("wheel", onWheel);
     };
   }, [mapUp]);
 
-  const lesson = kapitel ? getLessonById("nav2", kapitel) : undefined;
-  titleRef.current = lesson?.title ?? kapitel ?? "";
+  titleRef.current = kapitel ?? "";
 
   useEffect(() => {
     memoryRef.current = emptyMemory();
@@ -599,16 +602,17 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-heading sm:text-4xl">Stadtlabor</h1>
+          {embedded ? (
+            <h2 className="text-2xl font-semibold tracking-tight text-heading">Stadtlabor</h2>
+          ) : (
+            <h1 className="text-3xl font-semibold tracking-tight text-heading sm:text-4xl">Stadtlabor</h1>
+          )}
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             Norden bleibt oben. Der Twin bleibt in der Mitte. Fahren geht nur über /cmd_vel. Häuser halten an, die Fahrspuren sind Farbe.
           </p>
           {probe ? (
             <div className="mt-3 max-w-xl rounded-lg border border-border bg-card px-3 py-3 text-sm">
-              <p className="font-mono text-xs text-muted-foreground">
-                {probe.kapitel}
-                {lesson ? ` · ${lesson.title}` : ""}
-              </p>
+              <p className="font-mono text-xs text-muted-foreground">{probe.kapitel}</p>
               <p className="mt-1">{probe.task}</p>
               <p className="mt-2 text-muted-foreground">{statusText || probe.task}</p>
             </div>
@@ -666,21 +670,6 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
               Lidar-Strahlen
             </label>
           </div>
-          <div className="overflow-hidden rounded-lg border border-border bg-black">
-            {image ? (
-              <img
-                alt="Kamerabild der Fahrspuren"
-                width={320}
-                height={240}
-                className="h-auto w-full"
-                src={`data:image/bmp;base64,${image}`}
-              />
-            ) : (
-              <div className="flex aspect-[4/3] items-center justify-center px-3 text-center text-sm text-white/70">
-                Kamera wartet auf /camera/image_raw
-              </div>
-            )}
-          </div>
           <dl className="space-y-1.5 rounded-lg border border-border bg-card px-3 py-3 font-mono text-[11px]">
             <div className="flex justify-between gap-3">
               <dt>Pose</dt>
@@ -711,9 +700,8 @@ export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
               : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
           </p>
           <p className="text-xs text-muted-foreground">
-            Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Mausrad zoomt. Topics /scan,
-            /camera/image_raw und /imu. In
-            rviz2 Fixed Frame odom, RobotModel auf /robot_description.
+            Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
+            /imu. In rviz2 Fixed Frame odom, RobotModel auf /robot_description.
           </p>
         </div>
       </div>

@@ -4,19 +4,17 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TwinStamp } from "@/components/logo-mark";
 import { useCompletedKeys } from "@/components/lesson-progress";
-import { lessonHref, nav2Sections, type Lesson, type Nav2SectionId } from "@/lib/curriculum";
+import { lessonHref, type Lesson } from "@/lib/curriculum";
 import { lessonProgressKey } from "@/lib/progress";
 
 function LessonRow({
   lesson,
   current,
-  detail,
   done,
   stampDone,
 }: {
   lesson: Lesson;
   current: boolean;
-  detail: string;
   done: boolean;
   stampDone: boolean;
 }) {
@@ -32,7 +30,7 @@ function LessonRow({
         <span className="block min-w-0 flex-1">
           <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
           <span className="ml-2 font-medium text-heading">{lesson.title}</span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{detail}</span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{lesson.summary}</span>
         </span>
         {done && stampDone ? <TwinStamp /> : null}
         {lesson.status === "ready" ? <Badge variant="default">verfügbar</Badge> : null}
@@ -41,35 +39,16 @@ function LessonRow({
   );
 }
 
-function lessonDetail(lesson: Lesson, showSurface: boolean) {
-  return showSurface && lesson.nav2_surface
-    ? `${lesson.nav2_surface} — ${lesson.summary}`
-    : lesson.summary;
-}
-
-function lessonGroups(lessons: Lesson[]) {
-  const groups: { section?: Nav2SectionId; lessons: Lesson[] }[] = [];
-  for (const lesson of lessons) {
-    const last = groups[groups.length - 1];
-    if (last && last.section === lesson.section) last.lessons.push(lesson);
-    else groups.push({ section: lesson.section, lessons: [lesson] });
-  }
-  return groups;
-}
-
-function LessonColumns({
+export function LessonIndex({
   lessons,
   currentId,
-  showSurface,
-  columns,
-  completed,
+  columns = 2,
 }: {
   lessons: Lesson[];
   currentId?: string;
-  showSurface: boolean;
-  columns: 1 | 2;
-  completed: string[];
+  columns?: 1 | 2;
 }) {
+  const completed = useCompletedKeys();
   const columnsOfLessons =
     columns === 2
       ? [lessons.slice(0, Math.ceil(lessons.length / 2)), lessons.slice(Math.ceil(lessons.length / 2))]
@@ -87,79 +66,12 @@ function LessonColumns({
               key={`${lesson.track}-${lesson.id}`}
               lesson={lesson}
               current={lesson.id === currentId}
-              detail={lessonDetail(lesson, showSurface)}
               done={completed.includes(lessonProgressKey(lesson.track, lesson.id))}
               stampDone={currentId !== undefined}
             />
           ))}
         </ol>
       ))}
-    </div>
-  );
-}
-
-export function LessonIndex({
-  lessons,
-  currentId,
-  showSurface = false,
-  columns = 2,
-  headingLevel = 2,
-}: {
-  lessons: Lesson[];
-  currentId?: string;
-  showSurface?: boolean;
-  columns?: 1 | 2;
-  headingLevel?: 2 | 3;
-}) {
-  const completed = useCompletedKeys();
-  const groups = lessonGroups(lessons);
-  const grouped = groups.some((group) => group.section);
-  if (!grouped) {
-    return (
-      <LessonColumns
-        lessons={lessons}
-        currentId={currentId}
-        showSurface={showSurface}
-        columns={columns}
-        completed={completed}
-      />
-    );
-  }
-
-  const Heading = headingLevel === 2 ? "h2" : "h3";
-
-  return (
-    <div className="flex flex-col gap-8">
-      {groups.map((group) => {
-        const meta = nav2Sections.find((section) => section.id === group.section);
-        return (
-          <section key={group.section ?? "plain"} className="flex flex-col gap-2">
-            {meta ? (
-              <div className="px-2">
-                <Heading
-                  className={
-                    headingLevel === 2
-                      ? "font-heading text-xl font-semibold tracking-tight text-heading"
-                      : "text-sm font-medium text-heading"
-                  }
-                >
-                  {meta.title}
-                </Heading>
-                {columns === 2 ? (
-                  <p className="text-sm leading-6 text-muted-foreground">{meta.description}</p>
-                ) : null}
-              </div>
-            ) : null}
-            <LessonColumns
-              lessons={group.lessons}
-              currentId={currentId}
-              showSurface={showSurface}
-              columns={columns}
-              completed={completed}
-            />
-          </section>
-        );
-      })}
     </div>
   );
 }

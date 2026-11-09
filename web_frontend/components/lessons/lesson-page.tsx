@@ -54,9 +54,6 @@ export function LessonPage({
             <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
               {lesson.title}
             </h1>
-            {lesson.nav2_surface && (
-              <p className="font-mono text-xs text-muted-foreground">{lesson.nav2_surface}</p>
-            )}
             <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">
               {lesson.summary}
             </p>
@@ -83,7 +80,6 @@ export function LessonPage({
                 lessonId={lesson.id}
                 showTopics={lesson.track !== "autonom"}
               />
-              {lesson.track === "nav2" ? <CityProbeLink id={lesson.id} /> : null}
             </>
           )}
           {level !== "beginner" ? <LevelTask lesson={lesson} level={level} /> : null}
@@ -92,13 +88,7 @@ export function LessonPage({
           <h2 className="px-2 text-sm font-medium text-heading">
             In diesem Lernpfad{track ? ` · ${track.title}` : ""}
           </h2>
-          <LessonIndex
-            lessons={lessons}
-            currentId={lesson.id}
-            showSurface={lesson.track === "nav2"}
-            columns={1}
-            headingLevel={3}
-          />
+          <LessonIndex lessons={lessons} currentId={lesson.id} columns={1} />
         </aside>
       </div>
       {next && (
@@ -136,18 +126,6 @@ function LessonBody({
       {terms.length > 0 ? <GlossarySpoiler terms={terms} /> : null}
       <Animation title={copy.animationTitle} />
       <Lab copy={copy} nextHref={nextHref} level={level} />
-      {lesson.track === "nav2" ? <CityProbeLink id={lesson.id} /> : null}
     </>
-  );
-}
-
-function CityProbeLink({ id }: { id: string }) {
-  return (
-    <p className="max-w-2xl text-sm leading-7">
-      Die Stadtprobe prüft dasselbe Kriterium an einem festen Ort.{" "}
-      <Link href={`/labor?kapitel=${id}`} className="font-medium text-heading underline-offset-4 hover:underline">
-        Im Stadtlabor öffnen
-      </Link>
-    </p>
   );
 }

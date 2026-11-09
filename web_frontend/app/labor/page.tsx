@@ -1,4 +1,4 @@
-import { CityLab } from "@/components/city-lab";
+import { redirect } from "next/navigation";
 
 export default async function LaborPage({
   searchParams,
@@ -6,5 +6,5 @@ export default async function LaborPage({
   searchParams: Promise<{ kapitel?: string }>;
 }) {
   const { kapitel } = await searchParams;
-  return <CityLab kapitel={kapitel ?? null} />;
+  redirect(kapitel ? `/nav2?kapitel=${encodeURIComponent(kapitel)}` : "/nav2");
 }

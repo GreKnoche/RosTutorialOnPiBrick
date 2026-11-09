@@ -4,6 +4,7 @@ export const CITY_VIEW_W = 1.9;
 export const CITY_VIEW_H = 1.3;
 export const ZOOM_MIN = 0.15;
 export const ZOOM_MAX = 2.5;
+export const ZOOM_DEFAULT = 0.7;
 
 export function clampZoom(zoom: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));

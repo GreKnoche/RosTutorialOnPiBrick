@@ -9,7 +9,6 @@ const links = [
   { href: "/autonom", label: "Autonom" },
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
-  { href: "/labor", label: "Labor" },
 ];
 
 function linkActive(href: string, pathname: string) {

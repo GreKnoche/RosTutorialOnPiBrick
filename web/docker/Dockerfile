@@ -3,9 +3,6 @@ FROM node:22-bookworm AS frontend
 WORKDIR /src/web_frontend
 COPY web_frontend/package.json web_frontend/package-lock.json ./
 RUN npm ci
-COPY web_frontend ./
-ENV NEXT_PUBLIC_ROBOT_API=http://127.0.0.1:8000
-RUN npm run build
 
 FROM ros:jazzy-ros-base
 

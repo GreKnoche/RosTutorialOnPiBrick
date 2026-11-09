@@ -9,5 +9,11 @@ services:
       - ../shared/ros.env
     environment:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - NEXT_PUBLIC_ROBOT_API=http://127.0.0.1:8000
     volumes:
       - ../companion/src/brick_lessons/brick_lessons:/ws/companion/src/brick_lessons/brick_lessons
+      - ../web_frontend:/ws/web_frontend
+      - web_frontend_modules:/ws/web_frontend/node_modules
+
+volumes:
+  web_frontend_modules:
