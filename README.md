@@ -9,7 +9,7 @@ ROS 2 Jazzy lab: BrickPi3 on a Raspberry Pi, companion odometry and Nav2 on a la
 | [`pi-brick/`](pi-brick/) | Raspberry Pi + BrickPi3 ROS 2 Docker node. |
 | [`gazebo/`](gazebo/) | Gazebo Harmonic overlay + `ros_gz_bridge`. |
 | [`camera_lidar/`](camera_lidar/) | Standalone ground-plane LaserScan from a forward camera. Gazebo starts it with `use_sim_time`. |
-| [`web-frontend/`](web-frontend/) | Next.js lesson UI. [How to add a lesson](web-frontend/README.md). |
+| [`web_frontend/`](web_frontend/) | Next.js lesson UI and the FastAPI door. [How to add a lesson](web_frontend/README.md). `cd web && docker compose up --build` serves both on port 61333. |
 
 Drive-to-pose (odom only):
 

@@ -16,6 +16,7 @@ gazebo/log
 pi-brick/build
 pi-brick/install
 pi-brick/log
-web-frontend/node_modules
+web_frontend/node_modules
+web_frontend/.next
 **/.idea
 **/.vscode

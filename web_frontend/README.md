@@ -3,11 +3,22 @@
 Die Oberfläche ist eine Next.js-App. Jede Lektion hat einen Eintrag im Verzeichnis und, sobald sie Text hat, eine Markdown-Datei. Die Twin-Steuerung bleibt TypeScript und kommt nur dazu, wenn die Lektion anders fährt als die bisherigen.
 
 ```bash
-cd web-frontend
+cd web_frontend
 npm run dev
 ```
 
 Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lektionen sind unter `/autonom/<slug>` erreichbar, ROS 2 unter `/ros/<slug>`, Nav2 unter `/nav2/<id>`.
+
+## Docker
+
+Frontend und Backend laufen zusammen. Der Container nutzt das Host-Netz, Port 61333 und Port 8000, und `ROS_DOMAIN_ID` aus `shared/ros.env`. Speichern im Editor schreibt weiter nach `companion/src/brick_lessons/brick_lessons/` auf dem Host.
+
+```bash
+cd web
+docker compose up --build
+```
+
+`npm run dev` bleibt der Weg zum Entwickeln. Die Smoke-Tests laufen auf dem Host, nicht im Container.
 
 ## Smoke-Tests
 
