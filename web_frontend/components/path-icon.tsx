@@ -1,13 +1,8 @@
+import { TRACK_CAR } from "@/lib/track-car";
 import type { TrackId } from "@/lib/types";
 
-const COLORS: Record<TrackId, string> = {
-  autonom: "#e11d2e",
-  ros: "#2f6fed",
-  nav2: "#e6b325",
-};
-
 export function PathIcon({ id, className = "size-8" }: { id: TrackId; className?: string }) {
-  const color = COLORS[id];
+  const color = TRACK_CAR[id];
   return (
     <svg viewBox="0 0 32 32" aria-hidden className={`shrink-0 ${className}`}>
       {id === "autonom" && (

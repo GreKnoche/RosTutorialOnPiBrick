@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paintProbe } from "@/lib/city-layer";
 import {
@@ -16,10 +17,12 @@ import {
   SCAN_MIN,
   SCAN_STEP,
   ZOOM_DEFAULT,
+  cityPpm,
   cityScreen,
   clampZoom,
 } from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
+import { TRACK_CAR } from "@/lib/track-car";
 import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
 
 type Point = { x: number; y: number };
@@ -42,6 +45,8 @@ type CityMap = {
   cones: Point[];
 };
 
+type MapPin = { left: number; top: number; x: number; y: number };
+
 type Readout = {
   x: number;
   y: number;
@@ -57,6 +62,36 @@ const BODY_W = 0.084;
 
 function num(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clipNumber(value: number) {
+  const trimmed = value.toFixed(2).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  return trimmed.includes(".") ? trimmed : `${trimmed}.0`;
+}
+
+function pointClip(x: number, y: number) {
+  return `(${clipNumber(x)}, ${clipNumber(y)}, 0.0)`;
+}
+
+function copyPoint(text: string) {
+  const clipboard = navigator.clipboard;
+  if (clipboard?.writeText) {
+    void clipboard.writeText(text).catch(() => copyPointFallback(text));
+    return;
+  }
+  copyPointFallback(text);
+}
+
+function copyPointFallback(text: string) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.left = "-9999px";
+  document.body.append(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
 }
 
 function parseCity(data: unknown): CityMap | null {
@@ -268,12 +303,14 @@ function draw(
   zoom: number,
   probe: CityProbe | null,
   runner: Rect | null,
+  look: { x: number; y: number } | null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const to = (x: number, y: number) => cityScreen(pose.x, pose.y, x, y, width, height, zoom);
+  const view = look ?? pose;
+  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
   const ppm = to(pose.x, pose.y).ppm;
 
   paintGround(ctx, to, city?.shore ?? null, width, height);
@@ -361,7 +398,7 @@ function draw(
   ctx.rotate(-pose.theta);
   const length = Math.max(BODY_L * ppm, 28);
   const widthBody = Math.max(BODY_W * ppm, 18);
-  ctx.fillStyle = "#e11d2e";
+  ctx.fillStyle = TRACK_CAR.nav2;
   ctx.strokeStyle = "#fff7ed";
   ctx.lineWidth = Math.max(1.5, ppm * 0.012);
   ctx.beginPath();
@@ -388,13 +425,7 @@ function draw(
   ctx.textAlign = "start";
 }
 
-export function CityLab({
-  kapitel = null,
-  embedded = false,
-}: {
-  kapitel?: string | null;
-  embedded?: boolean;
-}) {
+export function CityLab({ kapitel = null }: { kapitel?: string | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
@@ -425,6 +456,10 @@ export function CityLab({
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const zoomRef = useRef(ZOOM_DEFAULT);
   zoomRef.current = zoom;
+  const lookRef = useRef<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ id: number; x: number; y: number; lookX: number; lookY: number } | null>(null);
+  const [mapPin, setMapPin] = useState<MapPin | null>(null);
+  const pinTimer = useRef<number | null>(null);
   const [readout, setReadout] = useState<Readout>({
     x: 2.45,
     y: 5.55,
@@ -510,6 +545,7 @@ export function CityLab({
         zoomRef.current,
         probeRef.current,
         runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null),
+        lookRef.current,
       );
       const current = probeRef.current;
       if (current) {
@@ -598,47 +634,120 @@ export function CityLab({
 
   const yaw = (readout.theta * 180) / Math.PI;
 
+  const cssPpm = () => {
+    const frame = frameRef.current;
+    if (!frame) return 1;
+    const rect = frame.getBoundingClientRect();
+    return cityPpm(rect.width, rect.height, zoomRef.current) || 1;
+  };
+
+  const onPanDown = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (event.button !== 0) return;
+    const pose = poseRef.current;
+    const look = lookRef.current ?? { x: pose.x, y: pose.y };
+    dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lookX: look.x, lookY: look.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPanMove = (event: PointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (Math.hypot(dx, dy) < 3) return;
+    const ppm = cssPpm();
+    lookRef.current = { x: drag.lookX - dx / ppm, y: drag.lookY + dy / ppm };
+  };
+
+  const onPanEnd = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (dragRef.current?.id !== event.pointerId) return;
+    dragRef.current = null;
+  };
+
+  const recenter = () => {
+    lookRef.current = null;
+    dragRef.current = null;
+  };
+
+  const onMapMenu = (event: MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const frame = frameRef.current;
+    if (!frame) return;
+    const rect = frame.getBoundingClientRect();
+    const sx = event.clientX - rect.left;
+    const sy = event.clientY - rect.top;
+    const view = lookRef.current ?? poseRef.current;
+    const ppm = cssPpm();
+    const x = view.x + (sx - rect.width / 2) / ppm;
+    const y = view.y - (sy - rect.height / 2) / ppm;
+    const labelW = 148;
+    const left = sx + 12 + labelW > rect.width ? Math.max(4, sx - labelW - 8) : sx + 12;
+    const top = sy < 22 ? sy + 12 : sy - 18;
+    setMapPin({ left, top, x, y });
+    copyPoint(pointClip(x, y));
+    if (pinTimer.current !== null) window.clearTimeout(pinTimer.current);
+    pinTimer.current = window.setTimeout(() => {
+      pinTimer.current = null;
+      setMapPin(null);
+    }, 1600);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pinTimer.current !== null) window.clearTimeout(pinTimer.current);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          {embedded ? (
-            <h2 className="text-2xl font-semibold tracking-tight text-heading">Stadtlabor</h2>
-          ) : (
-            <h1 className="text-3xl font-semibold tracking-tight text-heading sm:text-4xl">Stadtlabor</h1>
-          )}
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Norden bleibt oben. Der Twin bleibt in der Mitte. Fahren geht nur über /cmd_vel. Häuser halten an, die Fahrspuren sind Farbe.
-          </p>
-          {probe ? (
-            <div className="mt-3 max-w-xl rounded-lg border border-border bg-card px-3 py-3 text-sm">
-              <p className="font-mono text-xs text-muted-foreground">{probe.kapitel}</p>
-              <p className="mt-1">{probe.task}</p>
-              <p className="mt-2 text-muted-foreground">{statusText || probe.task}</p>
-            </div>
-          ) : null}
+      {probe ? (
+        <div className="rounded-lg border border-border bg-card px-3 py-3 text-sm">
+          <p className="font-mono text-xs text-muted-foreground">{probe.kapitel}</p>
+          <p className="mt-1">{probe.task}</p>
+          <p className="mt-2 text-muted-foreground">{statusText || probe.task}</p>
         </div>
-        <Button type="button" onClick={reset} disabled={!rosUp}>
-          Zurücksetzen
+      ) : null}
+      <div
+        ref={frameRef}
+        className="relative aspect-[2/1] w-full overflow-hidden rounded-lg border border-border bg-[#4098d8]"
+      >
+        <canvas
+          ref={canvasRef}
+          className="h-full w-full cursor-grab touch-none active:cursor-grabbing"
+          onPointerDown={onPanDown}
+          onPointerMove={onPanMove}
+          onPointerUp={onPanEnd}
+          onPointerCancel={onPanEnd}
+          onContextMenu={onMapMenu}
+        />
+        {mapPin ? (
+          <span
+            className="pointer-events-none absolute z-10 font-mono text-xs whitespace-nowrap text-[#d6f6ff]"
+            style={{ left: mapPin.left, top: mapPin.top, textShadow: "0 1px 2px rgba(17,19,24,0.9)" }}
+          >
+            {formatDe(mapPin.x, 2)} m, {formatDe(mapPin.y, 2)} m
+          </span>
+        ) : null}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1">
+          <Button type="button" aria-label="Herauszoomen" onClick={() => setZoom((current) => clampZoom(current / 1.25))}>
+            −
+          </Button>
+          <Button type="button" aria-label="Hineinzoomen" onClick={() => setZoom((current) => clampZoom(current * 1.25))}>
+            +
+          </Button>
+        </div>
+        <Button
+          type="button"
+          aria-label="Auf das Auto zentrieren"
+          className="absolute right-3 bottom-3 size-9 px-0"
+          onClick={recenter}
+        >
+          <LocateFixed className="size-4" />
         </Button>
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div
-          ref={frameRef}
-          className="relative h-[calc(100dvh-13rem)] min-h-[40rem] overflow-hidden rounded-lg border border-border bg-[#4098d8]"
-        >
-          <canvas ref={canvasRef} className="h-full w-full" />
-          <div className="absolute bottom-3 left-3 flex items-center gap-1">
-            <Button type="button" aria-label="Herauszoomen" onClick={() => setZoom((current) => clampZoom(current / 1.25))}>
-              −
-            </Button>
-            <Button type="button" aria-label="Hineinzoomen" onClick={() => setZoom((current) => clampZoom(current * 1.25))}>
-              +
-            </Button>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 text-sm">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -670,7 +779,11 @@ export function CityLab({
               Lidar-Strahlen
             </label>
           </div>
-          <dl className="space-y-1.5 rounded-lg border border-border bg-card px-3 py-3 font-mono text-[11px]">
+          <Button type="button" onClick={reset} disabled={!rosUp}>
+            Zurücksetzen
+          </Button>
+        </div>
+        <dl className="grid gap-x-6 gap-y-1.5 rounded-lg border border-border bg-card px-3 py-3 font-mono text-[11px] sm:grid-cols-2">
             <div className="flex justify-between gap-3">
               <dt>Pose</dt>
               <dd>
@@ -703,7 +816,6 @@ export function CityLab({
             Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
             /imu. In rviz2 Fixed Frame odom, RobotModel auf /robot_description.
           </p>
-        </div>
       </div>
     </div>
   );

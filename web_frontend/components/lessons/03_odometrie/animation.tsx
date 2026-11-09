@@ -45,6 +45,7 @@ function OdometryDemo({ run }: { run: number }) {
         <RobotLab
           lab="none"
           lessonId="odometrie-demo"
+          track="autonom"
           showTopics={false}
           path={{
             circumferenceCm: DEMO_U,

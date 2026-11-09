@@ -1,4 +1,4 @@
-/** Bird's-eye window. North stays up, and the twin stays in the middle. */
+/** Bird's-eye window. North stays up. The view center follows the car until you drag. */
 
 export const CITY_VIEW_W = 1.9;
 export const CITY_VIEW_H = 1.3;
@@ -14,6 +14,11 @@ export function clampZoom(zoom: number) {
 export const SCAN_MIN = -Math.PI / 2;
 export const SCAN_STEP = Math.PI / 180;
 
+export function cityPpm(width: number, height: number, zoom = 1) {
+  const scale = clampZoom(zoom);
+  return Math.min(width / (CITY_VIEW_W / scale), height / (CITY_VIEW_H / scale));
+}
+
 export function cityScreen(
   poseX: number,
   poseY: number,
@@ -23,8 +28,7 @@ export function cityScreen(
   height: number,
   zoom = 1,
 ) {
-  const scale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
-  const ppm = Math.min(width / (CITY_VIEW_W / scale), height / (CITY_VIEW_H / scale));
+  const ppm = cityPpm(width, height, zoom);
   return {
     x: width / 2 + (worldX - poseX) * ppm,
     y: height / 2 - (worldY - poseY) * ppm,

@@ -78,6 +78,7 @@ export function LessonPage({
               <RobotLab
                 lab={lesson.lab}
                 lessonId={lesson.id}
+                track={lesson.track}
                 showTopics={lesson.track !== "autonom"}
               />
             </>

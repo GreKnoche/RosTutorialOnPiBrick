@@ -73,6 +73,7 @@ export function LessonStudio({
       <RobotLab
         lab="none"
         lessonId={lessonId}
+        track="autonom"
         showTopics={false}
         ruler={ruler}
         turn={turn}

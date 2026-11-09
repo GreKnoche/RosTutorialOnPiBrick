@@ -3,7 +3,7 @@ import { loadCurriculum, lessonHref, trackHref } from "../lib/curriculum";
 import { lessonLevelKey, lessonLevels } from "../lib/lesson-levels";
 
 const curriculum = loadCurriculum();
-const fixedPages = ["/", "/willkommen", "/auswahl", "/lernpfade", "/labor"];
+const fixedPages = ["/", "/auswahl", "/lernpfade", "/labor"];
 
 function watchPage(page: Page) {
   const errors: string[] = [];

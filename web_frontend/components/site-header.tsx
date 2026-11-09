@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/logo-mark";
 
 const links = [
-  { href: "/willkommen", label: "Start" },
+  { href: "/lernpfade", label: "Start" },
   { href: "/autonom", label: "Autonom" },
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },

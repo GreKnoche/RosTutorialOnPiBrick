@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { LabKind } from "@/lib/types";
+import { TRACK_CAR } from "@/lib/track-car";
+import type { LabKind, TrackId } from "@/lib/types";
 import { CanvasPlant, type WheelPath } from "@/lib/canvas-plant";
 import { DEFAULT_CHASSIS, type Chassis, type Pose2D, type Twist2D } from "@/lib/ev3-core";
 import { formatDe } from "@/lib/format";
@@ -43,6 +44,7 @@ export type PathDrive = {
 type Props = {
   lab: LabKind;
   lessonId: string;
+  track: TrackId;
   showTopics?: boolean;
   ruler?: RulerDrive;
   turn?: TurnDrive;
@@ -134,7 +136,7 @@ function jumped(reduced = true) {
   return reduced && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, overlay }: Props) {
+export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn, path, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const clientId = useRef(useId());
@@ -364,6 +366,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
           Boolean(pathSpec),
           pathSpec?.waypoints ?? [],
           pathSpec?.hits ?? [],
+          TRACK_CAR[track],
         );
       } catch (err) {
         console.error(err);
@@ -373,7 +376,7 @@ export function RobotLab({ lab, lessonId, showTopics = true, ruler, turn, path, 
     step();
     const id = window.setInterval(step, 50);
     return () => window.clearInterval(id);
-  }, [lab, lessonId, showTopics, rulerEnabled, turnEnabled, pathEnabled, showPlant]);
+  }, [lab, lessonId, showTopics, rulerEnabled, turnEnabled, pathEnabled, showPlant, track]);
 
   useEffect(() => {
     if (!rulerEnabled) return;
@@ -741,6 +744,7 @@ function draw(
   pathMode = false,
   waypoints: Pose2D[] = [],
   hits: boolean[] = [],
+  carColor: string = TRACK_CAR.ros,
 ) {
   if (!canvas) return;
   const size = syncCanvasSize(canvas, frame);
@@ -833,7 +837,7 @@ function draw(
   ctx.rotate(-pose.theta);
   const L = Math.max(twin.chassis.bodyLength * ppm, 36);
   const W = Math.max(twin.chassis.bodyWidth * ppm, 24);
-  ctx.fillStyle = "#e11d2e";
+  ctx.fillStyle = carColor;
   ctx.strokeStyle = "#fff7ed";
   ctx.lineWidth = stroke * 1.6;
   roundRect(ctx, -L / 2, -W / 2, L, W, Math.max(4, ppm * 0.012));
