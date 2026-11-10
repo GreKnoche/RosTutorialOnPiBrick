@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 
 const SOURCE = `"""Wegpunkten folgen. Sammle alle Melonen."""
 
 import math
 
 import rclpy
+from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
@@ -36,18 +37,31 @@ class Waypoints(Node):
         self._client = ActionClient(self, FollowWaypoints, "follow_waypoints")
 
     def run(self):
+        self.get_logger().info("warte auf follow_waypoints")
         self._client.wait_for_server()
+        if not POINTS:
+            self.get_logger().error("keine Wegpunkte")
+            return
         goal = FollowWaypoints.Goal()
         goal.poses = [pose(self, x, y, theta) for x, y, theta in POINTS]
-        goal.number_of_loops = 0
-        goal.goal_index = 0
+        self.get_logger().info(f"{len(goal.poses)} Wegpunkte")
         send = self._client.send_goal_async(goal)
         rclpy.spin_until_future_complete(self, send)
         handle = send.result()
         if handle is None or not handle.accepted:
+            self.get_logger().error("Ziel abgelehnt")
             return
         done = handle.get_result_async()
         rclpy.spin_until_future_complete(self, done)
+        outcome = done.result()
+        if outcome is None or outcome.status != GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().error("Wegpunkte nicht erreicht")
+            return
+        missed = [] if outcome.result is None else [item.index for item in outcome.result.missed_waypoints]
+        if missed:
+            self.get_logger().error(f"Manöver fehlte bei {missed}")
+            return
+        self.get_logger().info("alle Wegpunkte erreicht")
 
 
 def main():
@@ -64,51 +78,75 @@ if __name__ == "__main__":
     main()
 `;
 
-function readPoints(source: string): Array<[number, number, number]> | null {
-  const block = source.match(/POINTS\s*=\s*\[([\s\S]*?)\]/);
-  if (!block) return null;
-  const body = block[1]
-    .split("\n")
-    .map((line) => line.replace(/#.*$/, ""))
-    .join("\n");
-  const triples = [
-    ...body.matchAll(
-      /\(\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*\)/g,
-    ),
-  ];
-  if (triples.length === 0) return null;
-  return triples.map((item) => [Number(item[1]), Number(item[2]), Number(item[3])]);
-}
-
-export function WaypointNode() {
+export function WaypointNode({
+  tree,
+  plugin,
+  driveRef,
+  onBusy,
+}: {
+  tree?: string;
+  plugin: string;
+  driveRef: RefObject<() => void>;
+  onBusy?: (busy: boolean) => void;
+}) {
   const [source, setSource] = useState(SOURCE);
   const [note, setNote] = useState("Rechtsklick kopiert einen Punkt. Füg die Melonen in POINTS ein.");
   const [busy, setBusy] = useState(false);
+  const [watching, setWatching] = useState(false);
 
-  async function drive(text = source) {
-    const points = readPoints(text);
-    if (!points) {
-      setNote("POINTS braucht mindestens einen Punkt, zum Beispiel (1.4, 5.59, 0.0).");
-      return;
-    }
+  useEffect(() => {
+    if (!watching) return;
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const response = await fetch("/api/waypoint-run");
+        const body = (await response.json()) as { running?: boolean; log?: string };
+        if (cancel) return;
+        if (body.log) setNote(body.log);
+        if (!body.running) setWatching(false);
+      } catch {
+        if (!cancel) setNote("Der Knoten ist nicht erreichbar.");
+      }
+    };
+    const timer = setInterval(() => void tick(), 1000);
+    void tick();
+    return () => {
+      cancel = true;
+      clearInterval(timer);
+    };
+  }, [watching]);
+
+  const drive = useCallback(async (text = source, routine = plugin) => {
     setBusy(true);
-    setNote("Unterwegs.");
+    onBusy?.(true);
+    setWatching(false);
+    setNote("Baue maneuver_at_waypoint und starte Nav2.");
     try {
       const response = await fetch("/api/waypoint-run", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ points }),
+        body: JSON.stringify(tree === undefined ? { source: text, plugin: routine } : { source: text, plugin: routine, tree }),
       });
-      const body = (await response.json()) as { ok?: boolean; error?: string };
+      const body = (await response.json()) as { ok?: boolean; error?: string; running?: boolean; log?: string };
       if (!response.ok || !body.ok) {
         setNote(body.error || "Der Knoten ist nicht gestartet.");
+        return;
       }
+      if (body.log) setNote(body.log);
+      setWatching(body.running !== false);
     } catch {
       setNote("Der Knoten ist nicht gestartet.");
     } finally {
       setBusy(false);
+      onBusy?.(false);
     }
-  }
+  }, [onBusy, plugin, source, tree]);
+
+  useEffect(() => {
+    driveRef.current = () => {
+      void drive();
+    };
+  }, [drive, driveRef]);
 
   return (
     <section className="flex flex-col gap-3">
@@ -130,7 +168,7 @@ export function WaypointNode() {
         aria-label="ROS-Knoten"
         className="min-h-[36rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
       />
-      <p className="text-sm text-muted-foreground">{note}</p>
+      <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-sm text-muted-foreground">{note}</pre>
     </section>
   );
 }

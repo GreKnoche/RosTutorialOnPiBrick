@@ -160,6 +160,8 @@ def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -
     assert "image" not in hub.snapshot()
     assert hub.city_view()["image"] == "abc"
     assert hub.city_view()["ranges"] == [1.5, None]
+    hub.store_city([1.5, None], 0.1, 0.0, None, keep_image=False)
+    assert "image" not in hub.city_view()
     apply_message(plant, {"type": "city", "enter": False, "client": "labor"})
     assert plant.city is None
     assert math.isclose(plant.odom.pose.x, 0.0)
@@ -222,6 +224,22 @@ def test_houses_stay_off_the_asphalt() -> None:
         for px, py in samples:
             nearest = min(_dist_ribbon(px, py, ribbon) for ribbon in CITY._ribbons)
             assert nearest > limit, house.name
+
+
+def test_the_camera_stays_off_until_the_holder_asks() -> None:
+    plant = CanvasPlant()
+    apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
+    assert plant.camera is False
+    apply_message(plant, {"type": "flags", "client": "other", "camera": True})
+    assert plant.camera is False
+    apply_message(plant, {"type": "flags", "client": "labor", "drift": True, "camera": True})
+    assert plant.camera is True
+    assert plant.drift is True
+    apply_message(plant, {"type": "flags", "client": "labor", "camera": False})
+    assert plant.camera is False
+    assert plant.drift is True
+    apply_message(plant, {"type": "city", "enter": False, "client": "labor"})
+    assert plant.camera is False
 
 
 def test_drift_bends_the_heading_only_for_the_holder() -> None:

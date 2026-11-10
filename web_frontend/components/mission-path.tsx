@@ -6,7 +6,6 @@ import { Check, Lock, Play } from "lucide-react";
 type Step = {
   id: string;
   title: string;
-  task?: string;
 };
 
 type Phase = "wait" | "along" | "dock";
@@ -19,11 +18,25 @@ type Pose = {
 
 const STEPS: Step[] = [
   { id: "start", title: "Start" },
-  { id: "folgen", title: "Wegpunkten folgen", task: "Alle Melonen, Punkt für Punkt." },
-  { id: "wegpunkte", title: "Wegpunkte", task: "Mehrere Punkte, einer nach dem anderen." },
-  { id: "nochmal", title: "Nochmal", task: "Dieselbe Reihe, noch einmal." },
-  { id: "anhalten", title: "Anhalten", task: "Zu nah, und der Befehl stoppt." },
+  { id: "folgen", title: "Wegpunkten folgen" },
+  { id: "controller", title: "Controller" },
+  { id: "baum-1", title: "Behavior Tree 1" },
+  { id: "nochmal", title: "Nochmal" },
+  { id: "anhalten", title: "Anhalten" },
 ];
+
+const MELON_MISSIONS = new Set(["folgen", "nochmal"]);
+
+/** Melons belong to the open collect mission. A finished station clears the map. */
+export function melonMissionOpen(done: number) {
+  return done >= 0 && done < STEPS.length && MELON_MISSIONS.has(STEPS[done].id);
+}
+
+/** Behavior trees stay behind the controller chapter. */
+export function treeUnlocked(done: number) {
+  const index = STEPS.findIndex((step) => step.id === "baum-1");
+  return index >= 0 && done >= index;
+}
 
 const ASPHALT = "#454c5a";
 
@@ -63,11 +76,19 @@ function Driveway({ side }: { side: "left" | "right" }) {
   );
 }
 
-export function MissionPath({ onStart, active = false }: { onStart?: () => void; active?: boolean }) {
-  const done = 1;
+export function MissionPath({
+  onStart,
+  onComplete,
+  active = false,
+  done = 1,
+}: {
+  onStart?: () => void;
+  onComplete?: (done: number) => void;
+  active?: boolean;
+  done?: number;
+}) {
   const current = Math.min(done, STEPS.length - 1);
   const fromIndex = Math.max(0, done - 1);
-  const [open, setOpen] = useState(true);
   const [pose, setPose] = useState<Pose>({ x: 0, y: 0, heading: 90 });
   const [placed, setPlaced] = useState(false);
   const [glide, setGlide] = useState(false);
@@ -76,8 +97,6 @@ export function MissionPath({ onStart, active = false }: { onStart?: () => void;
   const nodeRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const phaseRef = useRef<Phase>("wait");
   const placeRef = useRef<() => void>(() => {});
-  const step = STEPS[current];
-
   placeRef.current = () => {
     const list = listRef.current;
     const road = roadRef.current;
@@ -151,9 +170,8 @@ export function MissionPath({ onStart, active = false }: { onStart?: () => void;
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
-                      if (state !== "current") return;
-                      if (!active) onStart?.();
-                      else setOpen((value) => !value);
+                      if (state !== "current" || active) return;
+                      onStart?.();
                     }}
                   />
                 ) : null}
@@ -172,21 +190,12 @@ export function MissionPath({ onStart, active = false }: { onStart?: () => void;
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
-                      if (state !== "current") return;
-                      if (!active) onStart?.();
-                      else setOpen((value) => !value);
+                      if (state !== "current" || active) return;
+                      onStart?.();
                     }}
                   />
                 ) : null}
               </div>
-              {state === "current" && open && step.task ? (
-                <div className={`row-start-2 mt-2 ${side === "right" ? "col-start-5 pl-1" : "col-start-1 pr-1"}`}>
-                  <div className="rounded-xl bg-card px-2 py-2 text-center ring-1 ring-border">
-                    <p className="text-xs font-medium text-heading">{step.title}</p>
-                    <p className="mt-1 text-[0.7rem] leading-4">{step.task}</p>
-                  </div>
-                </div>
-              ) : null}
             </li>
           );
         })}
@@ -204,6 +213,15 @@ export function MissionPath({ onStart, active = false }: { onStart?: () => void;
           <MiniTwin />
         </div>
       </ol>
+      {done < STEPS.length ? (
+        <button
+          type="button"
+          onClick={() => onComplete?.(Math.min(done + 1, STEPS.length))}
+          className="mt-5 rounded-full border border-dashed border-[#a67c12] px-3 py-1 text-xs font-medium text-[#6e4e08] hover:bg-[#f8e7b0]"
+        >
+          Mission erledigt
+        </button>
+      ) : null}
     </nav>
   );
 }
@@ -230,7 +248,9 @@ function NodeButton({
         type="button"
         disabled={state === "locked" || passed}
         aria-current={state === "current" ? "step" : undefined}
-        aria-label={passed ? `${item.title}, geschafft` : state === "locked" ? `${item.title}, zu` : item.title}
+        aria-label={
+          passed || state === "done" ? `${item.title}, geschafft` : state === "locked" ? `${item.title}, zu` : item.title
+        }
         onClick={onClick}
         className={`relative z-10 flex size-12 items-center justify-center rounded-full ${
           passed

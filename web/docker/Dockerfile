@@ -14,12 +14,14 @@ ENV ROS_DOMAIN_ID=71
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     python3-colcon-common-extensions \
     python3-pip \
     python3-venv \
     python3-yaml \
     ros-jazzy-action-msgs \
     ros-jazzy-nav-msgs \
+    ros-jazzy-navigation2 \
     ros-jazzy-rosidl-default-generators \
     ros-jazzy-sensor-msgs \
     ros-jazzy-tf2-ros \

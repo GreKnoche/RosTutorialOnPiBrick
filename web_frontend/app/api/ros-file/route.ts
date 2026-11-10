@@ -3,6 +3,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 const FILES: Record<string, string> = {
+  mission: "companion/src/brick_nav/behavior_trees/mission.xml",
   navigate_to_pose: "companion/src/brick_nav/behavior_trees/navigate_to_pose.xml",
 };
 

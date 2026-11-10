@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="maneuver_at_waypoint">
+    <class type="maneuver_at_waypoint::ManeuverAtWaypoint" base_class_type="nav2_core::WaypointTaskExecutor">
+      <description>Student cmd_vel maneuver at each waypoint.</description>
+    </class>
+  </library>
+</class_libraries>

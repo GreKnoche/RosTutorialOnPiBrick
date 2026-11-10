@@ -25,7 +25,9 @@ def _setup(context, *args, **kwargs):
         "config",
         "nav2_params_gazebo.yaml" if gazebo else "nav2_params.yaml",
     )
-    bt_xml = os.path.join(nav_share, "behavior_trees", "navigate_to_pose.xml")
+    bt_xml = context.perform_substitution(LaunchConfiguration("bt_xml")).strip()
+    if not bt_xml:
+        bt_xml = os.path.join(nav_share, "behavior_trees", "navigate_to_pose.xml")
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
     lifecycle_nodes = ["controller_server", "planner_server", "bt_navigator"]
 
@@ -115,6 +117,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument("chassis_file", default_value=""),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
+            DeclareLaunchArgument("bt_xml", default_value=""),
             OpaqueFunction(function=_setup),
         ]
     )

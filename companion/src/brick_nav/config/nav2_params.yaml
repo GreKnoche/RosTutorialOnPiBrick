@@ -85,8 +85,8 @@ global_costmap:
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
-      width: 6
-      height: 6
+      width: 40
+      height: 40
       resolution: 0.05
       robot_radius: 0.09
       track_unknown_space: false

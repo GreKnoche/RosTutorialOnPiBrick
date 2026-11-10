@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paintProbe } from "@/lib/city-layer";
@@ -323,31 +323,51 @@ function drawMelon(ctx: CanvasRenderingContext2D, x: number, y: number, ppm: num
   ctx.restore();
 }
 
-function draw(
-  canvas: HTMLCanvasElement | null,
-  frame: HTMLDivElement | null,
-  city: CityMap | null,
-  pose: { x: number; y: number; theta: number },
-  ranges: Array<number | null> | undefined,
-  clutter: Rect[],
-  showRays: boolean,
+type Screen = { x: number; y: number; ppm: number };
+
+const worldCache: { key: string; canvas: HTMLCanvasElement | null } = { key: "", canvas: null };
+
+function worldKey(
+  width: number,
+  height: number,
   zoom: number,
+  view: { x: number; y: number },
+  city: CityMap | null,
+  clutter: Rect[],
   probe: CityProbe | null,
   runner: Rect | null,
-  look: { x: number; y: number } | null,
-  melons: boolean[] | null,
 ) {
-  if (!canvas) return;
-  const { width, height } = syncSize(canvas, frame);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const view = look ?? pose;
-  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
-  const ppm = to(pose.x, pose.y).ppm;
+  const boxes = clutter.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}:${box.color}`).join(",");
+  const runnerKey = runner ? `${runner.x.toFixed(2)}:${runner.y.toFixed(2)}` : "";
+  const probeKey = probe
+    ? `${probe.kapitel}:${probe.scene}:${probe.layer}:${probe.cells.length}:${probe.path.length}:${probe.particles.length}`
+    : "";
+  return [
+    width,
+    height,
+    zoom.toFixed(4),
+    view.x.toFixed(3),
+    view.y.toFixed(3),
+    city ? `${city.houses.length}:${city.roads.length}:${city.edges.length}` : "0",
+    boxes,
+    probeKey,
+    runnerKey,
+  ].join("|");
+}
 
+function paintWorld(
+  ctx: CanvasRenderingContext2D,
+  to: (x: number, y: number) => Screen,
+  ppm: number,
+  city: CityMap | null,
+  clutter: Rect[],
+  probe: CityProbe | null,
+  runner: Rect | null,
+  width: number,
+  height: number,
+) {
   paintGround(ctx, to, city?.shore ?? null, width, height);
-
-  if (city) {
+  if (!city) return;
     ctx.fillStyle = "#3c3b38";
     for (const road of city.roads) {
       ctx.beginPath();
@@ -403,7 +423,60 @@ function draw(
       }
     }
     ctx.stroke();
+    if (probe) paintProbe(ctx, to, ppm, probe, city.graph, city.arch, city.dock, runner);
+}
+
+function cachedWorld(
+  width: number,
+  height: number,
+  zoom: number,
+  view: { x: number; y: number },
+  city: CityMap | null,
+  clutter: Rect[],
+  probe: CityProbe | null,
+  runner: Rect | null,
+) {
+  const key = worldKey(width, height, zoom, view, city, clutter, probe, runner);
+  let layer = worldCache.canvas;
+  if (!layer) {
+    layer = document.createElement("canvas");
+    worldCache.canvas = layer;
   }
+  if (worldCache.key === key && layer.width === width && layer.height === height) return layer;
+  layer.width = width;
+  layer.height = height;
+  const ctx = layer.getContext("2d");
+  if (!ctx) return layer;
+  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
+  paintWorld(ctx, to, to(view.x, view.y).ppm, city, clutter, probe, runner, width, height);
+  worldCache.key = key;
+  return layer;
+}
+
+function draw(
+  canvas: HTMLCanvasElement | null,
+  frame: HTMLDivElement | null,
+  city: CityMap | null,
+  pose: { x: number; y: number; theta: number },
+  ranges: Array<number | null> | undefined,
+  clutter: Rect[],
+  showRays: boolean,
+  zoom: number,
+  probe: CityProbe | null,
+  runner: Rect | null,
+  look: { x: number; y: number } | null,
+  melons: boolean[] | null,
+) {
+  if (!canvas) return;
+  const { width, height } = syncSize(canvas, frame);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const view = look ?? pose;
+  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
+  const ppm = to(pose.x, pose.y).ppm;
+  const layer = cachedWorld(width, height, zoom, view, city, clutter, probe, runner);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(layer, 0, 0);
 
   if (melons) {
     MELONS.forEach(([x, y], index) => {
@@ -411,10 +484,6 @@ function draw(
       const screen = to(x, y);
       drawMelon(ctx, screen.x, screen.y, ppm);
     });
-  }
-
-  if (probe && city) {
-    paintProbe(ctx, to, ppm, probe, city.graph, city.arch, city.dock, runner);
   }
 
   if (showRays && ranges) {
@@ -436,22 +505,22 @@ function draw(
   ctx.save();
   ctx.translate(center.x, center.y);
   ctx.rotate(-pose.theta);
-  const length = Math.max(BODY_L * ppm, 28);
-  const widthBody = Math.max(BODY_W * ppm, 18);
+  const length = BODY_L * ppm;
+  const widthBody = BODY_W * ppm;
   ctx.fillStyle = TRACK_CAR.nav2;
   ctx.strokeStyle = "#fff7ed";
-  ctx.lineWidth = Math.max(1.5, ppm * 0.012);
+  ctx.lineWidth = Math.max(0.5, ppm * 0.012);
   ctx.beginPath();
-  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, Math.max(3, ppm * 0.01));
+  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, ppm * 0.01);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#111318";
-  const wheel = Math.max(5, ppm * 0.02);
+  const wheel = ppm * 0.02;
   ctx.fillRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
   ctx.fillRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
   ctx.fillStyle = "#fff7ed";
   ctx.beginPath();
-  ctx.moveTo(length / 2 + 5, 0);
+  ctx.moveTo(length / 2 + length * 0.18, 0);
   ctx.lineTo(length / 2 - length * 0.22, -widthBody * 0.28);
   ctx.lineTo(length / 2 - length * 0.22, widthBody * 0.28);
   ctx.closePath();
@@ -469,10 +538,12 @@ export function CityLab({
   kapitel = null,
   notice = null,
   melons = false,
+  onMelonsCleared,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
   melons?: boolean;
+  onMelonsCleared?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -489,9 +560,12 @@ export function CityLab({
   const [mapUp, setMapUp] = useState(false);
   const [drift, setDrift] = useState(false);
   const [clutter, setClutter] = useState(false);
-  const [rays, setRays] = useState(true);
-  const raysRef = useRef(true);
+  const [camera, setCamera] = useState(false);
+  const [rays, setRays] = useState(false);
+  const raysRef = useRef(false);
   raysRef.current = rays;
+  const cameraRef = useRef(false);
+  const appliedRef = useRef({ linear: 0, angular: 0 });
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
   const runnerRef = useRef<Rect | null>(null);
@@ -501,6 +575,8 @@ export function CityLab({
   kapitelRef.current = kapitel;
   const melonsOnRef = useRef(melons);
   melonsOnRef.current = melons;
+  const clearedRef = useRef(onMelonsCleared);
+  clearedRef.current = onMelonsCleared;
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
@@ -510,6 +586,12 @@ export function CityLab({
   const dragRef = useRef<{ id: number; x: number; y: number; lookX: number; lookY: number } | null>(null);
   const melonsRef = useRef(freshMelons());
   const [melonsLeft, setMelonsLeft] = useState(MELONS.length);
+
+  useLayoutEffect(() => {
+    if (!melons) return;
+    melonsRef.current = freshMelons();
+    setMelonsLeft(MELONS.length);
+  }, [melons]);
   const [mapPin, setMapPin] = useState<MapPin | null>(null);
   const pinTimer = useRef<number | null>(null);
   const [readout, setReadout] = useState<Readout>({
@@ -544,40 +626,69 @@ export function CityLab({
     const token = ++generation.current;
     const session = `${clientId.current}:${token}`;
     sessionRef.current = session;
+    let readoutAt = 0;
+    let readoutTimer = 0;
+    const publishReadout = () => {
+      readoutAt = performance.now();
+      const pose = poseRef.current;
+      const motion = motionRef.current;
+      const applied = appliedRef.current;
+      setReadout({
+        x: pose.x,
+        y: pose.y,
+        theta: pose.theta,
+        linear: motion.linear,
+        angular: motion.angular,
+        appliedLinear: applied.linear,
+        appliedAngular: applied.angular,
+      });
+    };
     const link = openTwin({
       onConnection(up) {
         if (generation.current !== token) return;
         setRosUp(up);
         if (up) {
-          linkRef.current?.send({ type: "city", enter: true, client: session });
+          link.send({ type: "city", enter: true, client: session });
+          link.send({ type: "flags", client: session, camera: cameraRef.current });
           const id = kapitelRef.current;
-          if (id) linkRef.current?.send({ type: "probe", client: session, kapitel: id });
+          if (id) link.send({ type: "probe", client: session, kapitel: id });
         }
       },
       onState(sample: TwinState) {
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
         motionRef.current = { linear: sample.linear, angular: sample.angular };
+        appliedRef.current = {
+          linear: sample.appliedLinear ?? sample.linear,
+          angular: sample.appliedAngular ?? sample.angular,
+        };
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
         runnerRef.current = sample.runner
           ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
           : null;
-        setReadout({
-          x: sample.x,
-          y: sample.y,
-          theta: sample.theta,
-          linear: sample.linear,
-          angular: sample.angular,
-          appliedLinear: sample.appliedLinear ?? sample.linear,
-          appliedAngular: sample.appliedAngular ?? sample.angular,
-        });
+        const now = performance.now();
+        if (now - readoutAt >= 200) {
+          if (readoutTimer) {
+            window.clearTimeout(readoutTimer);
+            readoutTimer = 0;
+          }
+          publishReadout();
+          return;
+        }
+        if (!readoutTimer) {
+          readoutTimer = window.setTimeout(() => {
+            readoutTimer = 0;
+            publishReadout();
+          }, 200 - (now - readoutAt));
+        }
       },
       onDone() {},
     });
     linkRef.current = link;
     link.send({ type: "city", enter: true, client: session });
     return () => {
+      if (readoutTimer) window.clearTimeout(readoutTimer);
       link.send({ type: "city", enter: false, client: session });
       link.close();
       if (linkRef.current === link) linkRef.current = null;
@@ -585,27 +696,60 @@ export function CityLab({
   }, []);
 
   useEffect(() => {
+    let painted = "";
     const step = () => {
-      draw(
-        canvasRef.current,
-        frameRef.current,
-        cityRef.current,
-        poseRef.current,
-        rangesRef.current,
-        clutterRef.current,
-        raysRef.current,
+      const pose = poseRef.current;
+      const look = lookRef.current;
+      const view = look ?? pose;
+      const runner = runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null);
+      const frame = frameRef.current;
+      const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
+      const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
+      let signature = [
+        pose.x.toFixed(3),
+        pose.y.toFixed(3),
+        pose.theta.toFixed(3),
+        view.x.toFixed(3),
+        view.y.toFixed(3),
         zoomRef.current,
-        probeRef.current,
-        runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null),
-        lookRef.current,
-        kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
-      );
+        raysRef.current ? "1" : "0",
+        frame?.clientWidth ?? 0,
+        frame?.clientHeight ?? 0,
+        window.devicePixelRatio || 1,
+        melonsNow,
+        runner ? `${runner.x.toFixed(2)}:${runner.y.toFixed(2)}` : "",
+        boxes,
+        probeRef.current?.kapitel ?? "",
+        probeRef.current?.scene ?? "",
+      ].join("|");
+      if (raysRef.current && rangesRef.current) {
+        signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
+      }
+      if (signature !== painted) {
+        painted = signature;
+        draw(
+          canvasRef.current,
+          frameRef.current,
+          cityRef.current,
+          pose,
+          rangesRef.current,
+          clutterRef.current,
+          raysRef.current,
+          zoomRef.current,
+          probeRef.current,
+          runner,
+          look,
+          kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
+        );
+      }
       if (!kapitelRef.current && melonsOnRef.current) {
         const pose = poseRef.current;
         const next = takeMelons(melonsRef.current, pose.x, pose.y);
         if (next !== melonsRef.current) {
           melonsRef.current = next;
-          setMelonsLeft(next.filter(Boolean).length);
+          const left = next.filter(Boolean).length;
+          setMelonsLeft(left);
+          if (left === 0) clearedRef.current?.();
         }
       }
       const current = probeRef.current;
@@ -669,12 +813,14 @@ export function CityLab({
     });
   }, [kapitel, rosUp]);
 
-  const sendFlags = (nextDrift: boolean, nextClutter: boolean) => {
+  const sendFlags = (nextDrift: boolean, nextClutter: boolean, nextCamera: boolean) => {
+    cameraRef.current = nextCamera;
     linkRef.current?.send({
       type: "flags",
       client: sessionRef.current,
       drift: nextDrift,
       clutter: nextClutter,
+      camera: nextCamera,
     });
   };
 
@@ -832,7 +978,7 @@ export function CityLab({
                 onChange={(event) => {
                   const next = event.target.checked;
                   setDrift(next);
-                  sendFlags(next, clutter);
+                  sendFlags(next, clutter, camera);
                 }}
               />
               Drift
@@ -845,7 +991,7 @@ export function CityLab({
                 onChange={(event) => {
                   const next = event.target.checked;
                   setClutter(next);
-                  sendFlags(drift, next);
+                  sendFlags(drift, next, camera);
                 }}
               />
               Hindernisse
@@ -853,6 +999,19 @@ export function CityLab({
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={rays} onChange={(event) => setRays(event.target.checked)} />
               Lidar-Strahlen
+            </label>
+            <label className="flex items-center gap-2" title="Rendert /camera/image_raw. Aus lässt den Rechner ruhiger.">
+              <input
+                type="checkbox"
+                checked={camera}
+                disabled={!rosUp}
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setCamera(next);
+                  sendFlags(drift, clutter, next);
+                }}
+              />
+              Kamerabild
             </label>
           </div>
           <Button type="button" onClick={reset} disabled={!rosUp}>
@@ -890,7 +1049,8 @@ export function CityLab({
           </p>
           <p className="text-xs text-muted-foreground">
             Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
-            /imu. In rviz2 Fixed Frame odom, RobotModel auf /robot_description.
+            /imu. /camera/image_raw nur bei angehaktem Kamerabild. In rviz2 Fixed Frame odom, RobotModel auf
+            /robot_description.
           </p>
       </div>
     </div>

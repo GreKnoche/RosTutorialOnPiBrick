@@ -2,11 +2,11 @@
 
 The city lab also publishes /scan, /camera/image_raw, and /imu. Those three
 stay quiet until a lab page holds the city, so a lesson keeps the old graph.
+The camera frame is the expensive one: it stays off until that page asks.
 """
 
 from __future__ import annotations
 
-import base64
 import math
 from collections import deque
 
@@ -32,7 +32,6 @@ from city import (
     SCAN_COUNT,
     SCAN_INCREMENT,
     SCAN_MIN,
-    bmp_bytes,
 )
 from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message
 
@@ -266,8 +265,7 @@ class CanvasTwinNode(Node):
         self._imu_pub.publish(imu)
 
         self._sensor_tick += 1
-        image_b64 = None
-        if self._sensor_tick % 2 == 0:
+        if self.plant.camera and self._sensor_tick % 2 == 0:
             frame = Image()
             frame.header.stamp = now
             frame.header.frame_id = "camera_link"
@@ -276,15 +274,13 @@ class CanvasTwinNode(Node):
             frame.encoding = "rgb8"
             frame.is_bigendian = 0
             frame.step = IMAGE_W * 3
-            rgb = city.render(pose.x, pose.y, pose.theta)
-            frame.data = rgb
+            frame.data = city.render(pose.x, pose.y, pose.theta)
             self._image_pub.publish(frame)
-            image_b64 = base64.b64encode(bmp_bytes(rgb, IMAGE_W, IMAGE_H)).decode("ascii")
         self.hub.store_city(
             [None if not math.isfinite(item) else float(item) for item in ranges],
             float(self.plant.applied.linear),
             float(self.plant.applied.angular),
-            image_b64,
+            None,
             city.clutter_dicts(),
             {
                 "scene": city.scene,
@@ -292,4 +288,5 @@ class CanvasTwinNode(Node):
                 "dock": city.dock_on,
                 "runner": city.runner_dict() if city.runner_on else None,
             },
+            keep_image=False,
         )

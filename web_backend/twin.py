@@ -114,6 +114,7 @@ class CanvasPlant:
         self.city_holder: str | None = None
         self.probe: str | None = None
         self.drift = False
+        self.camera = False
         self._drift_rng = random.Random()
         self.applied = Twist2D()
         self.linear_accel = 0.0
@@ -149,6 +150,7 @@ class CanvasPlant:
         self.city_holder = client if isinstance(client, str) else None
         self.city = CITY
         self.drift = False
+        self.camera = False
         self.probe = None
         self.city.set_scene("leer")
         self.reset(CITY.start_x, CITY.start_y, CITY.start_theta)
@@ -159,19 +161,22 @@ class CanvasPlant:
         if self.city_holder is not None and client != self.city_holder:
             return
         self.drift = False
+        self.camera = False
         self.probe = None
         self.city.set_scene("leer")
         self.city = None
         self.city_holder = None
         self.reset(0.0, 0.0, 0.0)
 
-    def set_flags(self, drift: object, clutter: object) -> None:
+    def set_flags(self, drift: object, clutter: object, camera: object = None) -> None:
         if self.city is None:
             return
         if drift is not None:
             self.drift = bool(drift)
         if clutter is not None:
             self.city.set_clutter(bool(clutter))
+        if camera is not None:
+            self.camera = bool(camera)
 
     def command_twist(self, linear: float, angular: float) -> None:
         self._mode = "teleop"
@@ -407,7 +412,11 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
         return ApplyResult()
     if kind == "flags":
         if plant.city is not None and client_id == plant.city_holder:
-            plant.set_flags(payload.get("drift") if "drift" in payload else None, payload.get("clutter") if "clutter" in payload else None)
+            plant.set_flags(
+                payload.get("drift") if "drift" in payload else None,
+                payload.get("clutter") if "clutter" in payload else None,
+                payload.get("camera") if "camera" in payload else None,
+            )
         return ApplyResult()
     if kind == "probe":
         if plant.city is not None and client_id == plant.city_holder:
@@ -476,6 +485,7 @@ class TwinHub:
         image: str | None,
         clutter: list[dict[str, object]] | None = None,
         props: dict[str, object] | None = None,
+        keep_image: bool = True,
     ) -> None:
         with self._lock:
             view = dict(self._city_view)
@@ -484,7 +494,9 @@ class TwinHub:
             view["applied_angular"] = applied_angular
             if clutter is not None:
                 view["clutter"] = clutter
-            if image is not None:
+            if not keep_image:
+                view.pop("image", None)
+            elif image is not None:
                 view["image"] = image
             if props:
                 view.update(props)

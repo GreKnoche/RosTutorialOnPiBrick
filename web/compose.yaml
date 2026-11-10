@@ -12,6 +12,7 @@ services:
       - NEXT_PUBLIC_ROBOT_API=http://127.0.0.1:8000
     volumes:
       - ../companion/src/brick_lessons/brick_lessons:/ws/companion/src/brick_lessons/brick_lessons
+      - ../companion/src/brick_nav/behavior_trees:/ws/companion/src/brick_nav/behavior_trees:ro
       - ../web_frontend:/ws/web_frontend
       - web_frontend_modules:/ws/web_frontend/node_modules
 

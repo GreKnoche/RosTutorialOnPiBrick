@@ -209,7 +209,14 @@ def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch)
         twin.submit({"type": "city", "enter": True, "client": "labor"})
         _spin_until(
             executor,
-            lambda: bool(scans) and bool(yaws) and bool(images),
+            lambda: bool(scans) and bool(yaws),
+            5.0,
+        )
+        assert images == []
+        twin.submit({"type": "flags", "client": "labor", "camera": True})
+        _spin_until(
+            executor,
+            lambda: bool(images),
             5.0,
         )
         finite = [item for item in scans[-1] if math.isfinite(item)]
