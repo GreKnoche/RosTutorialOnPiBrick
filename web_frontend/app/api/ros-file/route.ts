@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
+import { followPathSection } from "@/lib/controller-yaml";
 
 const FILES: Record<string, string> = {
   mission: "companion/src/brick_nav/behavior_trees/mission.xml",
@@ -9,6 +10,18 @@ const FILES: Record<string, string> = {
 
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id") ?? "";
+  if (id === "controller") {
+    try {
+      const raw = await fs.readFile(path.join(process.cwd(), "scripts", "nav2_params.yaml"), "utf8");
+      const source = followPathSection(raw);
+      if (!source) {
+        return NextResponse.json({ ok: false, message: "FollowPath fehlt" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, source });
+    } catch {
+      return NextResponse.json({ ok: false, message: "Datei nicht gefunden" }, { status: 404 });
+    }
+  }
   const rel = FILES[id];
   if (!rel) {
     return NextResponse.json({ ok: false, message: "unbekannte Datei" }, { status: 400 });

@@ -49,18 +49,11 @@ type CityMap = {
 
 type MapPin = { left: number; top: number; x: number; y: number };
 
-type Readout = {
-  x: number;
-  y: number;
-  theta: number;
-  linear: number;
-  angular: number;
-  appliedLinear: number;
-  appliedAngular: number;
-};
-
 const BODY_L = 0.128;
 const BODY_W = 0.084;
+/** CSS pixels. Scaled by the canvas pixel ratio when drawing. */
+const MIN_BODY_L = 26;
+const MIN_BODY_W = 17;
 
 function num(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -466,6 +459,7 @@ function draw(
   runner: Rect | null,
   look: { x: number; y: number } | null,
   melons: boolean[] | null,
+  minBody: boolean,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -505,17 +499,19 @@ function draw(
   ctx.save();
   ctx.translate(center.x, center.y);
   ctx.rotate(-pose.theta);
-  const length = BODY_L * ppm;
-  const widthBody = BODY_W * ppm;
+  const dpr = width / Math.max(1, canvas.clientWidth || width);
+  const length = minBody ? Math.max(BODY_L * ppm, MIN_BODY_L * dpr) : BODY_L * ppm;
+  const widthBody = minBody ? Math.max(BODY_W * ppm, MIN_BODY_W * dpr) : BODY_W * ppm;
+  const glyph = length / BODY_L;
   ctx.fillStyle = TRACK_CAR.nav2;
   ctx.strokeStyle = "#fff7ed";
-  ctx.lineWidth = Math.max(0.5, ppm * 0.012);
+  ctx.lineWidth = Math.max(0.5, glyph * 0.012);
   ctx.beginPath();
-  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, ppm * 0.01);
+  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, glyph * 0.01);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#111318";
-  const wheel = ppm * 0.02;
+  const wheel = glyph * 0.02;
   ctx.fillRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
   ctx.fillRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
   ctx.fillStyle = "#fff7ed";
@@ -564,8 +560,10 @@ export function CityLab({
   const [rays, setRays] = useState(false);
   const raysRef = useRef(false);
   raysRef.current = rays;
+  const [minBody, setMinBody] = useState(true);
+  const minBodyRef = useRef(true);
+  minBodyRef.current = minBody;
   const cameraRef = useRef(false);
-  const appliedRef = useRef({ linear: 0, angular: 0 });
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
   const runnerRef = useRef<Rect | null>(null);
@@ -594,15 +592,6 @@ export function CityLab({
   }, [melons]);
   const [mapPin, setMapPin] = useState<MapPin | null>(null);
   const pinTimer = useRef<number | null>(null);
-  const [readout, setReadout] = useState<Readout>({
-    x: 2.45,
-    y: 5.55,
-    theta: 0,
-    linear: 0,
-    angular: 0,
-    appliedLinear: 0,
-    appliedAngular: 0,
-  });
 
   useEffect(() => {
     let cancel = false;
@@ -614,7 +603,6 @@ export function CityLab({
         cityRef.current = city;
         if (!havePose.current) poseRef.current = { ...city.start };
         setMapUp(true);
-        setReadout((current) => (havePose.current ? current : { ...current, ...city.start }));
       })
       .catch(() => {});
     return () => {
@@ -626,23 +614,6 @@ export function CityLab({
     const token = ++generation.current;
     const session = `${clientId.current}:${token}`;
     sessionRef.current = session;
-    let readoutAt = 0;
-    let readoutTimer = 0;
-    const publishReadout = () => {
-      readoutAt = performance.now();
-      const pose = poseRef.current;
-      const motion = motionRef.current;
-      const applied = appliedRef.current;
-      setReadout({
-        x: pose.x,
-        y: pose.y,
-        theta: pose.theta,
-        linear: motion.linear,
-        angular: motion.angular,
-        appliedLinear: applied.linear,
-        appliedAngular: applied.angular,
-      });
-    };
     const link = openTwin({
       onConnection(up) {
         if (generation.current !== token) return;
@@ -658,37 +629,17 @@ export function CityLab({
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
         motionRef.current = { linear: sample.linear, angular: sample.angular };
-        appliedRef.current = {
-          linear: sample.appliedLinear ?? sample.linear,
-          angular: sample.appliedAngular ?? sample.angular,
-        };
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
         runnerRef.current = sample.runner
           ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
           : null;
-        const now = performance.now();
-        if (now - readoutAt >= 200) {
-          if (readoutTimer) {
-            window.clearTimeout(readoutTimer);
-            readoutTimer = 0;
-          }
-          publishReadout();
-          return;
-        }
-        if (!readoutTimer) {
-          readoutTimer = window.setTimeout(() => {
-            readoutTimer = 0;
-            publishReadout();
-          }, 200 - (now - readoutAt));
-        }
       },
       onDone() {},
     });
     linkRef.current = link;
     link.send({ type: "city", enter: true, client: session });
     return () => {
-      if (readoutTimer) window.clearTimeout(readoutTimer);
       link.send({ type: "city", enter: false, client: session });
       link.close();
       if (linkRef.current === link) linkRef.current = null;
@@ -713,6 +664,7 @@ export function CityLab({
         view.y.toFixed(3),
         zoomRef.current,
         raysRef.current ? "1" : "0",
+        minBodyRef.current ? "1" : "0",
         frame?.clientWidth ?? 0,
         frame?.clientHeight ?? 0,
         window.devicePixelRatio || 1,
@@ -740,6 +692,7 @@ export function CityLab({
           runner,
           look,
           kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
+          minBodyRef.current,
         );
       }
       if (!kapitelRef.current && melonsOnRef.current) {
@@ -795,7 +748,6 @@ export function CityLab({
         setProbe(next);
         if (next && !havePose.current) {
           poseRef.current = { x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 };
-          setReadout((current) => ({ ...current, x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 }));
         }
       })
       .catch(() => {});
@@ -840,8 +792,6 @@ export function CityLab({
       theta: start.theta,
     });
   };
-
-  const yaw = (readout.theta * 180) / Math.PI;
 
   const cssPpm = () => {
     const frame = frameRef.current;
@@ -1000,6 +950,13 @@ export function CityLab({
               <input type="checkbox" checked={rays} onChange={(event) => setRays(event.target.checked)} />
               Lidar-Strahlen
             </label>
+            <label
+              className="flex items-center gap-2"
+              title="Hält das Auto lesbar, wenn die Karte weit herausgezoomt ist. Aus zeigt die echte Größe."
+            >
+              <input type="checkbox" checked={minBody} onChange={(event) => setMinBody(event.target.checked)} />
+              Mindestgröße
+            </label>
             <label className="flex items-center gap-2" title="Rendert /camera/image_raw. Aus lässt den Rechner ruhiger.">
               <input
                 type="checkbox"
@@ -1018,40 +975,16 @@ export function CityLab({
             Zurücksetzen
           </Button>
         </div>
-        <dl className="grid gap-x-6 gap-y-1.5 rounded-lg border border-border bg-card px-3 py-3 font-mono text-[11px] sm:grid-cols-2">
-            <div className="flex justify-between gap-3">
-              <dt>Pose</dt>
-              <dd>
-                {formatDe(readout.x, 2)} m, {formatDe(readout.y, 2)} m
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>/imu Gier</dt>
-              <dd>{formatDe(yaw, 1)}°</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>/cmd_vel</dt>
-              <dd>
-                {formatDe(readout.linear, 2)} m/s, {formatDe(readout.angular, 2)} rad/s
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>/odom</dt>
-              <dd>
-                {formatDe(readout.appliedLinear, 2)} m/s, {formatDe(readout.appliedAngular, 2)} rad/s
-              </dd>
-            </div>
-          </dl>
-          <p className="text-sm text-muted-foreground">
-            {rosUp
-              ? "Verbunden. Ein Befehl auf /cmd_vel bewegt den Twin."
-              : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
-            /imu. /camera/image_raw nur bei angehaktem Kamerabild. In rviz2 Fixed Frame odom, RobotModel auf
-            /robot_description.
-          </p>
+        <p className="text-sm text-muted-foreground">
+          {rosUp
+            ? "Verbunden. Ein Befehl auf /cmd_vel bewegt den Twin."
+            : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
+          /imu. /camera/image_raw nur bei angehaktem Kamerabild. In rviz2 Fixed Frame odom, RobotModel auf
+          /robot_description.
+        </p>
       </div>
     </div>
   );

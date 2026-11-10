@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from "react";
+import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
 
 const SOURCE = `"""Wegpunkten folgen. Sammle alle Melonen."""
 
@@ -78,18 +79,25 @@ if __name__ == "__main__":
     main()
 `;
 
+function readWaypoint() {
+  return readNav2Text("waypoint");
+}
+
 export function WaypointNode({
   tree,
+  controller,
   plugin,
   driveRef,
   onBusy,
 }: {
   tree?: string;
+  controller?: string;
   plugin: string;
   driveRef: RefObject<() => void>;
   onBusy?: (busy: boolean) => void;
 }) {
-  const [source, setSource] = useState(SOURCE);
+  const stored = useSyncExternalStore(subscribeDrafts, readWaypoint, serverText);
+  const source = stored ?? SOURCE;
   const [note, setNote] = useState("Rechtsklick kopiert einen Punkt. Füg die Melonen in POINTS ein.");
   const [busy, setBusy] = useState(false);
   const [watching, setWatching] = useState(false);
@@ -125,7 +133,12 @@ export function WaypointNode({
       const response = await fetch("/api/waypoint-run", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(tree === undefined ? { source: text, plugin: routine } : { source: text, plugin: routine, tree }),
+        body: JSON.stringify({
+          source: text,
+          plugin: routine,
+          ...(tree === undefined ? {} : { tree }),
+          ...(controller === undefined ? {} : { controller }),
+        }),
       });
       const body = (await response.json()) as { ok?: boolean; error?: string; running?: boolean; log?: string };
       if (!response.ok || !body.ok) {
@@ -140,7 +153,7 @@ export function WaypointNode({
       setBusy(false);
       onBusy?.(false);
     }
-  }, [onBusy, plugin, source, tree]);
+  }, [controller, onBusy, plugin, source, tree]);
 
   useEffect(() => {
     driveRef.current = () => {
@@ -163,7 +176,7 @@ export function WaypointNode({
       </div>
       <textarea
         value={source}
-        onChange={(event) => setSource(event.target.value)}
+        onChange={(event) => writeNav2Text("waypoint", event.target.value === SOURCE ? null : event.target.value)}
         spellCheck={false}
         aria-label="ROS-Knoten"
         className="min-h-[36rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"

@@ -32,6 +32,12 @@ export function melonMissionOpen(done: number) {
   return done >= 0 && done < STEPS.length && MELON_MISSIONS.has(STEPS[done].id);
 }
 
+/** The controller chapter opens once waypoint following is finished. */
+export function controllerUnlocked(done: number) {
+  const index = STEPS.findIndex((step) => step.id === "controller");
+  return index >= 0 && done >= index;
+}
+
 /** Behavior trees stay behind the controller chapter. */
 export function treeUnlocked(done: number) {
   const index = STEPS.findIndex((step) => step.id === "baum-1");

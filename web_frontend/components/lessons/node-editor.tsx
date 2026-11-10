@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { readNodeDraft, serverText, subscribeDrafts, writeNodeDraft } from "@/lib/browser-draft";
 import { lessonLevelKey, type LessonLevel } from "@/lib/lesson-levels";
 
 export function NodeEditor({
@@ -14,10 +15,20 @@ export function NodeEditor({
   level: Extract<LessonLevel, "medium" | "hard">;
 }) {
   const key = lessonLevelKey(track, lessonId);
-  const [source, setSource] = useState("");
-  const [saved, setSaved] = useState("");
+  const draftKey = `${track}:${lessonId}:${level}`;
+  const draft = useSyncExternalStore(subscribeDrafts, () => readNodeDraft(track, lessonId, level), serverText);
+  const [fileKey, setFileKey] = useState(draftKey);
+  const [file, setFile] = useState<string | null>(null);
   const [status, setStatus] = useState("Lade Knoten…");
   const [busy, setBusy] = useState(false);
+  let shownFile = file;
+  if (fileKey !== draftKey) {
+    shownFile = null;
+    setFileKey(draftKey);
+    setFile(null);
+    setStatus("Lade Knoten…");
+  }
+  const source = draft ?? shownFile ?? "";
 
   useEffect(() => {
     let cancel = false;
@@ -30,8 +41,7 @@ export function NodeEditor({
           setStatus(body.message ?? "Knoten nicht gefunden");
           return;
         }
-        setSource(body.source);
-        setSaved(body.source);
+        setFile(body.source);
         setStatus("");
       })
       .catch(() => {
@@ -56,7 +66,8 @@ export function NodeEditor({
         setStatus(body.message ?? "Speichern fehlgeschlagen");
         return;
       }
-      setSaved(source);
+      setFile(source);
+      writeNodeDraft(track, lessonId, level, null);
       setStatus(`Gespeichert. ros2 run brick_lessons ${key}_${level} startet diese Datei.`);
     } catch {
       setStatus("Speichern fehlgeschlagen");
@@ -72,7 +83,7 @@ export function NodeEditor({
     const start = target.selectionStart;
     const end = target.selectionEnd;
     const next = `${source.slice(0, start)}  ${source.slice(end)}`;
-    setSource(next);
+    writeNodeDraft(track, lessonId, level, next === file ? null : next);
     requestAnimationFrame(() => {
       target.selectionStart = start + 2;
       target.selectionEnd = start + 2;
@@ -83,7 +94,7 @@ export function NodeEditor({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium text-heading">Knoten</h3>
-        <Button type="button" onClick={save} disabled={busy || source === "" || source === saved}>
+        <Button type="button" onClick={save} disabled={busy || file === null || source === file}>
           Speichern
         </Button>
       </div>
@@ -93,7 +104,7 @@ export function NodeEditor({
       <textarea
         id={`node-${key}-${level}`}
         value={source}
-        onChange={(event) => setSource(event.target.value)}
+        onChange={(event) => writeNodeDraft(track, lessonId, level, event.target.value === file ? null : event.target.value)}
         onKeyDown={onKeyDown}
         spellCheck={false}
         className="min-h-[28rem] w-full resize-y rounded-lg border border-border bg-card p-3 font-mono text-[0.65rem] leading-5 text-foreground"

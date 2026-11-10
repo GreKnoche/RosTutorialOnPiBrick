@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { followPathError, mergeFollowPath } from "@/lib/controller-yaml";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,45 @@ function cacheDir(): string {
 
 function missionFile(): string {
   return path.resolve(process.cwd(), "..", "companion/src/brick_nav/behavior_trees/mission.xml");
+}
+
+function stockParams(): string {
+  return path.join(process.cwd(), "scripts", "nav2_params.yaml");
+}
+
+function yamlSyntaxError(text: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = spawn("python3", ["-c", "import sys, yaml\nyaml.safe_load(sys.stdin.read())"], { env: process.env });
+    let out = "";
+    let settled = false;
+    const finish = (message: string | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(message);
+    };
+    child.stderr?.on("data", (chunk) => {
+      out = (out + chunk.toString()).slice(-2_000);
+    });
+    child.once("error", () => finish("Die Controller-YAML lässt sich nicht prüfen."));
+    child.once("close", (code) => finish(code === 0 ? null : out.trim() || "Die Controller-YAML ist kein gültiges YAML."));
+    child.stdin?.end(text);
+  });
+}
+
+async function resolveParams(controller: string | null): Promise<{ file: string; error: string | null }> {
+  const stock = stockParams();
+  if (controller === null) return { file: stock, error: null };
+  const shape = followPathError(controller);
+  if (shape) return { file: stock, error: shape };
+  const base = await readFile(stock, "utf8").catch(() => "");
+  const merged = mergeFollowPath(base, controller);
+  if (!merged) return { file: stock, error: "FollowPath fehlt in nav2_params.yaml." };
+  const syntax = await yamlSyntaxError(merged);
+  if (syntax) return { file: stock, error: syntax };
+  const dest = path.join(cacheDir(), "nav2_params.yaml");
+  await mkdir(cacheDir(), { recursive: true });
+  await writeFile(dest, merged, "utf8");
+  return { file: dest, error: null };
 }
 
 function sourceOf(value: unknown): string | null {
@@ -208,7 +248,7 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
   return null;
 }
 
-async function ensureNav(navKey: string, treePath: string): Promise<string | null> {
+async function ensureNav(navKey: string, treePath: string, paramsPath: string): Promise<string | null> {
   if (slot.nav && slot.nav.exitCode === null && slot.navKey === navKey) return null;
   if (await foreignNavigator()) {
     return "Nav2 läuft schon ohne diese XML. Beende den anderen Stack und starte noch einmal.";
@@ -222,7 +262,7 @@ async function ensureNav(navKey: string, treePath: string): Promise<string | nul
   const command = [
     rosPrelude(),
     `source ${sh(pluginSetup)}`,
-    `exec ros2 launch ${sh(launch)} bt_xml:=${sh(treePath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(path.join(process.cwd(), "scripts", "nav2_params.yaml"))}`,
+    `exec ros2 launch ${sh(launch)} bt_xml:=${sh(treePath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)}`,
   ].join("\n");
   const child = startGroup(command);
   slot.nav = child;
@@ -254,11 +294,13 @@ function exitWithin(child: ChildProcess, ms: number): Promise<number | null> {
   });
 }
 
-async function runStudent(source: string, plugin: string, tree: string) {
+async function runStudent(source: string, plugin: string, tree: string, controller: string | null) {
   await stopStudent();
   slot.studentLog = "";
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
+  const params = await resolveParams(controller);
+  if (params.error) return { ok: false as const, error: params.error };
   const treePath = path.join(dir, "mission.xml");
   const sourcePath = path.join(dir, "waypoint_lesson.py");
   await writeFile(treePath, tree, "utf8");
@@ -266,8 +308,9 @@ async function runStudent(source: string, plugin: string, tree: string) {
   const pluginHash = createHash("sha256").update(plugin).digest("hex");
   const pluginError = await buildPlugin(plugin, pluginHash);
   if (pluginError) return { ok: false as const, error: pluginError };
-  const navKey = `${createHash("sha256").update(tree).digest("hex")}:${pluginHash}`;
-  const navError = await ensureNav(navKey, treePath);
+  const paramsBytes = await readFile(params.file, "utf8");
+  const navKey = `${createHash("sha256").update(tree).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}`;
+  const navError = await ensureNav(navKey, treePath, params.file);
   if (navError) return { ok: false as const, error: navError };
   const gen = slot.studentGen;
   const child = startGroup([rosPrelude(), `exec python3 -u ${sh(sourcePath)}`].join("\n"));
@@ -328,7 +371,17 @@ export async function POST(request: Request) {
   if (!chosen) {
     return Response.json({ ok: false, error: "mission.xml fehlt." }, { status: 500 });
   }
-  const result = await enqueue(() => runStudent(source, plugin, chosen));
+  let controller: string | null = null;
+  if (body && typeof body === "object" && "controller" in body && (body as { controller?: unknown }).controller !== undefined) {
+    const raw = (body as { controller?: unknown }).controller;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "FollowPath ist leer." }, { status: 400 });
+    }
+    controller = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = followPathError(controller);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
+  const result = await enqueue(() => runStudent(source, plugin, chosen, controller));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

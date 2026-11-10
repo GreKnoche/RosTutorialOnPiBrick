@@ -1,27 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CityLab } from "@/components/city-lab";
-import { MissionPath, melonMissionOpen, treeUnlocked } from "@/components/mission-path";
+import { MissionPath, controllerUnlocked, melonMissionOpen, treeUnlocked } from "@/components/mission-path";
 import { NavGraph } from "@/components/nav-graph";
+import { readNav2Progress, serverNav2Progress, subscribeDrafts, writeNav2Progress } from "@/lib/browser-draft";
 
 export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
-  const [started, setStarted] = useState(false);
+  const progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
   const [hint, setHint] = useState(false);
-  const [done, setDone] = useState(1);
+  const started = progress.started;
+  const done = progress.done;
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[24rem_minmax(0,1fr)]">
       <MissionPath
         active={started}
         done={done}
         onStart={() => {
-          setStarted(true);
+          writeNav2Progress({ started: true, done });
           setHint(true);
         }}
         onComplete={(next) => {
-          setStarted(true);
+          writeNav2Progress({ started: true, done: next });
           setHint(false);
-          setDone(next);
         }}
       />
       <div>
@@ -30,10 +31,10 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           melons={started && melonMissionOpen(done)}
           onMelonsCleared={() => {
             setHint(false);
-            setDone((current) => (melonMissionOpen(current) ? current + 1 : current));
+            if (melonMissionOpen(done)) writeNav2Progress({ started: true, done: done + 1 });
           }}
           notice={
-            hint ? (
+            started && hint ? (
               <button
                 type="button"
                 onClick={() => setHint(false)}
@@ -48,7 +49,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
             ) : null
           }
         />
-        {started ? <NavGraph tree={treeUnlocked(done)} /> : null}
+        {started ? <NavGraph controller={controllerUnlocked(done)} tree={treeUnlocked(done)} /> : null}
       </div>
     </div>
   );
