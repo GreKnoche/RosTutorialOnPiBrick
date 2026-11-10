@@ -6,6 +6,7 @@ const NAV2_TEXT_KEYS = {
   maneuver: "learn2ros.nav2.maneuver",
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",
+  follower: "learn2ros.nav2.follower",
 } as const;
 const NODES_KEY = "learn2ros.nodes";
 const MAX_TEXT = 100_000;

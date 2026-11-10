@@ -31,10 +31,13 @@ export type TwinDone = {
   poses: TwinGoal[];
 };
 
+export type TwinPhase = "connecting" | "up" | "down";
+
 type Handlers = {
   onConnection: (up: boolean) => void;
   onState: (sample: TwinState) => void;
   onDone: (msg: TwinDone) => void;
+  onPhase?: (phase: TwinPhase) => void;
 };
 
 export type TwinLink = {
@@ -143,10 +146,18 @@ export function openTwin(handlers: Handlers): TwinLink {
   let socket: WebSocket | null = null;
   let closed = false;
   let retry = 0;
+  let phase: TwinPhase = "down";
   const pending: string[] = [];
+
+  const setPhase = (next: TwinPhase) => {
+    if (phase === next) return;
+    phase = next;
+    handlers.onPhase?.(next);
+  };
 
   const connect = () => {
     if (closed) return;
+    setPhase("connecting");
     const next = new WebSocket(twinUrl());
     socket = next;
     next.onopen = () => {
@@ -167,6 +178,7 @@ export function openTwin(handlers: Handlers): TwinLink {
       const record = data as Record<string, unknown>;
       if (record.type === "offline") {
         handlers.onConnection(false);
+        setPhase("down");
         return;
       }
       if (record.type === "done") {
@@ -175,6 +187,7 @@ export function openTwin(handlers: Handlers): TwinLink {
         return;
       }
       if (record.type === "state") {
+        setPhase("up");
         const sample = asState(record);
         if (sample) handlers.onState(sample);
       }
@@ -182,6 +195,7 @@ export function openTwin(handlers: Handlers): TwinLink {
     next.onclose = () => {
       if (socket === next) socket = null;
       handlers.onConnection(false);
+      setPhase("down");
       if (!closed) retry = window.setTimeout(connect, 2000);
     };
   };

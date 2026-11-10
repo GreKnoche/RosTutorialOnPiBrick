@@ -185,6 +185,22 @@ def test_the_camera_shows_sky_road_and_a_house() -> None:
     assert struct.unpack_from("<I", along, 2)[0] == len(along)
 
 
+def test_the_finish_line_crosses_the_street_and_the_car_waits_in_front() -> None:
+    from city import BODY_LENGTH_M, FINISH_A, FINISH_B
+
+    assert len(CITY.finish) == 16
+    points = [corner for corners, _color in CITY.finish for corner in corners]
+    assert any(math.isclose(px, FINISH_A[0], abs_tol=1e-9) and math.isclose(py, FINISH_A[1], abs_tol=1e-9) for px, py in points)
+    assert any(math.isclose(px, FINISH_B[0], abs_tol=1e-9) and math.isclose(py, FINISH_B[1], abs_tol=1e-9) for px, py in points)
+    mid_x = (FINISH_A[0] + FINISH_B[0]) / 2.0
+    mid_y = (FINISH_A[1] + FINISH_B[1]) / 2.0
+    assert CITY.start_x < mid_x
+    assert math.isclose(CITY.start_y, mid_y, abs_tol=0.02)
+    assert CITY.start_theta == 0.0
+    nose_x = CITY.start_x + BODY_LENGTH_M / 2.0
+    assert nose_x < min(px for px, _py in points) + 0.02
+
+
 def test_city_route_returns_the_same_map() -> None:
     class Bridge:
         robot_ready = False

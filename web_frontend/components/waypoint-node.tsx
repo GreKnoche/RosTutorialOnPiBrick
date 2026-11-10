@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from "react";
+import { CodeEditor } from "@/components/code-editor";
 import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
 
 const SOURCE = `"""Wegpunkten folgen. Sammle alle Melonen."""
@@ -86,12 +87,14 @@ function readWaypoint() {
 export function WaypointNode({
   tree,
   controller,
+  follower,
   plugin,
   driveRef,
   onBusy,
 }: {
   tree?: string;
   controller?: string;
+  follower?: string;
   plugin: string;
   driveRef: RefObject<() => void>;
   onBusy?: (busy: boolean) => void;
@@ -138,6 +141,7 @@ export function WaypointNode({
           plugin: routine,
           ...(tree === undefined ? {} : { tree }),
           ...(controller === undefined ? {} : { controller }),
+          ...(follower === undefined ? {} : { follower }),
         }),
       });
       const body = (await response.json()) as { ok?: boolean; error?: string; running?: boolean; log?: string };
@@ -153,7 +157,7 @@ export function WaypointNode({
       setBusy(false);
       onBusy?.(false);
     }
-  }, [controller, onBusy, plugin, source, tree]);
+  }, [controller, follower, onBusy, plugin, source, tree]);
 
   useEffect(() => {
     driveRef.current = () => {
@@ -174,12 +178,12 @@ export function WaypointNode({
           Fahren
         </button>
       </div>
-      <textarea
+      <CodeEditor
         value={source}
-        onChange={(event) => writeNav2Text("waypoint", event.target.value === SOURCE ? null : event.target.value)}
-        spellCheck={false}
-        aria-label="ROS-Knoten"
-        className="min-h-[36rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
+        onChange={(value) => writeNav2Text("waypoint", value === SOURCE ? null : value)}
+        label="ROS-Knoten"
+        language="python"
+        height="h-[36rem]"
       />
       <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-sm text-muted-foreground">{note}</pre>
     </section>

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { followPathError, mergeFollowPath } from "@/lib/controller-yaml";
+import { followerError, mergeFollower } from "@/lib/follower-yaml";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,8 @@ type Slot = {
   navKey: string;
   pluginHash: string;
   studentGen: number;
+  starting: boolean;
+  startGen: number;
 };
 
 const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??= {
@@ -27,7 +30,11 @@ const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??=
   navKey: "",
   pluginHash: "",
   studentGen: 0,
+  starting: false,
+  startGen: 0,
 });
+slot.starting ??= false;
+slot.startGen ??= 0;
 
 let gate: Promise<void> = Promise.resolve();
 
@@ -87,14 +94,27 @@ function yamlSyntaxError(text: string): Promise<string | null> {
   });
 }
 
-async function resolveParams(controller: string | null): Promise<{ file: string; error: string | null }> {
+async function resolveParams(
+  controller: string | null,
+  follower: string | null,
+): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null) return { file: stock, error: null };
-  const shape = followPathError(controller);
-  if (shape) return { file: stock, error: shape };
-  const base = await readFile(stock, "utf8").catch(() => "");
-  const merged = mergeFollowPath(base, controller);
-  if (!merged) return { file: stock, error: "FollowPath fehlt in nav2_params.yaml." };
+  if (controller === null && follower === null) return { file: stock, error: null };
+  let merged = await readFile(stock, "utf8").catch(() => "");
+  if (controller !== null) {
+    const shape = followPathError(controller);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeFollowPath(merged, controller);
+    if (!next) return { file: stock, error: "FollowPath fehlt in nav2_params.yaml." };
+    merged = next;
+  }
+  if (follower !== null) {
+    const shape = followerError(follower);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeFollower(merged, follower);
+    if (!next) return { file: stock, error: "waypoint_follower fehlt in nav2_params.yaml." };
+    merged = next;
+  }
   const syntax = await yamlSyntaxError(merged);
   if (syntax) return { file: stock, error: syntax };
   const dest = path.join(cacheDir(), "nav2_params.yaml");
@@ -129,6 +149,7 @@ function treeOf(value: unknown): string | null {
 
 function push(target: "studentLog" | "navLog", chunk: Buffer | string) {
   slot[target] = (slot[target] + chunk.toString()).slice(-LOG_LIMIT);
+  if (target === "studentLog" && slot.studentLog.trim()) slot.starting = false;
 }
 
 function rosBash(command: string, limit = LOG_LIMIT): Promise<{ code: number; out: string }> {
@@ -294,36 +315,62 @@ function exitWithin(child: ChildProcess, ms: number): Promise<number | null> {
   });
 }
 
-async function runStudent(source: string, plugin: string, tree: string, controller: string | null) {
+function stopStarting(gen: number) {
+  if (slot.startGen === gen) slot.starting = false;
+}
+
+async function runStudent(
+  source: string,
+  plugin: string,
+  tree: string,
+  controller: string | null,
+  follower: string | null,
+) {
+  const gen = ++slot.startGen;
+  slot.starting = true;
   await stopStudent();
+  if (slot.startGen !== gen) return { ok: false as const, error: "Der Start wurde ersetzt." };
   slot.studentLog = "";
+  slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller);
-  if (params.error) return { ok: false as const, error: params.error };
+  const params = await resolveParams(controller, follower);
+  if (params.error) {
+    stopStarting(gen);
+    return { ok: false as const, error: params.error };
+  }
   const treePath = path.join(dir, "mission.xml");
   const sourcePath = path.join(dir, "waypoint_lesson.py");
   await writeFile(treePath, tree, "utf8");
   await writeFile(sourcePath, source, "utf8");
   const pluginHash = createHash("sha256").update(plugin).digest("hex");
   const pluginError = await buildPlugin(plugin, pluginHash);
-  if (pluginError) return { ok: false as const, error: pluginError };
+  if (pluginError) {
+    stopStarting(gen);
+    return { ok: false as const, error: pluginError };
+  }
   const paramsBytes = await readFile(params.file, "utf8");
   const navKey = `${createHash("sha256").update(tree).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}`;
   const navError = await ensureNav(navKey, treePath, params.file);
-  if (navError) return { ok: false as const, error: navError };
-  const gen = slot.studentGen;
+  if (navError) {
+    stopStarting(gen);
+    return { ok: false as const, error: navError };
+  }
+  const studentGen = slot.studentGen;
   const child = startGroup([rosPrelude(), `exec python3 -u ${sh(sourcePath)}`].join("\n"));
   slot.student = child;
-  watch(child, "studentLog", gen);
+  watch(child, "studentLog", studentGen);
   child.once("exit", () => {
     if (slot.student === child) slot.student = null;
+    stopStarting(gen);
   });
   const early = await exitWithin(child, 1500);
   if (early !== null && early !== 0) {
     if (slot.student === child) slot.student = null;
+    stopStarting(gen);
     return { ok: false as const, error: slot.studentLog.trim() || "Der Knoten ist sofort beendet." };
   }
+  if (slot.studentLog.trim()) stopStarting(gen);
   return { ok: true as const, running: early === null, log: slot.studentLog.trim() };
 }
 
@@ -338,8 +385,10 @@ function navErrors(): string {
 
 export async function GET() {
   const running = slot.student !== null && slot.student.exitCode === null;
-  const log = [slot.studentLog.trim(), running ? "" : navErrors()].filter(Boolean).join("\n");
-  return Response.json({ ok: true, running, log });
+  const student = slot.studentLog.trim();
+  const starting = slot.starting && !student;
+  const log = starting ? "" : [student, running ? "" : navErrors()].filter(Boolean).join("\n");
+  return Response.json({ ok: true, running, starting, log });
 }
 
 export async function POST(request: Request) {
@@ -381,7 +430,17 @@ export async function POST(request: Request) {
     const shape = followPathError(controller);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
-  const result = await enqueue(() => runStudent(source, plugin, chosen, controller));
+  let follower: string | null = null;
+  if (body && typeof body === "object" && "follower" in body && (body as { follower?: unknown }).follower !== undefined) {
+    const raw = (body as { follower?: unknown }).follower;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "waypoint_follower ist leer." }, { status: 400 });
+    }
+    follower = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = followerError(follower);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
+  const result = await enqueue(() => runStudent(source, plugin, chosen, controller, follower));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

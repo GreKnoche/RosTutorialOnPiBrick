@@ -142,7 +142,7 @@ export function MissionPath({
   }, []);
 
   return (
-    <nav aria-label="Missionen" className="mx-auto w-full max-w-xs lg:mx-0 lg:max-w-none">
+    <nav aria-label="Missionen" className="w-fit">
       <ol ref={listRef} className="relative flex flex-col gap-5 pt-3 pb-2">
         <div
           ref={roadRef}
@@ -164,7 +164,7 @@ export function MissionPath({
           const passed = item.id === "start";
           const side = index % 2 === 0 ? "left" : "right";
           return (
-            <li key={item.id} className="relative z-10 grid grid-cols-[minmax(0,1fr)_1.5rem_2.5rem_1.5rem_minmax(0,1fr)]">
+            <li key={item.id} className="relative z-10 grid grid-cols-[3rem_1.5rem_2.5rem_1.5rem_3rem]">
               <div className="flex flex-col items-end">
                 {side === "left" ? (
                   <NodeButton

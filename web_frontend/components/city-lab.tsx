@@ -25,7 +25,7 @@ import {
 import { formatDe } from "@/lib/format";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { TRACK_CAR } from "@/lib/track-car";
-import { ROBOT_API, openTwin, type TwinLink, type TwinState } from "@/lib/twin-socket";
+import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; w: number; h: number; color: string };
@@ -33,11 +33,13 @@ type Seg = { x0: number; y0: number; x1: number; y1: number };
 type Road = { points: Point[] };
 type Shore = { x: number; y: number; w: number; h: number };
 type GraphEdge = { id: string; short: boolean; points: Point[] };
+type FinishSquare = { points: Point[]; color: string };
 type CityMap = {
   start: { x: number; y: number; theta: number };
   roads: Road[];
   edges: Seg[];
   lanes: Seg[];
+  finish: FinishSquare[];
   houses: Rect[];
   shore: Shore;
   graph: GraphEdge[];
@@ -48,6 +50,32 @@ type CityMap = {
 };
 
 type MapPin = { left: number; top: number; x: number; y: number };
+
+function MiniTwin() {
+  return (
+    <svg width="16" height="10" viewBox="0 0 16 10" aria-hidden className="block">
+      <rect x="0.6" y="1.6" width="10.2" height="6.8" rx="1.2" fill="#e6b325" stroke="#fff7ed" strokeWidth="0.6" />
+      <rect x="2.4" y="0.35" width="2.2" height="1.5" rx="0.3" fill="#111318" />
+      <rect x="2.4" y="8.15" width="2.2" height="1.5" rx="0.3" fill="#111318" />
+      <path d="M11.2 5 L8.6 2.5 L8.6 7.5 Z" fill="#fff7ed" />
+    </svg>
+  );
+}
+
+function TwinOrbit() {
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status" aria-label="Knoten startet">
+      <span className="relative size-8">
+        <span className="absolute inset-2 rounded-full border border-neutral-500" />
+        <span className="absolute inset-0 animate-spin [animation-duration:1.4s] motion-reduce:animate-none">
+          <span className="absolute top-2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <MiniTwin />
+          </span>
+        </span>
+      </span>
+    </span>
+  );
+}
 
 const BODY_L = 0.128;
 const BODY_W = 0.084;
@@ -131,6 +159,7 @@ function parseCity(data: unknown): CityMap | null {
     roads: roads(record.roads),
     edges: segs(record.edges),
     lanes: segs(record.lanes),
+    finish: finishOf(record.finish),
     houses: rects(record.houses, true),
     shore: shoreOf(record.shore),
     graph: graphOf(record.graph),
@@ -139,6 +168,22 @@ function parseCity(data: unknown): CityMap | null {
     runner: rects(record.runner ? [record.runner] : [], false)[0] ?? null,
     cones: pointsOf(record.cones),
   };
+}
+
+function finishOf(value: unknown): FinishSquare[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const square = item as Record<string, unknown>;
+    if (!Array.isArray(square.points)) return [];
+    const points = square.points.flatMap((point) => {
+      if (!point || typeof point !== "object") return [];
+      const spot = point as Record<string, unknown>;
+      return [{ x: num(spot.x), y: num(spot.y) }];
+    });
+    const color = typeof square.color === "string" ? square.color : "#f4f4f2";
+    return points.length >= 3 ? [{ points, color }] : [];
+  });
 }
 
 function pointsOf(value: unknown): Point[] {
@@ -341,7 +386,7 @@ function worldKey(
     zoom.toFixed(4),
     view.x.toFixed(3),
     view.y.toFixed(3),
-    city ? `${city.houses.length}:${city.roads.length}:${city.edges.length}` : "0",
+    city ? `${city.houses.length}:${city.roads.length}:${city.edges.length}:${city.finish.length}` : "0",
     boxes,
     probeKey,
     runnerKey,
@@ -392,6 +437,17 @@ function paintWorld(
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
+    for (const square of city.finish) {
+      ctx.beginPath();
+      square.points.forEach((point, index) => {
+        const screen = to(point.x, point.y);
+        if (index === 0) ctx.moveTo(screen.x, screen.y);
+        else ctx.lineTo(screen.x, screen.y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = square.color;
+      ctx.fill();
+    }
     const cones =
       probe?.scene === "kegel" && clutter.length === 0
         ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#e87820" }))
@@ -544,7 +600,7 @@ export function CityLab({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
-  const poseRef = useRef({ x: 2.45, y: 5.55, theta: 0 });
+  const poseRef = useRef({ x: 1.6, y: 5.54, theta: 0 });
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const linkRef = useRef<TwinLink | null>(null);
@@ -553,6 +609,10 @@ export function CityLab({
   const sessionRef = useRef("");
   const generation = useRef(0);
   const [rosUp, setRosUp] = useState(false);
+  const [phase, setPhase] = useState<TwinPhase>("connecting");
+  const [nodeLog, setNodeLog] = useState("");
+  const [booting, setBooting] = useState(false);
+  const logRef = useRef<HTMLPreElement>(null);
   const [mapUp, setMapUp] = useState(false);
   const [drift, setDrift] = useState(false);
   const [clutter, setClutter] = useState(false);
@@ -624,6 +684,10 @@ export function CityLab({
           const id = kapitelRef.current;
           if (id) link.send({ type: "probe", client: session, kapitel: id });
         }
+      },
+      onPhase(next) {
+        if (generation.current !== token) return;
+        setPhase(next);
       },
       onState(sample: TwinState) {
         havePose.current = true;
@@ -783,7 +847,7 @@ export function CityLab({
     const origin = probeRef.current?.start;
     const start = origin
       ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
-      : (cityRef.current?.start ?? { x: 2.45, y: 5.55, theta: 0 });
+      : (cityRef.current?.start ?? { x: 1.6, y: 5.54, theta: 0 });
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -864,6 +928,36 @@ export function CityLab({
     };
   }, []);
 
+  useEffect(() => {
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const response = await fetch("/api/waypoint-run");
+        const body = (await response.json()) as { log?: string; starting?: boolean };
+        if (cancel) return;
+        const log = typeof body.log === "string" ? body.log : "";
+        setNodeLog(log);
+        setBooting(body.starting === true && log.trim() === "");
+      } catch {
+        if (!cancel) {
+          setNodeLog("");
+          setBooting(false);
+        }
+      }
+    };
+    const timer = window.setInterval(() => void tick(), 1000);
+    void tick();
+    return () => {
+      cancel = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const box = logRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [nodeLog]);
+
   return (
     <div className="flex flex-col gap-4">
       {probe ? (
@@ -886,11 +980,22 @@ export function CityLab({
           onPointerCancel={onPanEnd}
           onContextMenu={onMapMenu}
         />
+        <span
+          role="status"
+          title={phase === "up" ? "Verbunden" : phase === "connecting" ? "Verbinde" : "Nicht verbunden"}
+          aria-label={phase === "up" ? "Verbunden" : phase === "connecting" ? "Verbinde" : "Nicht verbunden"}
+          className={`absolute top-3 left-3 z-10 size-2.5 rounded-full ring-2 ring-neutral-900/80 ${
+            phase === "up" ? "bg-emerald-500" : phase === "connecting" ? "bg-amber-400" : "bg-red-500"
+          }`}
+        />
         {!kapitel && melons ? (
-          <p className="absolute top-3 left-3 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
+          <p className="absolute top-3 left-8 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
             {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${MELONS.length - melonsLeft}/${MELONS.length}`}
           </p>
         ) : null}
+        <p className="pointer-events-none absolute top-2 right-2 z-10 rounded bg-neutral-700/80 px-2 py-0.5 text-[0.7rem] text-neutral-300">
+          Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m
+        </p>
         {notice}
         {mapPin ? (
           <span
@@ -975,16 +1080,17 @@ export function CityLab({
             Zurücksetzen
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {rosUp
-            ? "Verbunden. Ein Befehl auf /cmd_vel bewegt den Twin."
-            : "Der Twin ist nicht verbunden. Die Karte erscheint, sobald das Labor läuft."}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m. Topics /scan und
-          /imu. /camera/image_raw nur bei angehaktem Kamerabild. In rviz2 Fixed Frame odom, RobotModel auf
-          /robot_description.
-        </p>
+        <div className="relative">
+          <pre
+            ref={logRef}
+            aria-label="Ausgabe von waypoint_lesson"
+            aria-busy={booting}
+            className="box-content h-8 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
+          >
+            {booting ? "" : nodeLog}
+          </pre>
+          {booting ? <TwinOrbit /> : null}
+        </div>
       </div>
     </div>
   );

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { WaypointNode } from "@/components/waypoint-node";
+import { CodeEditor } from "@/components/code-editor";
 import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
 import { followPathError } from "@/lib/controller-yaml";
+import { followerError } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 
 type Mission = "folgen" | "controller" | "baum-1";
@@ -54,20 +56,17 @@ function readController() {
   return text;
 }
 
+function readFollower() {
+  const text = readNav2Text("follower");
+  if (text && followerError(text)) return null;
+  return text;
+}
+
 function placeNode(node: GraphNode, controller: boolean, tree: boolean): GraphNode {
   if (node.id === "controller" && tree) return { ...node, x: 78 };
   if (node.id === "mission" && controller) return { ...node, x: 22 };
   return node;
 }
-
-const FOLLOWER_SOURCE = `waypoint_follower:
-  ros__parameters:
-    loop_rate: 20
-    stop_on_failure: false
-    waypoint_task_executor_plugin: "maneuver_at_waypoint"
-    maneuver_at_waypoint:
-      plugin: "maneuver_at_waypoint::ManeuverAtWaypoint"
-`;
 
 function nodeTone(selected: boolean) {
   const ring = selected ? "ring-2 ring-[#e6b325]" : "ring-1 ring-border";
@@ -86,15 +85,19 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
   const missionDraft = useSyncExternalStore(subscribeDrafts, readMission, serverText);
   const maneuverDraft = useSyncExternalStore(subscribeDrafts, readManeuver, serverText);
   const controllerDraft = useSyncExternalStore(subscribeDrafts, readController, serverText);
+  const followerDraft = useSyncExternalStore(subscribeDrafts, readFollower, serverText);
   const [fileXml, setFileXml] = useState<string | null>(null);
   const [xmlStatus, setXmlStatus] = useState("Lade Behavior Tree…");
   const [fileController, setFileController] = useState<string | null>(null);
   const [controllerStatus, setControllerStatus] = useState("Lade Controller…");
+  const [fileFollower, setFileFollower] = useState<string | null>(null);
+  const [followerStatus, setFollowerStatus] = useState("Lade waypoint_follower…");
   const [busy, setBusy] = useState(false);
   const driveRef = useRef<() => void>(() => {});
   const xml = missionDraft ?? fileXml ?? "";
   const maneuver = maneuverDraft ?? MANEUVER_PLUGIN_SOURCE;
   const controllerYaml = controllerDraft ?? fileController ?? "";
+  const followerYaml = followerDraft ?? fileFollower ?? "";
   const placed = span === 0 ? visible.map((node) => ({ ...node, x: 0, y: 50 })) : visible;
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
@@ -117,6 +120,27 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
       },
     ];
   });
+
+  useEffect(() => {
+    let cancel = false;
+    fetch("/api/ros-file?id=follower")
+      .then(async (response) => {
+        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
+        if (cancel) return;
+        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
+          setFollowerStatus(body.message ?? "Datei nicht gefunden");
+          return;
+        }
+        setFileFollower(body.source);
+        setFollowerStatus("");
+      })
+      .catch(() => {
+        if (!cancel) setFollowerStatus("Datei nicht gefunden");
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!tree) return;
@@ -208,6 +232,7 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
         <WaypointNode
           tree={tree && xmlStatus === "" ? xml : undefined}
           controller={controller && controllerStatus === "" ? controllerYaml : undefined}
+          follower={followerStatus === "" ? followerYaml : undefined}
           plugin={maneuver}
           driveRef={driveRef}
           onBusy={setBusy}
@@ -215,10 +240,25 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
       </div>
       {current.id === "waypoint_follower" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">waypoint_follower</h3>
-          <pre className="overflow-auto rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]">
-            {FOLLOWER_SOURCE}
-          </pre>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">waypoint_follower</h3>
+            <button
+              type="button"
+              onClick={() => driveRef.current()}
+              disabled={busy || followerStatus !== ""}
+              className="rounded-xl bg-[#e6b325] px-4 py-2 text-sm font-semibold text-[#1c1404] shadow-sm disabled:opacity-60"
+            >
+              Fahren
+            </button>
+          </div>
+          <CodeEditor
+            value={followerYaml}
+            onChange={(value) => writeNav2Text("follower", value === fileFollower ? null : value)}
+            label="waypoint_follower"
+            language="yaml"
+            height="h-[16rem]"
+          />
+          {followerStatus ? <p className="text-sm leading-6">{followerStatus}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
             Nach jedem erreichten Punkt ruft dieser Knoten maneuver() im Plugin auf.
           </p>
@@ -237,14 +277,12 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
               Fahren
             </button>
           </div>
-          <textarea
+          <CodeEditor
             value={controllerYaml}
-            onChange={(event) =>
-              writeNav2Text("controller", event.target.value === fileController ? null : event.target.value)
-            }
-            spellCheck={false}
-            aria-label="FollowPath"
-            className="min-h-[22rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
+            onChange={(value) => writeNav2Text("controller", value === fileController ? null : value)}
+            label="FollowPath"
+            language="yaml"
+            height="h-[28rem]"
           />
           {controllerStatus ? <p className="text-sm leading-6">{controllerStatus}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
@@ -255,12 +293,12 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
       {current.id === "mission" ? (
         <div className="flex flex-col gap-3">
           <h3 className="text-base font-semibold">mission.xml</h3>
-          <textarea
+          <CodeEditor
             value={xml}
-            onChange={(event) => writeNav2Text("mission", event.target.value === fileXml ? null : event.target.value)}
-            spellCheck={false}
-            aria-label="Behavior Tree mission"
-            className="min-h-[20rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
+            onChange={(value) => writeNav2Text("mission", value === fileXml ? null : value)}
+            label="Behavior Tree mission"
+            language="xml"
+            height="h-[20rem]"
           />
           {xmlStatus ? <p className="text-sm leading-6">{xmlStatus}</p> : null}
         </div>
@@ -278,14 +316,12 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
               Fahren
             </button>
           </div>
-          <textarea
+          <CodeEditor
             value={maneuver}
-            onChange={(event) =>
-              writeNav2Text("maneuver", event.target.value === MANEUVER_PLUGIN_SOURCE ? null : event.target.value)
-            }
-            spellCheck={false}
-            aria-label="Manöver maneuver_at_waypoint"
-            className="min-h-[36rem] w-full resize-y rounded-lg border border-border bg-[#1c1404] p-4 font-mono text-[0.65rem] leading-5 text-[#f4efe4]"
+            onChange={(value) => writeNav2Text("maneuver", value === MANEUVER_PLUGIN_SOURCE ? null : value)}
+            label="Manöver maneuver_at_waypoint"
+            language="cpp"
+            height="h-[36rem]"
           />
         </div>
       ) : null}

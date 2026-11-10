@@ -33,6 +33,10 @@ WATER = (64, 152, 216)
 ROAD = (60, 59, 56)
 EDGE = (244, 244, 242)
 LANE = (244, 214, 120)
+CHECK_LIGHT = (244, 244, 242)
+CHECK_DARK = (28, 28, 26)
+FINISH_A = (1.76, 5.89)
+FINISH_B = (1.8, 5.21)
 
 _VFOV = 2.0 * math.atan(math.tan(CAMERA_HFOV_RAD / 2.0) * IMAGE_H / IMAGE_W)
 _TAN_H = math.tan(CAMERA_HFOV_RAD / 2.0)
@@ -315,6 +319,46 @@ def _offset_side(points: list[tuple[float, float]], sign: float) -> list[tuple[f
         scale = min(half / dot, half * 3.0)
         side.append((x + sign * nx * scale, y + sign * ny * scale))
     return side
+
+
+def _finish_line(
+    a: tuple[float, float] = FINISH_A,
+    b: tuple[float, float] = FINISH_B,
+    cols: int = 8,
+    rows: int = 2,
+) -> tuple[list[tuple[list[tuple[float, float]], tuple[int, int, int]]], tuple[float, float, float]]:
+    """Checker band from ``a`` to ``b``, and a spawn just in front of its middle.
+
+    The band is centered on the segment. The spawn faces across it, one gap
+    clear of the near edge, so the nose sits in the middle of the street.
+    """
+    ax, ay = a
+    bx, by = b
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    ux, uy = dx / length, dy / length
+    px, py = -uy, ux
+    if px < 0.0:
+        px, py = -px, -py
+    cell = length / cols
+    squares: list[tuple[list[tuple[float, float]], tuple[int, int, int]]] = []
+    for col in range(cols):
+        for row in range(rows):
+            ox = ax + ux * cell * col + px * cell * (row - rows / 2.0)
+            oy = ay + uy * cell * col + py * cell * (row - rows / 2.0)
+            quad = [
+                (ox, oy),
+                (ox + ux * cell, oy + uy * cell),
+                (ox + ux * cell + px * cell, oy + uy * cell + py * cell),
+                (ox + px * cell, oy + py * cell),
+            ]
+            color = CHECK_LIGHT if (col + row) % 2 == 0 else CHECK_DARK
+            squares.append((quad, color))
+    mid_x = (ax + bx) / 2.0
+    mid_y = (ay + by) / 2.0
+    back = cell * (rows / 2.0) + 0.03 + BODY_LENGTH_M / 2.0
+    spawn = (mid_x - px * back, mid_y - py * back, 0.0)
+    return squares, spawn
 
 
 def _ribbon_polygon(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -676,9 +720,9 @@ class City:
         spur_end = yp(577.0)
         self.width = right_x - left_x + 2.4
         self.height = top_y - spur_end + 2.2
-        self.start_x = left_x + 1.05
-        self.start_y = mid_y
-        self.start_theta = 0.0
+        self.finish, spawn = _finish_line()
+        self.start_x, self.start_y, self.start_theta = spawn
+        self._lane_x = left_x + 1.05
         self._ribbons = [
             _straight(top_left, top_y, top_right, top_y),
             _bend(top_left, corner_y, corner, math.pi, math.pi / 2.0),
@@ -730,7 +774,7 @@ class City:
                 if not _near_ribbon(mid_x, mid_y_mark, self._ribbons, index, ROAD_W * 0.8):
                     self.lanes.append(mark)
         self._spots = (
-            (self.start_x + 2.15, mid_y),
+            (self._lane_x + 2.15, mid_y),
             (right_x - 1.15, mid_y),
             (stem_x, (top_y + mid_y) / 2.0),
             (left_u_x, left_u_y - u_r),
@@ -763,7 +807,7 @@ class City:
             (72, 78, 88),
         )
         mark_w, mark_h = 0.26, 0.1
-        mark_x = self.start_x + 1.7
+        mark_x = self._lane_x + 1.7
         mark_y = mid_y - ROAD_W / 2.0 - mark_h - 0.02
         self.dock = Mark(mark_x, mark_y, mark_w, mark_h)
         dock_x = mark_x + mark_w / 2.0
@@ -780,7 +824,7 @@ class City:
         )
         self.cones = tuple(self._spots)
         self.graph = _graph(self._ribbons, stem_x, mid_y)
-        self.runner_s = (self.start_x + 0.55) - left_x
+        self.runner_s = (self._lane_x + 0.55) - left_x
 
     def place(self, name: str) -> Place:
         for item in self.places:
@@ -801,7 +845,7 @@ class City:
         self.dock_on = self.scene == "dock"
         self.runner_on = self.scene == "dock"
         if self.runner_on:
-            self.runner_s = (self.start_x + 0.55) - self.left_x
+            self.runner_s = (self._lane_x + 0.55) - self.left_x
             self.runner_dir = 1.0
 
     def advance_runner(self, dt: float) -> None:
@@ -914,6 +958,10 @@ class City:
             self._paint_ground_line(buf, x, y, theta, edge, EDGE)
         for lane in self.lanes:
             self._paint_ground_line(buf, x, y, theta, lane, LANE)
+        for corners, color in self.finish:
+            painted = _ground_poly(x, y, theta, corners)
+            if painted is not None:
+                _fill_polygon(buf, painted, color)
         faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
         extras: list[House] = []
         if self.runner_on:
@@ -1076,6 +1124,13 @@ class City:
             "roads": [{"points": [{"x": px, "y": py} for px, py in road]} for road in self.roads],
             "edges": [{"x0": edge.x0, "y0": edge.y0, "x1": edge.x1, "y1": edge.y1} for edge in self.edges],
             "lanes": [{"x0": lane.x0, "y0": lane.y0, "x1": lane.x1, "y1": lane.y1} for lane in self.lanes],
+            "finish": [
+                {
+                    "points": [{"x": px, "y": py} for px, py in corners],
+                    "color": color_hex(color),
+                }
+                for corners, color in self.finish
+            ],
             "houses": [
                 {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}
                 for house in self.houses

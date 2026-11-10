@@ -12,7 +12,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const started = progress.started;
   const done = progress.done;
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[24rem_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
       <MissionPath
         active={started}
         done={done}
