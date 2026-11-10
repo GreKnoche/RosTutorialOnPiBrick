@@ -1,27 +1,5 @@
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M5 9.5c4-4.5 10-4.5 14 0" />
-      <path d="M8 15 9.5 11.5h5L16 15" />
-      <path d="M4.5 15h15v3H4.5z" />
-      <circle cx="8.2" cy="20.6" r="1.55" fill="currentColor" stroke="none" />
-      <circle cx="15.8" cy="20.6" r="1.55" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-const twinScale = 1.4;
-
 export function TwinStamp({ className = "size-12" }: { className?: string }) {
+  const twinScale = 1.4;
   return (
     <span
       aria-label="erledigt"
@@ -50,12 +28,30 @@ export function TwinStamp({ className = "size-12" }: { className?: string }) {
   );
 }
 
+const road = "M22 70 L22 56.1 A34.1 34.1 0 0 1 56.1 22 L72 22";
+
 export function BrandLogo({ className }: { className?: string }) {
   return (
-    <span
-      className={`flex items-center justify-center rounded-lg bg-heading text-background ${className ?? ""}`}
-    >
-      <LogoMark className="size-[68%]" />
+    <span className={`inline-flex shrink-0 ${className ?? "size-11"}`}>
+      <svg viewBox="0 0 64 64" className="size-full" overflow="hidden" aria-hidden>
+        <rect width="64" height="64" fill="#0e6bc4" />
+        <path d={road} fill="none" stroke="#f7f8fa" strokeWidth="20" strokeLinecap="butt" />
+        <path d={road} fill="none" stroke="#2a2e34" strokeWidth="14.6" strokeLinecap="butt" />
+        <path
+          d={road}
+          fill="none"
+          stroke="#f7f8fa"
+          strokeWidth="2.5"
+          strokeLinecap="butt"
+          strokeDasharray="5.4 4"
+        />
+        <g transform="translate(32 32) rotate(-45)">
+          <rect x="-5" y="-8.6" width="10" height="3.2" rx="0.7" fill="#141414" />
+          <rect x="-5" y="5.4" width="10" height="3.2" rx="0.7" fill="#141414" />
+          <rect x="-11" y="-5.2" width="19" height="10.4" rx="2.2" fill="#e11d2e" stroke="#fff7ed" strokeWidth="1" />
+          <path d="M12.2 0 6.4-3.6v7.2z" fill="#fff7ed" />
+        </g>
+      </svg>
     </span>
   );
 }

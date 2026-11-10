@@ -67,6 +67,17 @@ class Segment:
 
 
 @dataclass(frozen=True)
+class Gate:
+    """A line the car has to drive across. Start and finish share one segment."""
+
+    id: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+@dataclass(frozen=True)
 class Place:
     id: str
     x: float
@@ -825,6 +836,26 @@ class City:
         self.cones = tuple(self._spots)
         self.graph = _graph(self._ribbons, stem_x, mid_y)
         self.runner_s = (self._lane_x + 0.55) - left_x
+        half = ROAD_W / 2.0
+        ax, ay = FINISH_A
+        bx, by = FINISH_B
+        start = Gate("start", ax, ay, bx, by)
+        # The return stem is the north-south road after the hairpin. No coordinate
+        # was given for that left-right line, so it sits on the middle of the stem.
+        stem_y = (mid_y + right_u_y) / 2.0
+        self.gates = (
+            start,
+            Gate("quer", 7.16, mid_y - half, 7.16, mid_y + half),
+            Gate("ost", right_x - half, 3.95, right_x + half, 3.95),
+            Gate("kehre", right_u_x, right_u_y - u_r - half, right_u_x, right_u_y - u_r + half),
+            Gate("stamm", ustem_x - half, stem_y, ustem_x + half, stem_y),
+            Gate("ziel", ax, ay, bx, by),
+        )
+
+    def on_asphalt(self, x: float, y: float) -> bool:
+        """True when the point is on a road, with a small margin at the white edge."""
+        limit = ROAD_W / 2.0 + 0.02
+        return any(_dist_ribbon(x, y, ribbon) <= limit for ribbon in self._ribbons)
 
     def place(self, name: str) -> Place:
         for item in self.places:
@@ -962,6 +993,10 @@ class City:
             painted = _ground_poly(x, y, theta, corners)
             if painted is not None:
                 _fill_polygon(buf, painted, color)
+        for gate in self.gates:
+            if gate.id in {"start", "ziel"}:
+                continue
+            self._paint_ground_line(buf, x, y, theta, Segment(gate.x0, gate.y0, gate.x1, gate.y1), (255, 176, 64))
         faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
         extras: list[House] = []
         if self.runner_on:
@@ -1130,6 +1165,10 @@ class City:
                     "color": color_hex(color),
                 }
                 for corners, color in self.finish
+            ],
+            "gates": [
+                {"id": gate.id, "x0": gate.x0, "y0": gate.y0, "x1": gate.x1, "y1": gate.y1}
+                for gate in self.gates
             ],
             "houses": [
                 {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}

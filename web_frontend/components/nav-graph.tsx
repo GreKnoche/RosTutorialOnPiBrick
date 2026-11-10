@@ -7,17 +7,9 @@ import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/
 import { followPathError } from "@/lib/controller-yaml";
 import { followerError } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
+import { NAV_NODES, type NavNode } from "@/lib/nav2-lessons";
 
-type Mission = "folgen" | "controller" | "baum-1";
 type LinkShow = "always" | "tree" | "path";
-
-type GraphNode = {
-  id: string;
-  name: string;
-  mission: Mission;
-  x: number;
-  y: number;
-};
 
 type GraphLink = {
   from: string;
@@ -25,14 +17,6 @@ type GraphLink = {
   label: string;
   show: LinkShow;
 };
-
-const NODES: GraphNode[] = [
-  { id: "waypoint_lesson", name: "waypoint_lesson", mission: "folgen", x: 16, y: 28 },
-  { id: "waypoint_follower", name: "waypoint_follower", mission: "folgen", x: 50, y: 58 },
-  { id: "maneuver", name: "maneuver", mission: "folgen", x: 84, y: 28 },
-  { id: "controller", name: "controller_server", mission: "controller", x: 50, y: 88 },
-  { id: "mission", name: "mission", mission: "baum-1", x: 50, y: 88 },
-];
 
 const LINKS: GraphLink[] = [
   { from: "waypoint_lesson", to: "waypoint_follower", label: "follow_waypoints", show: "always" },
@@ -62,7 +46,7 @@ function readFollower() {
   return text;
 }
 
-function placeNode(node: GraphNode, controller: boolean, tree: boolean): GraphNode {
+function placeNode(node: NavNode, controller: boolean, tree: boolean): NavNode {
   if (node.id === "controller" && tree) return { ...node, x: 78 };
   if (node.id === "mission" && controller) return { ...node, x: 22 };
   return node;
@@ -73,10 +57,18 @@ function nodeTone(selected: boolean) {
   return `${ring} bg-[#f8e7b0] text-[#3c3214]`;
 }
 
-export function NavGraph({ controller = false, tree = false }: { controller?: boolean; tree?: boolean }) {
-  const visible = NODES.filter((node) => {
-    if (node.mission === "controller") return controller;
-    if (node.mission === "baum-1") return tree;
+export function NavGraph({
+  controller = false,
+  tree = false,
+  active = "",
+}: {
+  controller?: boolean;
+  tree?: boolean;
+  active?: string;
+}) {
+  const visible = NAV_NODES.filter((node) => {
+    if (node.show === "controller") return controller;
+    if (node.show === "baum-1") return tree;
     return true;
   }).map((node) => placeNode(node, controller, tree));
   const span = visible.reduce((high, node) => Math.max(high, node.y), 0) - visible.reduce((low, node) => Math.min(low, node.y), 100);
@@ -220,7 +212,13 @@ export function NavGraph({ controller = false, tree = false }: { controller?: bo
               type="button"
               aria-pressed={node.id === current.id}
               onClick={() => setSelected(node.id)}
-              className={`absolute z-20 w-28 -translate-y-1/2 rounded-xl px-1.5 py-1 text-center ${span === 0 ? "" : "-translate-x-1/2"} ${nodeTone(node.id === current.id)}`}
+              className={`absolute z-20 w-28 -translate-y-1/2 rounded-xl px-1.5 py-1 text-center ${span === 0 ? "" : "-translate-x-1/2"} ${
+                node.id === current.id
+                  ? nodeTone(true)
+                  : node.id === active
+                    ? "bg-[#f8e7b0] text-[#3c3214] ring-2 ring-[#2f6b4f]"
+                    : nodeTone(false)
+              }`}
               style={{ left: span === 0 ? "0" : `${node.x}%`, top: `${node.y}%` }}
             >
               <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{node.name}</span>

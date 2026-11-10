@@ -287,6 +287,7 @@ class CanvasTwinNode(Node):
                 "arch": city.arch_on,
                 "dock": city.dock_on,
                 "runner": city.runner_dict() if city.runner_on else None,
+                "lap": self.plant.lap_status(),
             },
             keep_image=False,
         )

@@ -111,6 +111,7 @@ class CanvasPlant:
         self._queue: list[Segment] = []
         self._left = 0.0
         self.city = None
+        self.lap = None
         self.city_holder: str | None = None
         self.probe: str | None = None
         self.drift = False
@@ -145,10 +146,16 @@ class CanvasPlant:
         self._hold = Twist2D()
         self._queue = []
         self._left = 0.0
+        if self.lap is not None and self.city is not None:
+            home = abs(float(x) - self.city.start_x) < 0.05 and abs(float(y) - self.city.start_y) < 0.05
+            self.lap.reset(float(x), float(y), home)
 
     def enter_city(self, client: str | None) -> None:
+        from lap import Lap
+
         self.city_holder = client if isinstance(client, str) else None
         self.city = CITY
+        self.lap = Lap(CITY.gates, CITY.on_asphalt)
         self.drift = False
         self.camera = False
         self.probe = None
@@ -165,6 +172,7 @@ class CanvasPlant:
         self.probe = None
         self.city.set_scene("leer")
         self.city = None
+        self.lap = None
         self.city_holder = None
         self.reset(0.0, 0.0, 0.0)
 
@@ -283,6 +291,11 @@ class CanvasPlant:
             return [self._pose()]
         return None
 
+    def lap_status(self) -> dict[str, object] | None:
+        if self.lap is None:
+            return None
+        return self.lap.status()
+
     def sample(self) -> TwinSample:
         pose = self.odom.pose
         goal = self.goal
@@ -338,6 +351,8 @@ class CanvasPlant:
             return
         self.city.resolve(self.odom.pose, foot_radius())
         after = self.odom.pose
+        if self.lap is not None:
+            self.lap.observe(before.x, before.y, after.x, after.y)
         dtheta = wrap_angle(after.theta - before.theta)
         mid = before.theta + 0.5 * dtheta
         ds = (after.x - before.x) * math.cos(mid) + (after.y - before.y) * math.sin(mid)

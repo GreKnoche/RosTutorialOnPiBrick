@@ -49,7 +49,14 @@ public:
     }
     logger_ = node->get_logger();
     clock_ = node->get_clock();
-    cmd_node_ = std::make_shared<rclcpp::Node>("maneuver_at_waypoint_cmd");
+    // Launch setzt __node:=waypoint_follower für den ganzen Prozess.
+    // Ohne diese Optionen hieße der Publisher ebenfalls waypoint_follower.
+    rclcpp::NodeOptions options;
+    options.use_global_arguments(false);
+    options.start_parameter_services(false);
+    options.start_parameter_event_publisher(false);
+    options.enable_rosout(false);
+    cmd_node_ = std::make_shared<rclcpp::Node>("maneuver_at_waypoint_cmd", options);
     cmd_pub_ = cmd_node_->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
   }
 

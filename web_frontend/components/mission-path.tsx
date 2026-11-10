@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Lock, Play } from "lucide-react";
+import { PATH_STEPS } from "@/lib/nav2-lessons";
 
 type Step = {
   id: string;
@@ -16,33 +17,7 @@ type Pose = {
   heading: number;
 };
 
-const STEPS: Step[] = [
-  { id: "start", title: "Start" },
-  { id: "folgen", title: "Wegpunkten folgen" },
-  { id: "controller", title: "Controller" },
-  { id: "baum-1", title: "Behavior Tree 1" },
-  { id: "nochmal", title: "Nochmal" },
-  { id: "anhalten", title: "Anhalten" },
-];
-
-const MELON_MISSIONS = new Set(["folgen", "nochmal"]);
-
-/** Melons belong to the open collect mission. A finished station clears the map. */
-export function melonMissionOpen(done: number) {
-  return done >= 0 && done < STEPS.length && MELON_MISSIONS.has(STEPS[done].id);
-}
-
-/** The controller chapter opens once waypoint following is finished. */
-export function controllerUnlocked(done: number) {
-  const index = STEPS.findIndex((step) => step.id === "controller");
-  return index >= 0 && done >= index;
-}
-
-/** Behavior trees stay behind the controller chapter. */
-export function treeUnlocked(done: number) {
-  const index = STEPS.findIndex((step) => step.id === "baum-1");
-  return index >= 0 && done >= index;
-}
+const STEPS: Step[] = PATH_STEPS;
 
 const ASPHALT = "#454c5a";
 
@@ -102,6 +77,13 @@ export function MissionPath({
   const roadRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const phaseRef = useRef<Phase>("wait");
+  const stepKey = `${done}:${active}`;
+  const [openKey, setOpenKey] = useState(stepKey);
+  const [openId, setOpenId] = useState<string | null>(null);
+  if (openKey !== stepKey) {
+    setOpenKey(stepKey);
+    setOpenId(null);
+  }
   const placeRef = useRef<() => void>(() => {});
   placeRef.current = () => {
     const list = listRef.current;
@@ -172,13 +154,15 @@ export function MissionPath({
                     state={state}
                     passed={passed}
                     live={active && state === "current"}
+                    armed={openId === item.id}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
                       if (state !== "current" || active) return;
-                      onStart?.();
+                      setOpenId(item.id);
                     }}
+                    onStart={() => onStart?.()}
                   />
                 ) : null}
               </div>
@@ -192,13 +176,15 @@ export function MissionPath({
                     state={state}
                     passed={passed}
                     live={active && state === "current"}
+                    armed={openId === item.id}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
                       if (state !== "current" || active) return;
-                      onStart?.();
+                      setOpenId(item.id);
                     }}
+                    onStart={() => onStart?.()}
                   />
                 ) : null}
               </div>
@@ -237,14 +223,18 @@ function NodeButton({
   state,
   passed,
   live,
+  armed,
   onClick,
+  onStart,
   buttonRef,
 }: {
   item: Step;
   state: "done" | "current" | "locked";
   passed: boolean;
   live: boolean;
+  armed: boolean;
   onClick: () => void;
+  onStart: () => void;
   buttonRef: (el: HTMLButtonElement | null) => void;
 }) {
   return (
@@ -254,6 +244,7 @@ function NodeButton({
         type="button"
         disabled={state === "locked" || passed}
         aria-current={state === "current" ? "step" : undefined}
+        aria-expanded={state === "current" && !live ? armed : undefined}
         aria-label={
           passed || state === "done" ? `${item.title}, geschafft` : state === "locked" ? `${item.title}, zu` : item.title
         }
@@ -285,6 +276,15 @@ function NodeButton({
       >
         {item.title}
       </span>
+      {armed ? (
+        <button
+          type="button"
+          onClick={onStart}
+          className="mt-1 rounded-full bg-[#e6b325] px-2 py-0.5 text-[0.7rem] font-semibold text-[#1c1404]"
+        >
+          Start
+        </button>
+      ) : null}
     </>
   );
 }

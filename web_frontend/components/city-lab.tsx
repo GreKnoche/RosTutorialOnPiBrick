@@ -30,6 +30,8 @@ import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } fr
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; w: number; h: number; color: string };
 type Seg = { x0: number; y0: number; x1: number; y1: number };
+type Gate = Seg & { id: string };
+type LapState = { text: string; done: boolean; grass: boolean; next: string };
 type Road = { points: Point[] };
 type Shore = { x: number; y: number; w: number; h: number };
 type GraphEdge = { id: string; short: boolean; points: Point[] };
@@ -40,6 +42,7 @@ type CityMap = {
   edges: Seg[];
   lanes: Seg[];
   finish: FinishSquare[];
+  gates: Gate[];
   houses: Rect[];
   shore: Shore;
   graph: GraphEdge[];
@@ -160,6 +163,7 @@ function parseCity(data: unknown): CityMap | null {
     edges: segs(record.edges),
     lanes: segs(record.lanes),
     finish: finishOf(record.finish),
+    gates: gatesOf(record.gates),
     houses: rects(record.houses, true),
     shore: shoreOf(record.shore),
     graph: graphOf(record.graph),
@@ -168,6 +172,16 @@ function parseCity(data: unknown): CityMap | null {
     runner: rects(record.runner ? [record.runner] : [], false)[0] ?? null,
     cones: pointsOf(record.cones),
   };
+}
+
+function gatesOf(value: unknown): Gate[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const line = item as Record<string, unknown>;
+    if (typeof line.id !== "string") return [];
+    return [{ id: line.id, x0: num(line.x0), y0: num(line.y0), x1: num(line.x1), y1: num(line.y1) }];
+  });
 }
 
 function finishOf(value: unknown): FinishSquare[] {
@@ -502,6 +516,30 @@ function cachedWorld(
   return layer;
 }
 
+function drawGates(
+  ctx: CanvasRenderingContext2D,
+  to: (x: number, y: number) => Screen,
+  ppm: number,
+  gates: Gate[],
+  lap: LapState | null,
+) {
+  const order = gates.map((gate) => gate.id);
+  const active = lap ? order.indexOf(lap.next) : -1;
+  for (const gate of gates) {
+    if (gate.id === "start" || gate.id === "ziel") continue;
+    const at = order.indexOf(gate.id);
+    const passed = lap?.done || (active >= 0 && at < active);
+    ctx.strokeStyle = lap?.grass ? "#e15a4a" : passed ? "#7dcea0" : at === active ? "#7ee0ff" : "#ffb040";
+    ctx.lineWidth = Math.max(3, ppm * (at === active ? 0.06 : 0.04));
+    const a = to(gate.x0, gate.y0);
+    const b = to(gate.x1, gate.y1);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+}
+
 function draw(
   canvas: HTMLCanvasElement | null,
   frame: HTMLDivElement | null,
@@ -516,6 +554,8 @@ function draw(
   look: { x: number; y: number } | null,
   melons: boolean[] | null,
   minBody: boolean,
+  lap: LapState | null,
+  gates: boolean,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -527,6 +567,7 @@ function draw(
   const layer = cachedWorld(width, height, zoom, view, city, clutter, probe, runner);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(layer, 0, 0);
+  if (gates && city) drawGates(ctx, to, ppm, city.gates, lap);
 
   if (melons) {
     MELONS.forEach(([x, y], index) => {
@@ -590,17 +631,23 @@ export function CityLab({
   kapitel = null,
   notice = null,
   melons = false,
+  gates = false,
   onMelonsCleared,
+  onGatesCleared,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
   melons?: boolean;
+  gates?: boolean;
   onMelonsCleared?: () => void;
+  onGatesCleared?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
   const poseRef = useRef({ x: 1.6, y: 5.54, theta: 0 });
+  const lapRef = useRef<LapState | null>(null);
+  const [lap, setLap] = useState<LapState | null>(null);
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const linkRef = useRef<TwinLink | null>(null);
@@ -633,8 +680,13 @@ export function CityLab({
   kapitelRef.current = kapitel;
   const melonsOnRef = useRef(melons);
   melonsOnRef.current = melons;
+  const gatesOnRef = useRef(gates);
+  gatesOnRef.current = gates;
   const clearedRef = useRef(onMelonsCleared);
   clearedRef.current = onMelonsCleared;
+  const gatesClearedRef = useRef(onGatesCleared);
+  gatesClearedRef.current = onGatesCleared;
+  const lapDoneRef = useRef(false);
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
@@ -692,6 +744,13 @@ export function CityLab({
       onState(sample: TwinState) {
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
+        const nextLap = sample.lap ?? null;
+        lapRef.current = nextLap;
+        setLap((previous) =>
+          previous?.text === nextLap?.text && previous?.done === nextLap?.done && previous?.grass === nextLap?.grass
+            ? previous
+            : nextLap,
+        );
         motionRef.current = { linear: sample.linear, angular: sample.angular };
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
@@ -737,6 +796,10 @@ export function CityLab({
         boxes,
         probeRef.current?.kapitel ?? "",
         probeRef.current?.scene ?? "",
+        gatesOnRef.current ? "1" : "0",
+        lapRef.current?.next ?? "",
+        lapRef.current?.done ? "1" : "0",
+        lapRef.current?.grass ? "1" : "0",
       ].join("|");
       if (raysRef.current && rangesRef.current) {
         signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
@@ -757,6 +820,8 @@ export function CityLab({
           look,
           kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
           minBodyRef.current,
+          gatesOnRef.current ? lapRef.current : null,
+          gatesOnRef.current,
         );
       }
       if (!kapitelRef.current && melonsOnRef.current) {
@@ -769,6 +834,9 @@ export function CityLab({
           if (left === 0) clearedRef.current?.();
         }
       }
+      const lapDone = Boolean(gatesOnRef.current && lapRef.current?.done);
+      if (lapDone && !lapDoneRef.current) gatesClearedRef.current?.();
+      lapDoneRef.current = lapDone;
       const current = probeRef.current;
       if (current) {
         const runner = runnerRef.current;
@@ -988,6 +1056,15 @@ export function CityLab({
             phase === "up" ? "bg-emerald-500" : phase === "connecting" ? "bg-amber-400" : "bg-red-500"
           }`}
         />
+        {gates && lap ? (
+          <p
+            className={`absolute bottom-14 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full px-3 py-1 text-center text-xs font-semibold ${
+              lap.grass ? "bg-[#4a1c14]/90 text-[#ffd0c8]" : lap.done ? "bg-[#14301c]/90 text-[#d7ffe4]" : "bg-[#1c1404]/80 text-[#f4efe4]"
+            }`}
+          >
+            {lap.text}
+          </p>
+        ) : null}
         {!kapitel && melons ? (
           <p className="absolute top-3 left-8 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
             {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${MELONS.length - melonsLeft}/${MELONS.length}`}

@@ -101,6 +101,8 @@ async def twin_socket(websocket: WebSocket) -> None:
                     payload["arch"] = bool(view.get("arch"))
                     payload["dock"] = bool(view.get("dock"))
                     payload["runner"] = view.get("runner")
+                    if isinstance(view.get("lap"), dict):
+                        payload["lap"] = view["lap"]
                     session["tick"] = int(session["tick"]) + 1
                     if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
                         payload["image"] = view["image"]

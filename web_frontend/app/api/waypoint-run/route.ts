@@ -218,33 +218,76 @@ function startGroup(command: string): ChildProcess {
   });
 }
 
+function graphProbe(kind: "action" | "navigator"): string {
+  const ready =
+    kind === "action"
+      ? '"/follow_waypoints/_action/send_goal" in names'
+      : 'any(ns.rstrip("/") + "/" + name == "/bt_navigator" for name, ns in nodes)';
+  return [
+    "python3 - <<'PY'",
+    "import time",
+    "import rclpy",
+    "from rclpy.node import Node",
+    "rclpy.init()",
+    "node = Node('nav_ready_probe')",
+    "found = False",
+    "deadline = time.time() + 1.5",
+    "while time.time() < deadline and not found:",
+    "    rclpy.spin_once(node, timeout_sec=0.2)",
+    "    names = [name for name, _types in node.get_service_names_and_types()]",
+    "    nodes = node.get_node_names_and_namespaces()",
+    `    found = ${ready}`,
+    "print('ready' if found else 'wait')",
+    "node.destroy_node()",
+    "rclpy.shutdown()",
+    "PY",
+  ].join("\n");
+}
+
 async function navReady(child: ChildProcess): Promise<boolean> {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) return false;
-    const info = await rosBash("timeout 8 ros2 action info /follow_waypoints");
-    if (/Action servers:\s*[1-9]/.test(info.out)) return true;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const info = await rosBash(graphProbe("action"));
+    if (info.out.includes("ready")) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return false;
 }
 
 async function foreignNavigator(): Promise<boolean> {
   if (slot.nav && slot.nav.exitCode === null) return false;
-  const listed = await rosBash("timeout 8 ros2 node list");
-  return listed.out.split("\n").some((line) => line.trim() === "/bt_navigator");
+  const listed = await rosBash(graphProbe("navigator"));
+  return listed.out.includes("ready");
 }
 
 function pluginWorkspace(): string {
   return path.join(cacheDir(), "plugin_ws");
 }
 
+function hardenPlugin(source: string): string {
+  return source.replace(
+    /std::make_shared<rclcpp::Node>\(\s*"maneuver_at_waypoint_cmd"\s*\)/g,
+    `([] {
+      rclcpp::NodeOptions options;
+      options.use_global_arguments(false);
+      options.start_parameter_services(false);
+      options.start_parameter_event_publisher(false);
+      options.enable_rosout(false);
+      return std::make_shared<rclcpp::Node>("maneuver_at_waypoint_cmd", options);
+    }())`,
+  );
+}
+
 async function buildPlugin(source: string, hash: string): Promise<string | null> {
   const setup = path.join(pluginWorkspace(), "install", "setup.bash");
-  if (slot.pluginHash === hash) {
+  const builtCpp = path.join(pluginWorkspace(), "src", "maneuver_at_waypoint", "src", "maneuver_at_waypoint.cpp");
+  const previous = await readFile(builtCpp, "utf8").catch(() => "");
+  if (slot.pluginHash === hash && previous.includes("use_global_arguments(false)")) {
     const existing = await readFile(setup, "utf8").catch(() => "");
     if (existing) return null;
   }
+  source = hardenPlugin(source);
   const ws = pluginWorkspace();
   const pkg = path.join(ws, "src", "maneuver_at_waypoint");
   const skeleton = path.join(process.cwd(), "scripts", "maneuver_at_waypoint");

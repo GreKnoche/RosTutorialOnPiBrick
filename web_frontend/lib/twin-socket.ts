@@ -22,6 +22,7 @@ export type TwinState = {
   arch?: boolean;
   dock?: boolean;
   runner?: { x: number; y: number; w: number; h: number; theta: number } | null;
+  lap?: { text: string; done: boolean; grass: boolean; next: string } | null;
 };
 
 export type TwinDone = {
@@ -87,6 +88,19 @@ function asState(data: Record<string, unknown>): TwinState | null {
     arch: data.arch === true,
     dock: data.dock === true,
     runner: asRunner(data.runner),
+    lap: asLap(data.lap),
+  };
+}
+
+function asLap(value: unknown): { text: string; done: boolean; grass: boolean; next: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const lap = value as Record<string, unknown>;
+  if (typeof lap.text !== "string" || !lap.text) return null;
+  return {
+    text: lap.text,
+    done: lap.done === true,
+    grass: lap.grass === true,
+    next: typeof lap.next === "string" ? lap.next : "",
   };
 }
 

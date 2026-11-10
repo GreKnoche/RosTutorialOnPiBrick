@@ -185,6 +185,55 @@ def test_the_camera_shows_sky_road_and_a_house() -> None:
     assert struct.unpack_from("<I", along, 2)[0] == len(along)
 
 
+def _walk(lap, points: list[tuple[float, float]]) -> None:
+    for start, end in zip(points, points[1:]):
+        lap.observe(start[0], start[1], end[0], end[1])
+
+
+def test_the_lap_crosses_the_gates_in_order_and_grass_ends_it() -> None:
+    from lap import Lap
+
+    lap = Lap(CITY.gates, CITY.on_asphalt)
+    lap.reset(CITY.start_x, CITY.start_y, True)
+    assert lap.status()["text"] == "Überfahre die Startlinie."
+    ids = [gate.id for gate in CITY.gates]
+    assert ids == ["start", "quer", "ost", "kehre", "stamm", "ziel"]
+    for gate in CITY.gates:
+        mid_x = (gate.x0 + gate.x1) / 2.0
+        mid_y = (gate.y0 + gate.y1) / 2.0
+        assert CITY.on_asphalt(mid_x, mid_y), gate.id
+    assert abs(((CITY.gates[1].x0 + CITY.gates[1].x1) / 2.0) - 7.16) < 1e-6
+    assert abs(((CITY.gates[2].y0 + CITY.gates[2].y1) / 2.0) - 3.95) < 1e-6
+    assert abs(((CITY.gates[3].y0 + CITY.gates[3].y1) / 2.0) - 1.53) < 0.02
+
+    mid_y = CITY.mid_y
+    right_x = CITY.right_x
+    bend = CITY._ribbons[9]
+    stem_x = CITY.ustem_x
+    _walk(
+        lap,
+        [
+            (CITY.start_x, CITY.start_y),
+            (right_x, mid_y),
+            (right_x, bend[-1][1]),
+            *list(reversed(bend)),
+            (stem_x, mid_y),
+            (CITY.start_x - 0.3, mid_y),
+        ],
+    )
+    assert lap.done
+    assert lap.status()["text"] == "Runde geschafft."
+
+    fresh = Lap(CITY.gates, CITY.on_asphalt)
+    fresh.reset(CITY.start_x, CITY.start_y, True)
+    fresh.observe(CITY.start_x, CITY.start_y, 4.8, CITY.mid_y)
+    fresh.observe(4.8, CITY.mid_y, 4.8, CITY.mid_y + 1.2)
+    assert fresh.grass
+    assert fresh.status()["text"] == "Gras. Die Runde zählt nicht."
+    fresh.reset(CITY.start_x, CITY.start_y, False)
+    assert fresh.status()["text"] == ""
+
+
 def test_the_finish_line_crosses_the_street_and_the_car_waits_in_front() -> None:
     from city import BODY_LENGTH_M, FINISH_A, FINISH_B
 
