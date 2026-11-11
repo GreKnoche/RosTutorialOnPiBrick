@@ -7,7 +7,7 @@ cd web_frontend
 npm run dev
 ```
 
-Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lektionen sind unter `/autonom/<slug>` erreichbar, ROS 2 unter `/ros/<slug>`, Nav2 unter `/nav2/<id>`.
+Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lektionen sind unter `/autonom/<slug>` erreichbar, ROS 2 unter `/ros/<slug>`, Nav2 unter `/nav2/<id>`. Neue Lektionen für Autonom und ROS legst du im Studio unter `/studio` an. Es schreibt [`content/catalog.json`](content/catalog.json) und die Markdown-Datei. Ein Baustein im Abschnitt `## labor` hängt den Twin an, ohne ein eigenes Lab.
 
 ## Docker
 
@@ -33,11 +33,11 @@ npm test
 
 ## Was woher kommt
 
-Titel, Kurztext und Reihenfolge stehen in [`lib/curriculum.ts`](lib/curriculum.ts). Das ist das Verzeichnis. Der Fließtext in der Lektion steht in `content/<track>/<id>-<slug>.md`. Die Seite [`components/lessons/lesson-page.tsx`](components/lessons/lesson-page.tsx) liest beides und zeichnet Kopf, Seitenleiste und den Link zum nächsten Kapitel.
+Titel, Kurztext und Reihenfolge stehen in [`content/catalog.json`](content/catalog.json). [`lib/curriculum.ts`](lib/curriculum.ts) liest diese Datei. Der Fließtext in der Lektion steht in `content/<track>/<id>-<slug>.md`. Die Seite [`components/lessons/lesson-page.tsx`](components/lessons/lesson-page.tsx) liest beides und zeichnet Kopf, Seitenleiste und den Link zum nächsten Kapitel.
 
-Gibt es für den Slug ein Modul in [`components/lessons/registry.ts`](components/lessons/registry.ts), kommen Animation und Lab aus diesem Modul. Sonst zeigt die Seite den Markdown-Text und darunter den leeren Twin. So ist Lektion 4 heute: Eintrag im Verzeichnis, noch keine Markdown-Datei und kein Lab.
+Gibt es für den Slug ein Modul in [`components/lessons/registry.ts`](components/lessons/registry.ts), kommen Animation und Lab aus diesem Modul. Sonst zeigt die Seite den Markdown-Text. Steht darin `## labor`, fährt der Twin mit diesem Baustein. Ohne Baustein bleibt der Twin leer oder folgt `lab` im Katalog.
 
-Unter der Einleitung hat jeder nötige, noch unbekannte Fachbegriff einen eigenen Spoiler. Die Erklärungen stehen in [`content/glossary.md`](content/glossary.md). Ein Begriff erscheint nur beim ersten Kapitel, in dem er vorkommt, und nur wenn das Kapitel eine Markdown-Datei hat. Begriffe, die das Kapitel selbst erklärt, stehen als `taughtTerms` am Lektionseintrag in [`lib/curriculum.ts`](lib/curriculum.ts) und werden dort nicht zusätzlich als Glossar angezeigt.
+Unter der Einleitung hat jeder nötige, noch unbekannte Fachbegriff einen eigenen Spoiler. Die Erklärungen stehen in [`content/glossary.md`](content/glossary.md). Ein Begriff erscheint nur beim ersten Kapitel, in dem er vorkommt, und nur wenn das Kapitel eine Markdown-Datei hat. Begriffe, die das Kapitel selbst erklärt, stehen als `taughtTerms` am Lektionseintrag in [`content/catalog.json`](content/catalog.json) und werden dort nicht zusätzlich als Glossar angezeigt.
 
 ## Schwierigkeit
 
@@ -49,17 +49,17 @@ Die Ziele stehen in [`lib/lesson-levels.ts`](lib/lesson-levels.ts). Dieselben Za
 
 Damit reicht es, wenn das Kapitel noch keine eigene Fahrt hat.
 
-1. In `lessons` von `lib/curriculum.ts` einen Eintrag anlegen. `id` und `slug` bestimmen Dateiname und Adresse. `title` ist die Überschrift, `summary` der Satz direkt darunter. `track` ist `autonom`, `ros` oder `nav2`. `lab` bleibt `"none"`, solange der Twin nicht selbst ein Ziel ansteuert.
+1. Im Studio unter `/studio` eine Lektion anlegen, oder den Eintrag in `lessons` von `content/catalog.json` schreiben. `id` und `slug` bestimmen Dateiname und Adresse. `title` ist die Überschrift, `summary` der Satz direkt darunter. `track` ist `autonom` oder `ros`. `lab` bleibt `"none"`, solange der Twin nicht selbst per Tastatur oder Zielpose fährt und kein `## labor` gesetzt ist.
 
-```ts
+```json
 {
-  id: "04",
-  slug: "kalibrierung-drift",
-  title: "Kalibrierung und Drift – Warum stimmt die Pose nicht?",
-  status: "stub",
-  summary: "Systematische Parameterfehler von zufälligem Schlupf unterscheiden.",
-  track: "autonom",
-  lab: "none",
+  "id": "09",
+  "slug": "neue-lektion",
+  "title": "Titel der Lektion",
+  "status": "stub",
+  "summary": "Ein Satz direkt unter der Überschrift.",
+  "track": "autonom",
+  "lab": "none"
 }
 ```
 
@@ -125,4 +125,4 @@ Die Ids unter `## missions` sind der Vertrag mit dem Lab. In Lektion 1 heißen s
 
 ## Prüfen
 
-`npm run dev` neu laden und die neue Adresse öffnen. Sichtbar sein sollen Überschrift und Kurztext aus `curriculum.ts`, die Einleitung aus der Markdown-Datei, und falls ein Modul registriert ist Animation, Rechnung und Missionen. Der Link „Nächstes Kapitel“ folgt dem nächsten Eintrag im Verzeichnis. Eine Lektion ohne Markdown-Datei und ohne Register-Zeile zeigt nur den leeren Twin.
+`npm run dev` neu laden und die neue Adresse öffnen. Sichtbar sein sollen Überschrift und Kurztext aus `catalog.json`, die Einleitung aus der Markdown-Datei, und falls ein Modul registriert ist Animation, Rechnung und Missionen. Der Link „Nächstes Kapitel“ folgt dem nächsten Eintrag im Verzeichnis. Eine Lektion ohne Markdown-Datei und ohne Register-Zeile zeigt nur den Twin aus `lab`.

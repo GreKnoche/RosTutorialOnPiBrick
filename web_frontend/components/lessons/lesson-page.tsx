@@ -4,6 +4,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { GlossarySpoiler } from "@/components/glossary-spoiler";
 import { LessonIndex } from "@/components/lesson-index";
 import { CopySection } from "@/components/lessons/copy-section";
+import { ComposedLab } from "@/components/lessons/composed-lab";
 import { lessonModule, type LessonModule } from "@/components/lessons/registry";
 import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { RobotLab } from "@/components/robot-lab";
@@ -63,7 +64,6 @@ export function LessonPage({
           </section>
           {active && copy ? (
             <LessonBody
-              lesson={lesson}
               active={active}
               copy={copy}
               nextHref={nextHref}
@@ -77,12 +77,16 @@ export function LessonPage({
               {copy
                 ? copy.sectionOrder.map((id) => <CopySection key={id} copy={copy} id={id} />)
                 : null}
-              <RobotLab
-                lab={lesson.lab}
-                lessonId={lesson.id}
-                track={lesson.track}
-                showTopics={lesson.track !== "autonom"}
-              />
+              {copy?.labor ? (
+                <ComposedLab lesson={lesson} copy={copy} nextHref={nextHref} />
+              ) : (
+                <RobotLab
+                  lab={lesson.lab}
+                  lessonId={lesson.id}
+                  track={lesson.track}
+                  showTopics={lesson.track !== "autonom"}
+                />
+              )}
             </>
           )}
           {level !== "beginner" ? <LevelTask lesson={lesson} level={level} /> : null}
@@ -107,14 +111,12 @@ export function LessonPage({
 }
 
 function LessonBody({
-  lesson,
   active,
   copy,
   nextHref,
   level,
   terms,
 }: {
-  lesson: Lesson;
   active: LessonModule;
   copy: LessonCopy;
   nextHref?: string;

@@ -79,13 +79,16 @@ export function LessonEditor({
   }
 
   function updateSection(id: string, patch: Partial<LessonSectionCopy>) {
-    setCopy((current) => ({
-      ...current,
-      sections: {
-        ...current.sections,
-        [id]: { id, eyebrow: "", title: "", body: "", ...current.sections[id], ...patch },
-      },
-    }));
+    setCopy((current) => {
+      const section = current.sections[id] ?? { id, eyebrow: "", title: "", body: "" };
+      return {
+        ...current,
+        sections: {
+          ...current.sections,
+          [id]: { ...section, ...patch, id: section.id },
+        },
+      };
+    });
   }
 
   return (

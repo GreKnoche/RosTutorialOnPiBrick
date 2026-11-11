@@ -13,7 +13,7 @@ import type { LessonCopy } from "@/lib/lesson-copy";
 import type { LessonLevel } from "@/lib/lesson-levels";
 
 // Neues Kapitel:
-// 1. Eintrag in lib/curriculum.ts
+// 1. Eintrag in content/catalog.json, oder über /studio
 // 2. content/<track>/<id>-<slug>.md
 // 3. Nur bei neuer Twin-Logik: components/lessons/<slug>/ und eine Zeile in lessonModules.
 
