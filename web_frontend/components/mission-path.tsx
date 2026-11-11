@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Lock, Play } from "lucide-react";
+import { useDebugAdmin } from "@/lib/debug-admin";
 import { PATH_STEPS } from "@/lib/nav2-lessons";
 
 type Step = {
@@ -76,6 +77,7 @@ export function MissionPath({
   runningId?: string | null;
   heldId?: string | null;
 }) {
+  const admin = useDebugAdmin();
   const current = Math.min(done, STEPS.length - 1);
   const fromIndex = Math.max(0, done - 1);
   const runningIndex = runningId ? STEPS.findIndex((step) => step.id === runningId) : -1;
@@ -219,7 +221,7 @@ export function MissionPath({
           <MiniTwin />
         </div>
       </ol>
-      {done < STEPS.length || done > 1 ? (
+      {admin && (done < STEPS.length || done > 1) ? (
         <div className="mt-5 flex flex-col items-start gap-2">
           {done < STEPS.length ? (
             <button
