@@ -103,6 +103,14 @@ export const NAV_NODES: NavNode[] = [
     missions: [{ id: "controller", title: "Controller", kind: "gates", ...CONTROLLER_COURSE }],
   },
   {
+    id: "planner_plugin",
+    name: "planner_plugins",
+    x: 22,
+    y: 58,
+    show: "planner",
+    missions: [],
+  },
+  {
     id: "planner",
     name: "planner_server",
     x: 22,

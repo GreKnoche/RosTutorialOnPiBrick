@@ -61,6 +61,7 @@ export function MissionPath({
   onStart,
   onSelect,
   onComplete,
+  onBack,
   active = false,
   done = 1,
   runningId = null,
@@ -69,6 +70,7 @@ export function MissionPath({
   onStart?: (id: string) => void;
   onSelect?: (id: string) => void;
   onComplete?: (done: number) => void;
+  onBack?: (done: number) => void;
   active?: boolean;
   done?: number;
   runningId?: string | null;
@@ -217,14 +219,27 @@ export function MissionPath({
           <MiniTwin />
         </div>
       </ol>
-      {done < STEPS.length ? (
-        <button
-          type="button"
-          onClick={() => onComplete?.(Math.min(done + 1, STEPS.length))}
-          className="mt-5 rounded-full border border-dashed border-[#a67c12] px-3 py-1 text-xs font-medium text-[#6e4e08] hover:bg-[#f8e7b0]"
-        >
-          Mission erledigt
-        </button>
+      {done < STEPS.length || done > 1 ? (
+        <div className="mt-5 flex flex-col items-start gap-2">
+          {done < STEPS.length ? (
+            <button
+              type="button"
+              onClick={() => onComplete?.(Math.min(done + 1, STEPS.length))}
+              className="rounded-full border border-dashed border-[#a67c12] px-3 py-1 text-xs font-medium text-[#6e4e08] hover:bg-[#f8e7b0]"
+            >
+              Mission erledigt
+            </button>
+          ) : null}
+          {done > 1 ? (
+            <button
+              type="button"
+              onClick={() => onBack?.(Math.max(1, done - 1))}
+              className="rounded-full border border-dashed border-[#6b6456] px-3 py-1 text-xs font-medium text-[#4a453c] hover:bg-[#efe8d8]"
+            >
+              Mission zurück
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </nav>
   );

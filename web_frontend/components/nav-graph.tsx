@@ -6,10 +6,11 @@ import { CodeEditor } from "@/components/code-editor";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText } from "@/lib/browser-draft";
 import { absorbFollowPath, followPathError } from "@/lib/controller-yaml";
 import { followerError } from "@/lib/follower-yaml";
+import { absorbPlannerSettings, plannerSettingsError } from "@/lib/planner-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 import { NAV_NODES, type NavNode, type StationGraph } from "@/lib/nav2-lessons";
 
-type LinkShow = "poses" | "tree" | "direct" | "path" | "through" | "throughPlan" | "throughTree" | "planned" | "plannedDrive";
+type LinkShow = "poses" | "tree" | "direct" | "path" | "through" | "throughPlan" | "throughTree" | "planned" | "plannedDrive" | "plugin";
 
 type GraphLink = {
   from: string;
@@ -29,9 +30,10 @@ const LINKS: GraphLink[] = [
   { from: "mission", to: "controller", label: "follow_path", show: "direct" },
   { from: "mission", to: "planner", label: "compute_path_through_poses", show: "planned" },
   { from: "planner", to: "controller", label: "follow_path", show: "plannedDrive" },
+  { from: "planner", to: "planner_plugin", label: "GridBased", show: "plugin" },
 ];
 
-function readField(missionId: string, field: "maneuver" | "mission" | "controller" | "follower") {
+function readField(missionId: string, field: "maneuver" | "mission" | "controller" | "follower" | "planner") {
   const text = readLessonText(missionId, field);
   if (field === "follower" && text && followerError(text)) return null;
   return text;
@@ -41,17 +43,17 @@ function placeNode(node: NavNode, controller: boolean, planner: boolean, tree: b
   if (through && tree && planner) {
     if (node.id === "waypoint_lesson") return { ...node, x: 8 };
     if (node.id === "mission") return { ...node, x: 34 };
-    if (node.id === "planner") return { ...node, x: 60 };
+    if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: 60 };
     if (node.id === "controller") return { ...node, x: 86 };
   }
   if (through && planner) {
-    if (node.id === "planner") return { ...node, x: 50 };
+    if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: 50 };
     if (node.id === "controller") return { ...node, x: 84 };
   }
   if (through && node.id === "controller") return { ...node, x: 72 };
   if (node.id === "controller" && tree) return { ...node, x: planner ? 84 : 78 };
   if (node.id === "controller" && planner) return { ...node, x: 78 };
-  if (node.id === "planner") return { ...node, x: tree ? 50 : 22 };
+  if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: tree ? 50 : 22 };
   if (node.id === "mission" && controller) return { ...node, x: planner ? 16 : 22 };
   return node;
 }
@@ -62,6 +64,7 @@ const NODE_FILL: Record<string, string> = {
   maneuver: "bg-[#f3b183]",
   controller: "bg-[#8ec0ea]",
   planner: "bg-[#c9b4ee]",
+  planner_plugin: "bg-[#ddc8f4]",
   mission: "bg-[#f0a3bc]",
 };
 
@@ -108,16 +111,21 @@ export function NavGraph({
   const readMission = useCallback(() => readField(missionId, "mission"), [missionId]);
   const readController = useCallback(() => readField(missionId, "controller"), [missionId]);
   const readFollower = useCallback(() => readField(missionId, "follower"), [missionId]);
+  const readPlanner = useCallback(() => readField(missionId, "planner"), [missionId]);
   const missionDraft = useSyncExternalStore(subscribeDrafts, readMission, serverText);
   const maneuverDraft = useSyncExternalStore(subscribeDrafts, readManeuver, serverText);
   const controllerDraft = useSyncExternalStore(subscribeDrafts, readController, serverText);
   const followerDraft = useSyncExternalStore(subscribeDrafts, readFollower, serverText);
+  const plannerDraft = useSyncExternalStore(subscribeDrafts, readPlanner, serverText);
   const [fileXml, setFileXml] = useState<string | null>(null);
   const [xmlStatus, setXmlStatus] = useState("Lade Behavior Tree…");
   const [fileController, setFileController] = useState<string | null>(null);
   const [controllerStatus, setControllerStatus] = useState("Lade Controller…");
   const [fileFollower, setFileFollower] = useState<string | null>(null);
   const [followerStatus, setFollowerStatus] = useState("Lade waypoint_follower…");
+  const [filePlanner, setFilePlanner] = useState<string | null>(null);
+  const [plannerStatus, setPlannerStatus] = useState("Lade Planner…");
+  const [pluginYaml, setPluginYaml] = useState<string | null>(null);
   const ownDrive = useRef<() => void>(() => {});
   const driveRef = playRef ?? ownDrive;
   const xml = missionDraft ?? fileXml ?? "";
@@ -125,6 +133,8 @@ export function NavGraph({
   const controllerYaml = absorbFollowPath(fileController ?? "", controllerDraft ?? fileController ?? "");
   const controllerProblem = controllerYaml.trim() ? followPathError(controllerYaml) : null;
   const followerYaml = followerDraft ?? fileFollower ?? "";
+  const plannerYaml = absorbPlannerSettings(filePlanner ?? "", plannerDraft ?? filePlanner ?? "");
+  const plannerProblem = plannerYaml.trim() ? plannerSettingsError(plannerYaml) : null;
   const placed = span === 0 ? visible.map((node) => ({ ...node, x: 0, y: 50 })) : visible;
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
@@ -138,7 +148,8 @@ export function NavGraph({
       (link.show === "path" && controller && !tree && !through) ||
       (link.show === "through" && through && !planner && !tree) ||
       (link.show === "throughPlan" && through && planner && !tree) ||
-      (link.show === "throughTree" && through && tree);
+      (link.show === "throughTree" && through && tree) ||
+      (link.show === "plugin" && planner);
     if (!shown) return [];
     const from = byId.get(link.from);
     const to = byId.get(link.to);
@@ -222,6 +233,32 @@ export function NavGraph({
     };
   }, [controller]);
 
+  useEffect(() => {
+    if (!planner) return;
+    let cancel = false;
+    const load = (id: "planner" | "planner_plugin") =>
+      fetch(`/api/ros-file?id=${id}`).then(async (response) => {
+        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
+        if (cancel) return;
+        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
+          if (id === "planner") setPlannerStatus(body.message ?? "Datei nicht gefunden");
+          return;
+        }
+        if (id === "planner") {
+          setFilePlanner(body.source);
+          setPlannerStatus("");
+        } else {
+          setPluginYaml(body.source);
+        }
+      });
+    Promise.all([load("planner"), load("planner_plugin")]).catch(() => {
+      if (!cancel) setPlannerStatus("Datei nicht gefunden");
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [planner]);
+
   return (
     <section className="mt-6 flex flex-col gap-4">
       <h2 className="text-base font-semibold">Kommunikation</h2>
@@ -275,6 +312,7 @@ export function NavGraph({
           tree={tree && xmlStatus === "" ? xml : undefined}
           controller={controller && controllerStatus === "" ? controllerYaml : undefined}
           follower={followerStatus === "" ? followerYaml : undefined}
+          planner={planner && plannerStatus === "" ? plannerYaml : undefined}
           plugin={maneuver}
           through={through}
           missionId={missionId}
@@ -319,11 +357,49 @@ export function NavGraph({
           </p>
         </div>
       ) : null}
+      {current.id === "planner_plugin" ? (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-base font-semibold">planner_plugins</h3>
+          <CodeEditor
+            value={pluginYaml ?? "planner_plugins: [\"GridBased\"]\nGridBased:\n  plugin: \"nav2_navfn_planner::NavfnPlanner\"\n"}
+            label="planner_plugins"
+            language="yaml"
+            height="h-[6rem]"
+            readOnly
+          />
+          <p className="text-sm leading-6 text-muted-foreground">
+            <span className="font-mono">GridBased</span> ist der Name in der Liste und im Behavior Tree.{" "}
+            <span className="font-mono">NavfnPlanner</span> ist die Klasse. Ein Pfadaufruf nutzt genau diesen einen Planer.
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            NavFn, SmacPlanner2D und Theta* suchen in Zellen <span className="font-mono">(x, y)</span>. Der EV3 dreht auf der Stelle, deshalb bleibt so ein Pfad fahrbar. Smac Hybrid und Smac Lattice suchen in <span className="font-mono">(x, y, θ)</span> und brauchen einen Mindestradius. Die sind für ein Auto mit Ackermann-Lenkung.
+          </p>
+          <ul className="list-disc space-y-1 pl-4 text-sm leading-6 text-muted-foreground">
+            <li>Auf einer geraden Rasterzeile fallen NavFn, Smac2D und Theta* zusammen.</li>
+            <li>Eine schräge Diagonale zeigt den Unterschied. NavFn bleibt am Raster, Smac2D setzt eine Treppe, Theta* zieht eine Gerade.</li>
+            <li>Um einen Block legt Theta* eine scharfe Ecke. Smac2D hält Abstand in den billigen Zellen.</li>
+            <li>Eine Parklücke mit vorgeschriebener Blickrichtung zeigt Hybrid und Lattice. Die Zellplaner ignorieren die Nase am Ziel.</li>
+          </ul>
+          <p className="text-sm leading-6 text-muted-foreground">Die Zahlen von NavFn stehen im Knoten planner_server.</p>
+        </div>
+      ) : null}
       {current.id === "planner" ? (
         <div className="flex flex-col gap-3">
           <h3 className="text-base font-semibold">planner_server</h3>
+          <CodeEditor
+            value={plannerYaml}
+            onChange={(value) => {
+              const next = absorbPlannerSettings(plannerYaml, value);
+              writeLessonText(missionId, "planner", next === (filePlanner ?? "") ? null : next);
+            }}
+            label="Planner-Settings"
+            language="yaml"
+            height="h-[22rem]"
+          />
+          {plannerStatus ? <p className="text-sm leading-6">{plannerStatus}</p> : null}
+          {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
-            Der Planner rechnet den Pfad zum Ziel. Die Lektion dazu kommt noch.
+            Frequenz, Wartezeit auf die Costmap, tolerance, use_astar und allow_unknown. Die Klasse bleibt NavfnPlanner und steht im Knoten planner_plugins. Neue Parameter landen unter GridBased.
           </p>
         </div>
       ) : null}

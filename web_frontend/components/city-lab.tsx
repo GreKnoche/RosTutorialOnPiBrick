@@ -22,7 +22,7 @@ import {
   lookForTopRight,
 } from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
-import { ghostAt, ghostPoses, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
+import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
@@ -217,13 +217,16 @@ export function CityLab({
   const lapArmedRef = useRef(false);
   const ghostRef = useRef<GhostTake | null>(null);
   const ghostLapRef = useRef<GhostPose[]>([]);
-  const ghostRunRef = useRef<{ t0: number } | null>(null);
+  const ghostHoldRef = useRef<number | null>(null);
+  const ghostRunRef = useRef<{ t0: number; line: number } | null>(null);
+  const ghostLimitRef = useRef(0);
+  const raceNoteRef = useRef("");
+  const [raceNote, setRaceNote] = useState("");
+  const ghostSawStart = useRef(false);
   const ghostArmAt = useRef(0);
   const ghostGen = useRef(0);
   const seenRunRef = useRef(false);
   const takeGhostRef = useRef(false);
-  const ghostSavedRef = useRef(false);
-  const [takeGhost, setTakeGhost] = useState(false);
   const [ghostNote, setGhostNote] = useState("");
   const sampleGhostRef = useRef<(sample: TwinState) => void>(() => {});
   const stopGhostRef = useRef<(reason: string) => void>(() => {});
@@ -246,13 +249,9 @@ export function CityLab({
     take.settled = true;
     take.on = false;
     takeGhostRef.current = false;
-    setTakeGhost(false);
     const poses = ghostTrace(take.points);
     void commitGhost(take.points).then((result) => {
-      if (result.ok) {
-        ghostSavedRef.current = true;
-        if (poses.length > 1) ghostLapRef.current = poses;
-      }
+      if (result.ok && poses.length > 1) ghostLapRef.current = poses;
       setGhostNote(result.note);
     });
   };
@@ -300,18 +299,20 @@ export function CityLab({
   useEffect(() => {
     if (!gates) {
       takeGhostRef.current = false;
-      setTakeGhost(false);
       stopGhostRef.current("Aufnahme aus.");
-      return;
     }
-    if (ghostSavedRef.current) return;
-    takeGhostRef.current = true;
-    setTakeGhost(true);
   }, [gates]);
 
   useEffect(() => {
     if (!gates) {
+      ghostHoldRef.current = null;
       ghostRunRef.current = null;
+      ghostSawStart.current = false;
+      ghostLimitRef.current = 0;
+      if (raceNoteRef.current) {
+        raceNoteRef.current = "";
+        setRaceNote("");
+      }
       return;
     }
     let cancel = false;
@@ -429,8 +430,21 @@ export function CityLab({
       const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
       const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
       const run = ghostRunRef.current;
+      if (ghostHoldRef.current !== null && !run && gatesOnRef.current) {
+        const next = lapRef.current?.next ?? "";
+        if (next === "start") ghostSawStart.current = true;
+        else if (ghostSawStart.current && next) {
+          const offset = ghostHoldRef.current;
+          ghostHoldRef.current = null;
+          ghostRunRef.current = { t0: performance.now() - offset * 1000, line: offset };
+        }
+      }
+      const clock = ghostRunRef.current;
+      const held = ghostHoldRef.current;
       const ghost =
-        run && gatesOnRef.current ? ghostAt(ghostLapRef.current, (performance.now() - run.t0) / 1000) : null;
+        gatesOnRef.current && (held !== null || clock)
+          ? ghostAt(ghostLapRef.current, clock ? (performance.now() - clock.t0) / 1000 : (held ?? 0))
+          : null;
       let signature = [
         pose.x.toFixed(3),
         pose.y.toFixed(3),
@@ -498,7 +512,31 @@ export function CityLab({
       const lapDone = Boolean(lapRef.current?.done);
       if (!gatesOn) lapArmedRef.current = false;
       else if (!lapDone) lapArmedRef.current = true;
-      if (gatesOn && lapDone && lapArmedRef.current && !lapDoneRef.current) gatesClearedRef.current?.();
+      if (gatesOn && lapDone && lapArmedRef.current && !lapDoneRef.current) {
+        const run = ghostRunRef.current;
+        const limit = ghostLimitRef.current;
+        const student = run ? (performance.now() - run.t0) / 1000 - run.line : Number.POSITIVE_INFINITY;
+        if (limit > 0 && student > limit + 0.05) {
+          const text = `Zu langsam. ${formatDe(student, 1)} s, der Geist ${formatDe(limit, 1)} s.`;
+          if (raceNoteRef.current !== text) {
+            raceNoteRef.current = text;
+            setRaceNote(text);
+          }
+          ghostRunRef.current = null;
+          ghostHoldRef.current = null;
+          ghostSawStart.current = false;
+          const start = cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 };
+          linkRef.current?.send({
+            type: "reset",
+            client: sessionRef.current,
+            x: start.x,
+            y: start.y,
+            theta: start.theta,
+          });
+        } else {
+          gatesClearedRef.current?.();
+        }
+      }
       lapDoneRef.current = gatesOn && lapDone;
       const current = probeRef.current;
       if (current) {
@@ -586,8 +624,12 @@ export function CityLab({
       take.last = -1;
       take.points = [];
     }
-    ghostRunRef.current =
-      gatesOnRef.current && performance.now() - ghostArmAt.current < 800 ? { t0: performance.now() } : null;
+    const keepGhostHold = gatesOnRef.current && performance.now() - ghostArmAt.current < 800;
+    ghostRunRef.current = null;
+    if (!keepGhostHold) {
+      ghostHoldRef.current = null;
+      ghostSawStart.current = false;
+    }
     if (melonsOnRef.current) {
       holdMelons.current = true;
       melonsRef.current = freshMelons();
@@ -790,10 +832,16 @@ export function CityLab({
         {gates && lap ? (
           <p
             className={`absolute bottom-14 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full px-3 py-1 text-center text-xs font-semibold ${
-              lap.grass ? "bg-[#4a1c14]/90 text-[#ffd0c8]" : lap.done ? "bg-[#14301c]/90 text-[#d7ffe4]" : "bg-[#1c1404]/80 text-[#f4efe4]"
+              raceNote
+                ? "bg-[#4a3414]/90 text-[#ffe7c2]"
+                : lap.grass
+                  ? "bg-[#4a1c14]/90 text-[#ffd0c8]"
+                  : lap.done
+                    ? "bg-[#14301c]/90 text-[#d7ffe4]"
+                    : "bg-[#1c1404]/80 text-[#f4efe4]"
             }`}
           >
-            {lap.text}
+            {raceNote || lap.text}
           </p>
         ) : null}
         {!kapitel && melons ? (
@@ -833,20 +881,6 @@ export function CityLab({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            {gates && onPlay ? (
-              <FlagBox
-                on={takeGhost}
-                title="Die nächste Play-Fahrt wird gespeichert, wenn die Runde geschafft ist."
-                onToggle={() => {
-                  const next = !takeGhostRef.current;
-                  takeGhostRef.current = next;
-                  setTakeGhost(next);
-                  if (!next) stopGhostRef.current("Aufnahme aus.");
-                }}
-              >
-                Geist aufnehmen
-              </FlagBox>
-            ) : null}
             <FlagBox
               on={drift}
               disabled={!rosUp}
@@ -898,14 +932,21 @@ export function CityLab({
                   setGhostNote("Aufnahme läuft.");
                 }
                 const armGhost = gates && ghostLapRef.current.length > 1;
-                if (armGhost) ghostArmAt.current = performance.now();
-                onPlay();
-                if (armGhost) {
-                  window.setTimeout(() => {
-                    if (performance.now() - ghostArmAt.current > 800) return;
-                    ghostRunRef.current = { t0: performance.now() };
-                  }, 0);
+                if (raceNoteRef.current) {
+                  raceNoteRef.current = "";
+                  setRaceNote("");
                 }
+                if (armGhost) {
+                  const line = courseRef.current?.checkpoints.find((gate) => gate.id === "start");
+                  const x = line ? (line.x0 + line.x1) / 2 : 1.76;
+                  const race = ghostRace(ghostLapRef.current, x);
+                  ghostArmAt.current = performance.now();
+                  ghostSawStart.current = false;
+                  ghostRunRef.current = null;
+                  ghostHoldRef.current = race ? race.line : ghostCrossTime(ghostLapRef.current, x);
+                  ghostLimitRef.current = race?.lap ?? 0;
+                }
+                onPlay();
               }}
               disabled={!playReady || playBusy}
               className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#2f6b4f] text-white shadow-sm disabled:opacity-60"

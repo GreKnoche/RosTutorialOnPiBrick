@@ -62,6 +62,36 @@ function mixAngle(from: number, to: number, blend: number) {
   return from + turn * blend;
 }
 
+/** Start-line time and the lap from that line to the next crossing, both in seconds. */
+export function ghostRace(poses: GhostPose[], x: number): { line: number; lap: number } | null {
+  const crossed: number[] = [];
+  for (let index = 1; index < poses.length && crossed.length < 2; index += 1) {
+    const before = poses[index - 1];
+    const after = poses[index];
+    const span = after.x - before.x;
+    if (Math.abs(span) <= 1e-6) continue;
+    if ((before.x - x) * (after.x - x) > 0) continue;
+    const blend = (x - before.x) / span;
+    crossed.push(before.t + (after.t - before.t) * blend);
+  }
+  if (crossed.length < 2) return null;
+  return { line: crossed[0], lap: crossed[1] - crossed[0] };
+}
+
+/** Time in the trace when it first crosses a vertical line at `x`. */
+export function ghostCrossTime(poses: GhostPose[], x: number): number {
+  for (let index = 1; index < poses.length; index += 1) {
+    const before = poses[index - 1];
+    const after = poses[index];
+    const span = after.x - before.x;
+    if (span <= 1e-6) continue;
+    if ((before.x - x) * (after.x - x) > 0) continue;
+    const blend = (x - before.x) / span;
+    return before.t + (after.t - before.t) * blend;
+  }
+  return 0;
+}
+
 /** Pose at `time` seconds. Before the trace the car waits at the start, after it stays at the end. */
 export function ghostAt(poses: GhostPose[], time: number): GhostPose | null {
   if (poses.length === 0) return null;

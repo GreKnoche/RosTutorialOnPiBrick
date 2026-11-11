@@ -4,6 +4,7 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { followPathError, mergeFollowPath } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
+import { mergePlannerSettings, plannerSettingsError } from "@/lib/planner-yaml";
 
 export const runtime = "nodejs";
 
@@ -94,8 +95,8 @@ function yamlSyntaxError(text: string): Promise<string | null> {
     child.stderr?.on("data", (chunk) => {
       out = (out + chunk.toString()).slice(-2_000);
     });
-    child.once("error", () => finish("Die Controller-YAML lässt sich nicht prüfen."));
-    child.once("close", (code) => finish(code === 0 ? null : out.trim() || "Die Controller-YAML ist kein gültiges YAML."));
+    child.once("error", () => finish("nav2_params.yaml lässt sich nicht prüfen."));
+    child.once("close", (code) => finish(code === 0 ? null : out.trim() || "nav2_params.yaml ist kein gültiges YAML."));
     child.stdin?.end(text);
   });
 }
@@ -103,10 +104,18 @@ function yamlSyntaxError(text: string): Promise<string | null> {
 async function resolveParams(
   controller: string | null,
   follower: string | null,
+  planner: string | null,
 ): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null && follower === null) return { file: stock, error: null };
+  if (controller === null && follower === null && planner === null) return { file: stock, error: null };
   let merged = await readFile(stock, "utf8").catch(() => "");
+  if (planner !== null) {
+    const shape = plannerSettingsError(planner);
+    if (shape) return { file: stock, error: shape };
+    const next = mergePlannerSettings(merged, planner);
+    if (!next) return { file: stock, error: "planner_server fehlt in nav2_params.yaml." };
+    merged = next;
+  }
   if (controller !== null) {
     const shape = followPathError(controller);
     if (shape) return { file: stock, error: shape };
@@ -382,6 +391,7 @@ async function runStudent(
   tree: string,
   controller: string | null,
   follower: string | null,
+  planner: string | null,
 ) {
   const gen = ++slot.startGen;
   slot.starting = true;
@@ -391,7 +401,7 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower);
+  const params = await resolveParams(controller, follower, planner);
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
@@ -501,7 +511,17 @@ export async function POST(request: Request) {
     const shape = followerError(follower);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
-  const result = await enqueue(() => runStudent(source, plugin, chosen, controller, follower));
+  let planner: string | null = null;
+  if (body && typeof body === "object" && "planner" in body && (body as { planner?: unknown }).planner !== undefined) {
+    const raw = (body as { planner?: unknown }).planner;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Die Planner-Settings sind leer." }, { status: 400 });
+    }
+    planner = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = plannerSettingsError(planner);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
+  const result = await enqueue(() => runStudent(source, plugin, chosen, controller, follower, planner));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

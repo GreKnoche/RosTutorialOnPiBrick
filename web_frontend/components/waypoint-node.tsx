@@ -160,6 +160,7 @@ export function WaypointNode({
   tree,
   controller,
   follower,
+  planner,
   plugin,
   through = false,
   missionId = "folgen",
@@ -169,6 +170,7 @@ export function WaypointNode({
   tree?: string;
   controller?: string;
   follower?: string;
+  planner?: string;
   plugin: string;
   through?: boolean;
   missionId?: string;
@@ -227,6 +229,7 @@ export function WaypointNode({
           ...(tree === undefined ? {} : { tree }),
           ...(controller === undefined ? {} : { controller }),
           ...(follower === undefined ? {} : { follower }),
+          ...(planner === undefined ? {} : { planner }),
         }),
       });
       const body = (await response.json()) as { ok?: boolean; error?: string; running?: boolean; log?: string };
@@ -241,7 +244,7 @@ export function WaypointNode({
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, onBusy, plugin, source, through, tree]);
+  }, [controller, follower, onBusy, planner, plugin, source, through, tree]);
 
   useEffect(() => {
     driveRef.current = () => {

@@ -435,7 +435,7 @@ export function draw(
       line: "#8ecfff",
       wheel: "rgba(255,255,255,0.22)",
       nose: "rgba(255,255,255,0.28)",
-      width: (glyph) => Math.max(1.6, glyph * 0.04),
+      width: (glyph) => Math.max(0.6, glyph * 0.014),
       outline: true,
     });
   }

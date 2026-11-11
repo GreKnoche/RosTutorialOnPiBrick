@@ -69,6 +69,17 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           retry();
         }}
         onComplete={() => finishRun(replay === null)}
+        onBack={(next) => {
+          setHint(false);
+          setReplay(null);
+          setPicked((current) => {
+            if (!current) return null;
+            const index = PATH_STEPS.findIndex((step) => step.id === current);
+            if (index <= 0 || index >= next) return null;
+            return current;
+          });
+          writeNav2Progress({ started: false, done: next });
+        }}
       />
       <div>
         <CityLab
@@ -117,6 +128,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                     <li>Die Schikane, die enge Ecke und die Kegelreihe stehen im Weg.</li>
                     <li>In der Kehre anhalten, Nase nach Westen. Auf dem Rückweg anhalten, Nase nach Osten, dann die Linie zurück.</li>
                     <li>Gras macht die Runde ungültig.</li>
+                    <li>Die Runde zählt, wenn du schneller oder gleich schnell bist wie der Geist.</li>
                     <li>FollowPath steht im controller_server.</li>
                   </ul>
                 )}

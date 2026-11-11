@@ -9,6 +9,7 @@ const NAV2_TEXT_KEYS = {
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",
   follower: "learn2ros.nav2.follower",
+  planner: "learn2ros.nav2.planner",
 } as const;
 const LESSONS_KEY = "learn2ros.nav2.lessons";
 const NODES_KEY = "learn2ros.nodes";
