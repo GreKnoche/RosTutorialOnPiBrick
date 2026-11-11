@@ -11,9 +11,16 @@ from dataclasses import dataclass
 from city_geom import BODY_LENGTH_M
 
 HOUSE_HEIGHT_M = 1.15
+ROAD_W = 0.72
 
-FINISH_A = (1.76, 5.89)
-FINISH_B = (1.8, 5.21)
+# East curb of the west street. The line runs straight across the cross street,
+# from the north edge to the south edge.
+_ROAD_SCALE = ROAD_W / 56.0
+_WEST_X = 1.4
+_CROSS_Y = 0.9 + (620.0 - 258.0) * _ROAD_SCALE
+_HALF = ROAD_W / 2.0
+FINISH_A = (_WEST_X + _HALF, _CROSS_Y + _HALF)
+FINISH_B = (_WEST_X + _HALF, _CROSS_Y - _HALF)
 CHECK_LIGHT = (244, 244, 242)
 CHECK_DARK = (28, 28, 26)
 
@@ -42,13 +49,19 @@ class Segment:
 
 @dataclass(frozen=True)
 class Gate:
-    """A line the car has to drive across. Start and finish share one segment."""
+    """A line the car has to drive across. Start and finish share one segment.
+
+    A halt gate counts only when the car stops on the line, nose within
+    about 0.6 rad of yaw.
+    """
 
     id: str
     x0: float
     y0: float
     x1: float
     y1: float
+    halt: bool = False
+    yaw: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -83,9 +96,6 @@ class Mark:
     y: float
     w: float
     h: float
-
-
-ROAD_W = 0.72
 
 
 def _arc_points(cx: float, cy: float, radius: float, a0: float, a1: float, steps: int) -> list[tuple[float, float]]:

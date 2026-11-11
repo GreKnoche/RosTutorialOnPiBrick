@@ -2,6 +2,7 @@ import { PathIcon } from "@/components/path-icon";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { LessonIndex } from "@/components/lesson-index";
+import { readCatalog } from "@/lib/catalog-file";
 import {
   getTrackMeta,
   lessonsForTrack,
@@ -16,13 +17,14 @@ export function TrackLessons({
   trackId: TrackId;
   kicker: string;
 }) {
-  const track = getTrackMeta(trackId);
-  const lessons = lessonsForTrack(trackId);
+  const catalog = readCatalog();
+  const track = getTrackMeta(trackId, catalog);
+  const lessons = lessonsForTrack(trackId, catalog);
   const ready = lessons.filter((lesson) => lesson.status === "ready").length;
 
   return (
     <div className="flex flex-col gap-8">
-      <Breadcrumbs items={trackCrumbs(trackId)} />
+      <Breadcrumbs items={trackCrumbs(trackId, undefined, catalog)} />
       <section className="flex flex-col gap-4">
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
           {kicker}

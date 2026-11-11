@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { loadCurriculum, type Lesson } from "@/lib/curriculum";
+import { readCatalog } from "@/lib/catalog-file";
+import { type Lesson } from "@/lib/curriculum";
 import type { LessonCopy } from "@/lib/lesson-copy";
 import { loadLessonCopy } from "@/lib/load-lesson-copy";
 
@@ -62,7 +63,7 @@ export function freshGlossaryTerms(lesson: Lesson): GlossaryEntry[] {
     (lesson.taughtTerms ?? []).map((term) => term.toLocaleLowerCase("de")),
   );
   const seen = new Set<string>();
-  for (const earlier of loadCurriculum().lessons) {
+  for (const earlier of readCatalog().lessons) {
     if (earlier.track === lesson.track && earlier.id === lesson.id) break;
     if (earlier.slug === "behavior-trees") continue;
     const earlierCopy = loadLessonCopy(earlier.track, earlier.id, earlier.slug);

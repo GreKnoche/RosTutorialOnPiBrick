@@ -6,7 +6,7 @@ import math
 
 from city_map import CityMap, House
 
-CONE_COLOR = (232, 120, 32)
+CONE_COLOR = (255, 224, 96)
 CONE_SIZE = 0.22
 CONE_HEIGHT = 0.28
 
@@ -73,11 +73,16 @@ class CityScene:
 
     def set_clutter(self, enabled: bool) -> None:
         if enabled:
-            half = CONE_SIZE / 2.0
-            self.clutter = [
-                House(f"kegel-{index}", x - half, y - half, CONE_SIZE, CONE_SIZE, CONE_COLOR, CONE_HEIGHT)
-                for index, (x, y) in enumerate(self.chart.cones)
-            ]
+            self.set_obstacles(list(self.chart.cones))
         else:
-            self.clutter = []
+            self.set_obstacles([])
+
+    def set_obstacles(self, points: list[tuple[float, ...]]) -> None:
+        houses: list[House] = []
+        for index, block in enumerate(points):
+            x, y = block[0], block[1]
+            w = block[2] if len(block) > 2 else CONE_SIZE
+            h = block[3] if len(block) > 3 else CONE_SIZE
+            houses.append(House(f"kegel-{index}", x - w / 2.0, y - h / 2.0, w, h, CONE_COLOR, CONE_HEIGHT))
+        self.clutter = houses
         self._rects = [house.bounds for house in (*self.chart.houses, *self.clutter)]

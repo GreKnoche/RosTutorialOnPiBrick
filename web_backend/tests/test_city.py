@@ -235,8 +235,13 @@ def test_the_lap_crosses_the_gates_in_order_and_grass_ends_it() -> None:
 
 
 def test_the_finish_line_crosses_the_street_and_the_car_waits_in_front() -> None:
-    from city import BODY_LENGTH_M, FINISH_A, FINISH_B
+    from city import BODY_LENGTH_M, FINISH_A, FINISH_B, ROAD_W
 
+    curb = CITY.place("west").x + ROAD_W / 2.0
+    street = CITY.place("kreuzung").y
+    assert math.isclose(FINISH_A[0], curb) and math.isclose(FINISH_B[0], curb)
+    assert math.isclose(FINISH_A[1], street + ROAD_W / 2.0)
+    assert math.isclose(FINISH_B[1], street - ROAD_W / 2.0)
     assert len(CITY.finish) == 16
     points = [corner for corners, _color in CITY.finish for corner in corners]
     assert any(math.isclose(px, FINISH_A[0], abs_tol=1e-9) and math.isclose(py, FINISH_A[1], abs_tol=1e-9) for px, py in points)
@@ -481,3 +486,46 @@ def test_only_the_lab_socket_receives_the_camera() -> None:
     assert seen["ranges"] == [1.0, None]
     assert {"type": "city", "enter": True, "client": "labor"} in bridge.payloads
     assert bridge.payloads[-1] == {"type": "city", "enter": False, "client": "labor"}
+
+
+def test_a_halt_gate_counts_only_when_the_car_stops() -> None:
+    from city_map import Gate
+    from lap import Lap
+
+    gate = Gate("halten", 2.0, 0.0, 2.2, 0.0, True, math.pi)
+    lap = Lap((gate,), lambda _x, _y: True)
+    lap.reset(1.0, 0.0, True)
+    lap.observe(1.5, 0.0, 2.5, 0.0, math.pi, 0.4)
+    assert lap.status()["next"] == "halten"
+    lap.observe(2.1, 0.05, 2.1, 0.0, 0.0, 0.02)
+    assert lap.status()["next"] == "halten"
+    lap.observe(2.1, 0.02, 2.1, 0.0, math.pi, 0.02)
+    assert lap.status()["done"] is True
+
+
+def test_a_mission_spawns_its_cones_and_checkpoints() -> None:
+    CITY.set_clutter(False)
+    try:
+        plant = CanvasPlant()
+        apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
+        apply_message(
+            plant,
+            {
+                "type": "mission",
+                "client": "labor",
+                "obstacles": [{"x": 3.0, "y": 5.55}],
+                "checkpoints": [{"id": "start", "x0": 1.0, "y0": 0.0, "x1": 1.2, "y1": 0.0, "halt": True, "yaw": 1.2}],
+            },
+        )
+        assert len(CITY.clutter) == 1
+        assert plant.lap is not None
+        assert plant.lap.gates[0].id == "start"
+        assert plant.lap.gates[0].halt is True
+        apply_message(plant, {"type": "mission", "client": "other", "obstacles": [], "checkpoints": None})
+        assert len(CITY.clutter) == 1
+        apply_message(plant, {"type": "mission", "client": "labor", "obstacles": [], "checkpoints": None})
+        assert CITY.clutter == []
+        assert plant.lap is not None
+        assert [gate.id for gate in plant.lap.gates] == [gate.id for gate in CITY.gates]
+    finally:
+        CITY.set_clutter(False)

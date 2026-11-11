@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { WaypointNode } from "@/components/waypoint-node";
 import { CodeEditor } from "@/components/code-editor";
-import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
+import { readLessonText, serverText, subscribeDrafts, writeLessonText } from "@/lib/browser-draft";
 import { absorbFollowPath, followPathError } from "@/lib/controller-yaml";
 import { followerError } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
-import { NAV_NODES, type NavNode } from "@/lib/nav2-lessons";
+import { NAV_NODES, type NavNode, type StationGraph } from "@/lib/nav2-lessons";
 
 type LinkShow = "poses" | "tree" | "direct" | "path" | "through" | "throughPlan" | "throughTree" | "planned" | "plannedDrive";
 
@@ -31,21 +31,9 @@ const LINKS: GraphLink[] = [
   { from: "planner", to: "controller", label: "follow_path", show: "plannedDrive" },
 ];
 
-function readManeuver() {
-  return readNav2Text("maneuver");
-}
-
-function readMission() {
-  return readNav2Text("mission");
-}
-
-function readController() {
-  return readNav2Text("controller");
-}
-
-function readFollower() {
-  const text = readNav2Text("follower");
-  if (text && followerError(text)) return null;
+function readField(missionId: string, field: "maneuver" | "mission" | "controller" | "follower") {
+  const text = readLessonText(missionId, field);
+  if (field === "follower" && text && followerError(text)) return null;
   return text;
 }
 
@@ -68,41 +56,58 @@ function placeNode(node: NavNode, controller: boolean, planner: boolean, tree: b
   return node;
 }
 
-function nodeTone(selected: boolean) {
-  const ring = selected ? "ring-2 ring-[#e6b325]" : "ring-1 ring-border";
-  return `${ring} bg-[#f8e7b0] text-[#3c3214]`;
+const NODE_FILL: Record<string, string> = {
+  waypoint_lesson: "bg-[#f6d56b]",
+  waypoint_follower: "bg-[#8fceaa]",
+  maneuver: "bg-[#f3b183]",
+  controller: "bg-[#8ec0ea]",
+  planner: "bg-[#c9b4ee]",
+  mission: "bg-[#f0a3bc]",
+};
+
+function nodeTone(id: string, state: "on" | "focus" | "idle") {
+  const fill = NODE_FILL[id] ?? "bg-[#f8e7b0]";
+  const ring =
+    state === "on"
+      ? "ring-2 ring-[#a67c12] ring-offset-2 ring-offset-background"
+      : state === "focus"
+        ? "ring-2 ring-[#2f6b4f] ring-offset-2 ring-offset-background"
+        : "ring-1 ring-white/80";
+  return `${fill} ${ring} text-[#3c3214] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_3px_0_rgba(60,50,20,0.16)]`;
 }
 
 export function NavGraph({
-  controller = false,
-  planner = false,
-  tree = false,
-  through = false,
-  active = "",
+  graph,
   playRef,
   onPlayBusy,
+  onPick,
 }: {
-  controller?: boolean;
-  planner?: boolean;
-  tree?: boolean;
-  through?: boolean;
-  active?: string;
+  graph: StationGraph;
   playRef?: RefObject<() => void>;
   onPlayBusy?: (busy: boolean) => void;
+  onPick?: (id: string) => void;
 }) {
-  const visible = NAV_NODES.filter((node) => {
-    if (through && (node.id === "maneuver" || node.id === "waypoint_follower")) return false;
-    if (node.show === "controller") return controller;
-    if (node.show === "planner") return planner;
-    if (node.show === "baum-1") return tree;
-    return true;
-  }).map((node) => placeNode(node, controller, planner, tree, through));
+  const { through, controller, planner, tree } = graph;
+  const missionId = graph.id;
+  const focusNode = graph.focus;
+  const open = new Set(graph.nodes);
+  const visible = NAV_NODES.filter((node) => open.has(node.id)).map((node) => placeNode(node, controller, planner, tree, through));
   const span = visible.reduce((high, node) => Math.max(high, node.y), 0) - visible.reduce((low, node) => Math.min(low, node.y), 100);
   const graphHeight = span === 0 ? "3rem" : `${4 + span * 0.25}rem`;
-  const [selected, setSelected] = useState("waypoint_lesson");
-  useEffect(() => {
-    if (through && (selected === "maneuver" || selected === "waypoint_follower")) setSelected("waypoint_lesson");
-  }, [through, selected]);
+  const [pickedNode, setPickedNode] = useState<string | null>(null);
+  const [pickedFocus, setPickedFocus] = useState(focusNode);
+  if (pickedFocus !== focusNode) {
+    setPickedFocus(focusNode);
+    setPickedNode(null);
+  }
+  const wanted = pickedNode ?? focusNode;
+  const wantedHidden = through && (wanted === "maneuver" || wanted === "waypoint_follower");
+  const selected =
+    !wantedHidden && visible.some((node) => node.id === wanted) ? wanted : (visible[0]?.id ?? "waypoint_lesson");
+  const readManeuver = useCallback(() => readField(missionId, "maneuver"), [missionId]);
+  const readMission = useCallback(() => readField(missionId, "mission"), [missionId]);
+  const readController = useCallback(() => readField(missionId, "controller"), [missionId]);
+  const readFollower = useCallback(() => readField(missionId, "follower"), [missionId]);
   const missionDraft = useSyncExternalStore(subscribeDrafts, readMission, serverText);
   const maneuverDraft = useSyncExternalStore(subscribeDrafts, readManeuver, serverText);
   const controllerDraft = useSyncExternalStore(subscribeDrafts, readController, serverText);
@@ -250,14 +255,14 @@ export function NavGraph({
               key={node.id}
               type="button"
               aria-pressed={node.id === current.id}
-              onClick={() => setSelected(node.id)}
-              className={`absolute z-20 w-28 -translate-y-1/2 rounded-xl px-1.5 py-1 text-center ${span === 0 ? "" : "-translate-x-1/2"} ${
-                node.id === current.id
-                  ? nodeTone(true)
-                  : node.id === active
-                    ? "bg-[#f8e7b0] text-[#3c3214] ring-2 ring-[#2f6b4f]"
-                    : nodeTone(false)
-              }`}
+              onClick={() => {
+                setPickedNode(node.id);
+                onPick?.(node.id);
+              }}
+              className={`absolute z-20 w-28 -translate-y-1/2 rounded-full px-2.5 py-1.5 text-center ${span === 0 ? "" : "-translate-x-1/2"} ${nodeTone(
+                node.id,
+                node.id === current.id ? "on" : node.id === focusNode ? "focus" : "idle",
+              )}`}
               style={{ left: span === 0 ? "0" : `${node.x}%`, top: `${node.y}%` }}
             >
               <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{node.name}</span>
@@ -272,18 +277,17 @@ export function NavGraph({
           follower={followerStatus === "" ? followerYaml : undefined}
           plugin={maneuver}
           through={through}
+          missionId={missionId}
           driveRef={driveRef}
           onBusy={onPlayBusy}
         />
       </div>
       {current.id === "waypoint_follower" ? (
         <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">waypoint_follower</h3>
-      </div>
+          <h3 className="text-base font-semibold">waypoint_follower</h3>
           <CodeEditor
             value={followerYaml}
-            onChange={(value) => writeNav2Text("follower", value === fileFollower ? null : value)}
+            onChange={(value) => writeLessonText(missionId, "follower", value === (fileFollower ?? "") ? null : value)}
             label="waypoint_follower"
             language="yaml"
             height="h-[16rem]"
@@ -296,14 +300,12 @@ export function NavGraph({
       ) : null}
       {current.id === "controller" ? (
         <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">controller_server</h3>
-      </div>
+          <h3 className="text-base font-semibold">controller_server</h3>
           <CodeEditor
             value={controllerYaml}
             onChange={(value) => {
               const next = absorbFollowPath(controllerYaml, value);
-              writeNav2Text("controller", next === fileController ? null : next);
+              writeLessonText(missionId, "controller", next === (fileController ?? "") ? null : next);
             }}
             label="FollowPath"
             language="yaml"
@@ -330,7 +332,7 @@ export function NavGraph({
           <h3 className="text-base font-semibold">mission.xml</h3>
           <CodeEditor
             value={xml}
-            onChange={(value) => writeNav2Text("mission", value === fileXml ? null : value)}
+            onChange={(value) => writeLessonText(missionId, "mission", value === (fileXml ?? "") ? null : value)}
             label="Behavior Tree mission"
             language="xml"
             height="h-[20rem]"
@@ -340,12 +342,10 @@ export function NavGraph({
       ) : null}
       {current.id === "maneuver" ? (
         <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
-      </div>
+          <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
           <CodeEditor
             value={maneuver}
-            onChange={(value) => writeNav2Text("maneuver", value === MANEUVER_PLUGIN_SOURCE ? null : value)}
+            onChange={(value) => writeLessonText(missionId, "maneuver", value === MANEUVER_PLUGIN_SOURCE ? null : value)}
             label="Manöver maneuver_at_waypoint"
             language="cpp"
             height="h-[36rem]"

@@ -17,7 +17,7 @@ from brick_core.controller import PosePursuitController
 from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
 
-from city import CITY, foot_radius
+from city import CITY, Gate, foot_radius
 
 TICK_HZ = 20.0
 
@@ -186,6 +186,44 @@ class CanvasPlant:
         if camera is not None:
             self.camera = bool(camera)
 
+    def set_course(self, obstacles: object, checkpoints: object) -> None:
+        if self.city is None:
+            return
+        points: list[tuple[float, ...]] = []
+        if isinstance(obstacles, list):
+            for item in obstacles:
+                if not isinstance(item, dict):
+                    continue
+                x, y = _finite(item.get("x")), _finite(item.get("y"))
+                w, h = _finite(item.get("w")), _finite(item.get("h"))
+                points.append((x, y, w, h) if w > 0.0 and h > 0.0 else (x, y))
+        self.city.set_obstacles(points)
+        gates = CITY.gates
+        if isinstance(checkpoints, list):
+            parsed: list[Gate] = []
+            for item in checkpoints:
+                if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                    continue
+                parsed.append(
+                    Gate(
+                        item["id"],
+                        _finite(item.get("x0")),
+                        _finite(item.get("y0")),
+                        _finite(item.get("x1")),
+                        _finite(item.get("y1")),
+                        bool(item.get("halt")),
+                        _finite(item.get("yaw")),
+                    )
+                )
+            if parsed:
+                gates = tuple(parsed)
+        from lap import Lap
+
+        self.lap = Lap(gates, self.city.on_asphalt)
+        pose = self.odom.pose
+        home = abs(pose.x - self.city.start_x) < 0.05 and abs(pose.y - self.city.start_y) < 0.05
+        self.lap.reset(pose.x, pose.y, home)
+
     def command_twist(self, linear: float, angular: float) -> None:
         self._mode = "teleop"
         self._queue = []
@@ -352,7 +390,8 @@ class CanvasPlant:
         self.city.resolve(self.odom.pose, foot_radius())
         after = self.odom.pose
         if self.lap is not None:
-            self.lap.observe(before.x, before.y, after.x, after.y)
+            speed = math.hypot(after.x - before.x, after.y - before.y) / dt
+            self.lap.observe(before.x, before.y, after.x, after.y, after.theta, speed)
         dtheta = wrap_angle(after.theta - before.theta)
         mid = before.theta + 0.5 * dtheta
         ds = (after.x - before.x) * math.cos(mid) + (after.y - before.y) * math.sin(mid)
@@ -432,6 +471,10 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
                 payload.get("clutter") if "clutter" in payload else None,
                 payload.get("camera") if "camera" in payload else None,
             )
+        return ApplyResult()
+    if kind == "mission":
+        if plant.city is not None and client_id == plant.city_holder:
+            plant.set_course(payload.get("obstacles"), payload.get("checkpoints"))
         return ApplyResult()
     if kind == "probe":
         if plant.city is not None and client_id == plant.city_holder:

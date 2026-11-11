@@ -1,19 +1,15 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 from brick_lessons.goals import GOALS, Step
 
 REPO = Path(__file__).resolve().parents[4]
-CURRICULUM = REPO / "web_frontend" / "lib" / "curriculum.ts"
+CATALOG = REPO / "web_frontend" / "content" / "catalog.json"
 LEVELS = REPO / "web_frontend" / "lib" / "lesson-levels.ts"
 PACKAGE = Path(__file__).resolve().parents[1] / "brick_lessons"
-
-_LESSON = re.compile(
-    r'\{\s*id:\s*"(\d+)"[^{}]*?track:\s*"(autonom|ros)"',
-    re.S,
-)
 _LEVEL = re.compile(
     r'"(autonom|ros):(\d+)":\s*\{(?P<body>.*?)\n  \},',
     re.S,
@@ -26,8 +22,12 @@ _INLINE = re.compile(r"distanceM:\s*([0-9.eE+-]+)\s*,\s*yawRad:\s*([0-9.eE+-]+)"
 
 
 def _curriculum_keys() -> set[str]:
-    text = CURRICULUM.read_text(encoding="utf-8")
-    return {f"{track}_{lesson_id}" for lesson_id, track in _LESSON.findall(text)}
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    return {
+        f"{lesson['track']}_{lesson['id']}"
+        for lesson in catalog["lessons"]
+        if lesson["track"] in {"autonom", "ros"}
+    }
 
 
 def _named_steps() -> dict[str, Step]:

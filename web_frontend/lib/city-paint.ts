@@ -245,7 +245,7 @@ function paintWorld(
     }
     const cones =
       probe?.scene === "kegel" && clutter.length === 0
-        ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#e87820" }))
+        ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#ffe060" }))
         : [];
     const blocks = [...city.houses, ...clutter, ...cones];
     for (const house of blocks) {
@@ -310,7 +310,7 @@ function drawGates(
     if (gate.id === "start" || gate.id === "ziel") continue;
     const at = order.indexOf(gate.id);
     const passed = lap?.done || (active >= 0 && at < active);
-    ctx.strokeStyle = lap?.grass ? "#e15a4a" : passed ? "#7dcea0" : at === active ? "#7ee0ff" : "#ffb040";
+    ctx.strokeStyle = lap?.grass ? "#e15a4a" : at === active ? "#ffffff" : "#9fd4ff";
     ctx.lineWidth = Math.max(3, ppm * (at === active ? 0.06 : 0.04));
     const a = to(gate.x0, gate.y0);
     const b = to(gate.x1, gate.y1);
@@ -321,11 +321,64 @@ function drawGates(
   }
 }
 
+type Pose = { x: number; y: number; theta: number };
+
+type ChassisPaint = {
+  body: string;
+  line: string;
+  wheel: string;
+  nose: string;
+  width: (glyph: number) => number;
+  outline: boolean;
+};
+
+function drawChassis(
+  ctx: CanvasRenderingContext2D,
+  to: (x: number, y: number) => Screen,
+  pose: Pose,
+  ppm: number,
+  minBody: boolean,
+  dpr: number,
+  paint: ChassisPaint,
+) {
+  const center = to(pose.x, pose.y);
+  ctx.save();
+  ctx.translate(center.x, center.y);
+  ctx.rotate(-pose.theta);
+  const length = minBody ? Math.max(BODY_L * ppm, MIN_BODY_L * dpr) : BODY_L * ppm;
+  const widthBody = minBody ? Math.max(BODY_W * ppm, MIN_BODY_W * dpr) : BODY_W * ppm;
+  const glyph = length / BODY_L;
+  ctx.fillStyle = paint.body;
+  ctx.strokeStyle = paint.line;
+  ctx.lineWidth = paint.width(glyph);
+  ctx.beginPath();
+  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, glyph * 0.01);
+  ctx.fill();
+  ctx.stroke();
+  const wheel = glyph * 0.02;
+  ctx.fillStyle = paint.wheel;
+  ctx.fillRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
+  ctx.fillRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
+  if (paint.outline) {
+    ctx.strokeRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
+    ctx.strokeRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
+  }
+  ctx.fillStyle = paint.nose;
+  ctx.beginPath();
+  ctx.moveTo(length / 2 + length * 0.18, 0);
+  ctx.lineTo(length / 2 - length * 0.22, -widthBody * 0.28);
+  ctx.lineTo(length / 2 - length * 0.22, widthBody * 0.28);
+  ctx.closePath();
+  ctx.fill();
+  if (paint.outline) ctx.stroke();
+  ctx.restore();
+}
+
 export function draw(
   canvas: HTMLCanvasElement | null,
   frame: HTMLDivElement | null,
   city: CityMap | null,
-  pose: { x: number; y: number; theta: number },
+  pose: Pose,
   ranges: Array<number | null> | undefined,
   clutter: Rect[],
   showRays: boolean,
@@ -337,6 +390,8 @@ export function draw(
   minBody: boolean,
   lap: LapState | null,
   gates: boolean,
+  courseGates: Gate[] | null = null,
+  ghost: Pose | null = null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -348,7 +403,7 @@ export function draw(
   const layer = cachedWorld(width, height, zoom, view, city, clutter, probe, runner);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(layer, 0, 0);
-  if (gates && city) drawGates(ctx, to, ppm, city.gates, lap);
+  if (gates && city) drawGates(ctx, to, ppm, courseGates ?? city.gates, lap);
 
   if (melons) {
     MELONS.forEach(([x, y], index) => {
@@ -373,33 +428,25 @@ export function draw(
     });
   }
 
-  const center = to(pose.x, pose.y);
-  ctx.save();
-  ctx.translate(center.x, center.y);
-  ctx.rotate(-pose.theta);
   const dpr = width / Math.max(1, canvas.clientWidth || width);
-  const length = minBody ? Math.max(BODY_L * ppm, MIN_BODY_L * dpr) : BODY_L * ppm;
-  const widthBody = minBody ? Math.max(BODY_W * ppm, MIN_BODY_W * dpr) : BODY_W * ppm;
-  const glyph = length / BODY_L;
-  ctx.fillStyle = TRACK_CAR.nav2;
-  ctx.strokeStyle = "#fff7ed";
-  ctx.lineWidth = Math.max(0.5, glyph * 0.012);
-  ctx.beginPath();
-  ctx.roundRect(-length / 2, -widthBody / 2, length, widthBody, glyph * 0.01);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#111318";
-  const wheel = glyph * 0.02;
-  ctx.fillRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
-  ctx.fillRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
-  ctx.fillStyle = "#fff7ed";
-  ctx.beginPath();
-  ctx.moveTo(length / 2 + length * 0.18, 0);
-  ctx.lineTo(length / 2 - length * 0.22, -widthBody * 0.28);
-  ctx.lineTo(length / 2 - length * 0.22, widthBody * 0.28);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  if (ghost) {
+    drawChassis(ctx, to, ghost, ppm, minBody, dpr, {
+      body: "rgba(255,255,255,0.35)",
+      line: "#8ecfff",
+      wheel: "rgba(255,255,255,0.22)",
+      nose: "rgba(255,255,255,0.28)",
+      width: (glyph) => Math.max(1.6, glyph * 0.04),
+      outline: true,
+    });
+  }
+  drawChassis(ctx, to, pose, ppm, minBody, dpr, {
+    body: TRACK_CAR.nav2,
+    line: "#fff7ed",
+    wheel: "#111318",
+    nose: "#fff7ed",
+    width: (glyph) => Math.max(0.5, glyph * 0.012),
+    outline: false,
+  });
 
   ctx.fillStyle = "rgba(255,247,237,0.8)";
   ctx.font = `${Math.max(12, ppm * 0.04)}px ui-sans-serif, system-ui`;

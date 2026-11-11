@@ -5,6 +5,7 @@ import { LocateFixed, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { parseCity, type CityMap, type LapState, type Rect } from "@/lib/city-map";
 import { draw } from "@/lib/city-paint";
+import type { MissionCheckpoint, MissionObstacle } from "@/lib/nav2-lessons";
 import {
   emptyMemory,
   parseProbe,
@@ -21,10 +22,37 @@ import {
   lookForTopRight,
 } from "@/lib/city-view";
 import { formatDe } from "@/lib/format";
+import { ghostAt, ghostPoses, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type MapPin = { left: number; top: number; x: number; y: number };
+
+type GhostTake = {
+  on: boolean;
+  settled: boolean;
+  t0: number;
+  last: number;
+  points: GhostPose[];
+};
+
+async function commitGhost(points: GhostPose[]): Promise<{ ok: boolean; note: string }> {
+  const poses = ghostTrace(points);
+  if (poses.length < 2) return { ok: false, note: "Zu wenig Bewegung. Aufnahme verworfen." };
+  try {
+    const response = await fetch("/api/ghost-lap", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ poses }),
+    });
+    const body = (await response.json()) as { ok?: boolean; message?: string; count?: number; seconds?: number };
+    if (!response.ok || body.ok !== true) return { ok: false, note: body.message ?? "Geist nicht gespeichert." };
+    const seconds = typeof body.seconds === "number" ? body.seconds.toFixed(1) : "?";
+    return { ok: true, note: `Geist gespeichert, ${body.count ?? poses.length} Punkte, ${seconds} s.` };
+  } catch {
+    return { ok: false, note: "Geist nicht gespeichert." };
+  }
+}
 
 function MiniTwin() {
   return (
@@ -49,6 +77,37 @@ function TwinOrbit() {
         </span>
       </span>
     </span>
+  );
+}
+
+function FlagBox({
+  on,
+  disabled = false,
+  title,
+  onToggle,
+  children,
+}: {
+  on: boolean;
+  disabled?: boolean;
+  title?: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={disabled}
+      title={title}
+      onClick={onToggle}
+      className={`rounded-md border px-2.5 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        on
+          ? "border-[#7aa3c4] bg-active-lesson text-foreground"
+          : "border-border bg-card text-foreground hover:bg-muted"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -87,6 +146,9 @@ export function CityLab({
   notice = null,
   melons = false,
   gates = false,
+  course = null,
+  missionKey = "",
+  round = 0,
   onMelonsCleared,
   onGatesCleared,
   onPlay,
@@ -97,6 +159,9 @@ export function CityLab({
   notice?: ReactNode;
   melons?: boolean;
   gates?: boolean;
+  course?: { obstacles: MissionObstacle[]; checkpoints: MissionCheckpoint[] } | null;
+  missionKey?: string;
+  round?: number;
   onMelonsCleared?: () => void;
   onGatesCleared?: () => void;
   onPlay?: () => void;
@@ -106,7 +171,7 @@ export function CityLab({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
-  const poseRef = useRef({ x: 1.6, y: 5.54, theta: 0 });
+  const poseRef = useRef({ x: 1.576, y: 5.554, theta: 0 });
   const lapRef = useRef<LapState | null>(null);
   const [lap, setLap] = useState<LapState | null>(null);
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
@@ -123,7 +188,6 @@ export function CityLab({
   const logRef = useRef<HTMLPreElement>(null);
   const [mapUp, setMapUp] = useState(false);
   const [drift, setDrift] = useState(false);
-  const [clutter, setClutter] = useState(false);
   const [camera, setCamera] = useState(false);
   const [rays, setRays] = useState(false);
   const raysRef = useRef(false);
@@ -143,12 +207,26 @@ export function CityLab({
   melonsOnRef.current = melons;
   const gatesOnRef = useRef(gates);
   gatesOnRef.current = gates;
+  const courseRef = useRef(course);
+  courseRef.current = course;
   const clearedRef = useRef(onMelonsCleared);
   clearedRef.current = onMelonsCleared;
   const gatesClearedRef = useRef(onGatesCleared);
   gatesClearedRef.current = onGatesCleared;
   const lapDoneRef = useRef(false);
   const lapArmedRef = useRef(false);
+  const ghostRef = useRef<GhostTake | null>(null);
+  const ghostLapRef = useRef<GhostPose[]>([]);
+  const ghostRunRef = useRef<{ t0: number } | null>(null);
+  const ghostArmAt = useRef(0);
+  const ghostGen = useRef(0);
+  const seenRunRef = useRef(false);
+  const takeGhostRef = useRef(false);
+  const ghostSavedRef = useRef(false);
+  const [takeGhost, setTakeGhost] = useState(false);
+  const [ghostNote, setGhostNote] = useState("");
+  const sampleGhostRef = useRef<(sample: TwinState) => void>(() => {});
+  const stopGhostRef = useRef<(reason: string) => void>(() => {});
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
@@ -163,7 +241,93 @@ export function CityLab({
     if (!melons) return;
     melonsRef.current = freshMelons();
     setMelonsLeft(MELONS.length);
-  }, [melons]);
+  }, [melons, missionKey]);
+  const keepGhost = (take: GhostTake) => {
+    take.settled = true;
+    take.on = false;
+    takeGhostRef.current = false;
+    setTakeGhost(false);
+    const poses = ghostTrace(take.points);
+    void commitGhost(take.points).then((result) => {
+      if (result.ok) {
+        ghostSavedRef.current = true;
+        if (poses.length > 1) ghostLapRef.current = poses;
+      }
+      setGhostNote(result.note);
+    });
+  };
+  sampleGhostRef.current = (sample) => {
+    const take = ghostRef.current;
+    if (!take?.on || take.settled) return;
+    const now = performance.now();
+    if (take.t0 === 0) take.t0 = now;
+    const t = (now - take.t0) / 1000;
+    if (t > 180) {
+      take.settled = true;
+      take.on = false;
+      setGhostNote("Aufnahme zu lang. Verworfen.");
+      return;
+    }
+    if (take.last < 0 || t - take.last >= 0.1) {
+      take.points.push({ t, x: sample.x, y: sample.y, theta: sample.theta });
+      take.last = t;
+    }
+    if (sample.lap?.done) {
+      if (take.last < 0 || t - take.last > 1e-3) {
+        take.points.push({ t, x: sample.x, y: sample.y, theta: sample.theta });
+      }
+      keepGhost(take);
+      return;
+    }
+    if (sample.lap?.grass) {
+      take.settled = true;
+      take.on = false;
+      setGhostNote("Gras. Aufnahme verworfen.");
+    }
+  };
+  stopGhostRef.current = (reason) => {
+    const take = ghostRef.current;
+    if (!take?.on || take.settled) return;
+    if (lapRef.current?.done) {
+      keepGhost(take);
+      return;
+    }
+    take.settled = true;
+    take.on = false;
+    if (reason) setGhostNote(reason);
+  };
+
+  useEffect(() => {
+    if (!gates) {
+      takeGhostRef.current = false;
+      setTakeGhost(false);
+      stopGhostRef.current("Aufnahme aus.");
+      return;
+    }
+    if (ghostSavedRef.current) return;
+    takeGhostRef.current = true;
+    setTakeGhost(true);
+  }, [gates]);
+
+  useEffect(() => {
+    if (!gates) {
+      ghostRunRef.current = null;
+      return;
+    }
+    let cancel = false;
+    fetch("/api/ghost-lap")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (cancel) return;
+        const poses = ghostPoses(body && typeof body === "object" ? (body as { poses?: unknown }).poses : null);
+        if (poses) ghostLapRef.current = poses;
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, [gates]);
+
   const [mapPin, setMapPin] = useState<MapPin | null>(null);
   const pinTimer = useRef<number | null>(null);
 
@@ -195,6 +359,15 @@ export function CityLab({
         if (up) {
           link.send({ type: "city", enter: true, client: session });
           link.send({ type: "flags", client: session, camera: cameraRef.current });
+          const running = courseRef.current;
+          if (running) {
+            link.send({
+              type: "mission",
+              client: session,
+              obstacles: running.obstacles,
+              checkpoints: running.checkpoints,
+            });
+          }
           const id = kapitelRef.current;
           if (id) link.send({ type: "probe", client: session, kapitel: id });
         }
@@ -214,6 +387,7 @@ export function CityLab({
             : nextLap,
         );
         motionRef.current = { linear: sample.linear, angular: sample.angular };
+        sampleGhostRef.current(sample);
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
         runnerRef.current = sample.runner
@@ -234,7 +408,7 @@ export function CityLab({
   useEffect(() => {
     const lap = lapRef.current;
     if (!gates || !lap || (!lap.done && !lap.grass)) return;
-    const start = cityRef.current?.start ?? { x: 1.6, y: 5.54, theta: 0 };
+    const start = cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 };
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -254,10 +428,14 @@ export function CityLab({
       const frame = frameRef.current;
       const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
       const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
+      const run = ghostRunRef.current;
+      const ghost =
+        run && gatesOnRef.current ? ghostAt(ghostLapRef.current, (performance.now() - run.t0) / 1000) : null;
       let signature = [
         pose.x.toFixed(3),
         pose.y.toFixed(3),
         pose.theta.toFixed(3),
+        ghost ? `${ghost.x.toFixed(2)}:${ghost.y.toFixed(2)}:${ghost.theta.toFixed(2)}` : "",
         view.x.toFixed(3),
         view.y.toFixed(3),
         zoomRef.current,
@@ -272,6 +450,7 @@ export function CityLab({
         probeRef.current?.kapitel ?? "",
         probeRef.current?.scene ?? "",
         gatesOnRef.current ? "1" : "0",
+        (courseRef.current?.checkpoints ?? []).map((gate) => gate.id).join(","),
         lapRef.current?.next ?? "",
         lapRef.current?.done ? "1" : "0",
         lapRef.current?.grass ? "1" : "0",
@@ -297,11 +476,17 @@ export function CityLab({
           minBodyRef.current,
           gatesOnRef.current ? lapRef.current : null,
           gatesOnRef.current,
+          courseRef.current?.checkpoints ?? null,
+          ghost,
         );
       }
       if (!kapitelRef.current && melonsOnRef.current) {
         const pose = poseRef.current;
-        const next = takeMelons(melonsRef.current, pose.x, pose.y);
+        if (holdMelons.current) {
+          const start = cityRef.current?.start;
+          if (!start || Math.hypot(pose.x - start.x, pose.y - start.y) < 0.25) holdMelons.current = false;
+        }
+        const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y);
         if (next !== melonsRef.current) {
           melonsRef.current = next;
           const left = next.filter(Boolean).length;
@@ -375,13 +560,55 @@ export function CityLab({
     });
   }, [kapitel, rosUp]);
 
-  const sendFlags = (nextDrift: boolean, nextClutter: boolean, nextCamera: boolean) => {
+  const courseKey = JSON.stringify(course ?? null);
+  const courseWasOn = useRef(false);
+  useEffect(() => {
+    if (!rosUp) return;
+    if (!courseRef.current && !courseWasOn.current) return;
+    courseWasOn.current = courseRef.current !== null;
+    const running = courseRef.current;
+    linkRef.current?.send({
+      type: "mission",
+      client: sessionRef.current,
+      obstacles: running?.obstacles ?? [],
+      checkpoints: running?.checkpoints ?? null,
+    });
+  }, [courseKey, rosUp]);
+
+  const roundSeen = useRef(round);
+  const holdMelons = useRef(false);
+  useEffect(() => {
+    if (roundSeen.current === round) return;
+    roundSeen.current = round;
+    const take = ghostRef.current;
+    if (take?.on && !take.settled) {
+      take.t0 = 0;
+      take.last = -1;
+      take.points = [];
+    }
+    ghostRunRef.current =
+      gatesOnRef.current && performance.now() - ghostArmAt.current < 800 ? { t0: performance.now() } : null;
+    if (melonsOnRef.current) {
+      holdMelons.current = true;
+      melonsRef.current = freshMelons();
+      setMelonsLeft(MELONS.length);
+    }
+    const start = cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 };
+    linkRef.current?.send({
+      type: "reset",
+      client: sessionRef.current,
+      x: start.x,
+      y: start.y,
+      theta: start.theta,
+    });
+  }, [round]);
+
+  const sendFlags = (nextDrift: boolean, nextCamera: boolean) => {
     cameraRef.current = nextCamera;
     linkRef.current?.send({
       type: "flags",
       client: sessionRef.current,
       drift: nextDrift,
-      clutter: nextClutter,
       camera: nextCamera,
     });
   };
@@ -393,7 +620,7 @@ export function CityLab({
     const origin = probeRef.current?.start;
     const start = origin
       ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
-      : (cityRef.current?.start ?? { x: 1.6, y: 5.54, theta: 0 });
+      : (cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 });
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -475,29 +702,55 @@ export function CityLab({
   }, []);
 
   useEffect(() => {
+    if (playBusy) return;
+    const gen = ghostGen.current;
+    const timer = window.setTimeout(() => {
+      if (gen !== ghostGen.current || seenRunRef.current) return;
+      stopGhostRef.current("Fahrt nicht gestartet. Aufnahme verworfen.");
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [playBusy]);
+
+  useEffect(() => {
     let cancel = false;
+    let timer = 0;
+    let abandon = 0;
     const tick = async () => {
       try {
         const response = await fetch("/api/waypoint-run");
-        const body = (await response.json()) as { log?: string; starting?: boolean };
+        const body = (await response.json()) as { log?: string; starting?: boolean; running?: boolean };
         if (cancel) return;
         const log = typeof body.log === "string" ? body.log : "";
         setNodeLog(log);
         setBooting(body.starting === true && log.trim() === "");
-      } catch {
-        if (!cancel) {
-          setNodeLog("");
-          setBooting(false);
+        const active = playBusy || body.running === true || body.starting === true;
+        if (body.running === true || body.starting === true) seenRunRef.current = true;
+        if (!active) {
+          if (seenRunRef.current) {
+            seenRunRef.current = false;
+            const gen = ghostGen.current;
+            abandon = window.setTimeout(() => {
+              if (gen !== ghostGen.current) return;
+              stopGhostRef.current("Runde nicht geschafft. Aufnahme verworfen.");
+            }, 400);
+          }
+          return;
         }
+        timer = window.setTimeout(() => void tick(), 1000);
+      } catch {
+        if (cancel) return;
+        setNodeLog("");
+        setBooting(false);
+        if (playBusy) timer = window.setTimeout(() => void tick(), 1000);
       }
     };
-    const timer = window.setInterval(() => void tick(), 1000);
     void tick();
     return () => {
       cancel = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
+      window.clearTimeout(abandon);
     };
-  }, []);
+  }, [playBusy]);
 
   useEffect(() => {
     const box = logRef.current;
@@ -579,57 +832,54 @@ export function CityLab({
       </div>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={drift}
-                disabled={!rosUp}
-                onChange={(event) => {
-                  const next = event.target.checked;
-                  setDrift(next);
-                  sendFlags(next, clutter, camera);
+          <div className="flex flex-wrap items-center gap-2">
+            {gates && onPlay ? (
+              <FlagBox
+                on={takeGhost}
+                title="Die nächste Play-Fahrt wird gespeichert, wenn die Runde geschafft ist."
+                onToggle={() => {
+                  const next = !takeGhostRef.current;
+                  takeGhostRef.current = next;
+                  setTakeGhost(next);
+                  if (!next) stopGhostRef.current("Aufnahme aus.");
                 }}
-              />
-              Drift
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={probe ? probe.scene === "kegel" : clutter}
-                disabled={!rosUp || probe !== null}
-                onChange={(event) => {
-                  const next = event.target.checked;
-                  setClutter(next);
-                  sendFlags(drift, next, camera);
-                }}
-              />
-              Hindernisse
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={rays} onChange={(event) => setRays(event.target.checked)} />
-              Lidar-Strahlen
-            </label>
-            <label
-              className="flex items-center gap-2"
-              title="Zeichnet das Auto größer als in echt, damit es beim Herauszoomen sichtbar bleibt. Aus zeigt die echte Größe."
+              >
+                Geist aufnehmen
+              </FlagBox>
+            ) : null}
+            <FlagBox
+              on={drift}
+              disabled={!rosUp}
+              onToggle={() => {
+                const next = !drift;
+                setDrift(next);
+                sendFlags(next, camera);
+              }}
             >
-              <input type="checkbox" checked={minBody} onChange={(event) => setMinBody(event.target.checked)} />
+              Drift
+            </FlagBox>
+            <FlagBox on={rays} onToggle={() => setRays((current) => !current)}>
+              Lidar-Strahlen
+            </FlagBox>
+            <FlagBox
+              on={minBody}
+              title="Zeichnet das Auto größer als in echt, damit es beim Herauszoomen sichtbar bleibt. Aus zeigt die echte Größe."
+              onToggle={() => setMinBody((current) => !current)}
+            >
               Vergrößert
-            </label>
-            <label className="flex items-center gap-2" title="Rendert /camera/image_raw. Aus lässt den Rechner ruhiger.">
-              <input
-                type="checkbox"
-                checked={camera}
-                disabled={!rosUp}
-                onChange={(event) => {
-                  const next = event.target.checked;
-                  setCamera(next);
-                  sendFlags(drift, clutter, next);
-                }}
-              />
+            </FlagBox>
+            <FlagBox
+              on={camera}
+              disabled={!rosUp}
+              title="Rendert /camera/image_raw. Aus lässt den Rechner ruhiger."
+              onToggle={() => {
+                const next = !camera;
+                setCamera(next);
+                sendFlags(drift, next);
+              }}
+            >
               Kamerabild
-            </label>
+            </FlagBox>
           </div>
           <Button type="button" onClick={reset} disabled={!rosUp}>
             Zurücksetzen
@@ -640,7 +890,23 @@ export function CityLab({
             <button
               type="button"
               aria-label="Code abspielen"
-              onClick={onPlay}
+              onClick={() => {
+                if (gates && takeGhostRef.current) {
+                  ghostGen.current += 1;
+                  seenRunRef.current = false;
+                  ghostRef.current = { on: true, settled: false, t0: 0, last: -1, points: [] };
+                  setGhostNote("Aufnahme läuft.");
+                }
+                const armGhost = gates && ghostLapRef.current.length > 1;
+                if (armGhost) ghostArmAt.current = performance.now();
+                onPlay();
+                if (armGhost) {
+                  window.setTimeout(() => {
+                    if (performance.now() - ghostArmAt.current > 800) return;
+                    ghostRunRef.current = { t0: performance.now() };
+                  }, 0);
+                }
+              }}
               disabled={!playReady || playBusy}
               className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#2f6b4f] text-white shadow-sm disabled:opacity-60"
             >
@@ -659,6 +925,7 @@ export function CityLab({
             {booting ? <TwinOrbit /> : null}
           </div>
         </div>
+        {ghostNote ? <p className="text-sm leading-6 text-muted-foreground">{ghostNote}</p> : null}
       </div>
     </div>
   );

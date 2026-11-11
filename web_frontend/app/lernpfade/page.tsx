@@ -2,7 +2,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { LessonIndex } from "@/components/lesson-index";
 import { PathIcon } from "@/components/path-icon";
+import { readCatalog } from "@/lib/catalog-file";
 import { curriculumOutline, trackHref } from "@/lib/curriculum";
+
+export const dynamic = "force-dynamic";
 
 function availabilityLabel(ready: number, total: number) {
   if (total === 0) return "noch keine Lektionen";
@@ -14,7 +17,7 @@ function availabilityLabel(ready: number, total: number) {
 }
 
 export default function LearningPathsPage() {
-  const outline = curriculumOutline();
+  const outline = curriculumOutline(readCatalog());
 
   return (
     <div className="flex flex-col gap-10">

@@ -15,6 +15,8 @@ type Slot = {
   nav: ChildProcess | null;
   studentLog: string;
   navLog: string;
+  navRunLog: string;
+  navRun: boolean;
   navKey: string;
   pluginHash: string;
   studentGen: number;
@@ -27,6 +29,8 @@ const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??=
   nav: null,
   studentLog: "",
   navLog: "",
+  navRunLog: "",
+  navRun: false,
   navKey: "",
   pluginHash: "",
   studentGen: 0,
@@ -35,6 +39,8 @@ const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??=
 });
 slot.starting ??= false;
 slot.startGen ??= 0;
+slot.navRunLog ??= "";
+slot.navRun ??= false;
 
 let gate: Promise<void> = Promise.resolve();
 
@@ -148,8 +154,10 @@ function treeOf(value: unknown): string | null {
 }
 
 function push(target: "studentLog" | "navLog", chunk: Buffer | string) {
-  slot[target] = (slot[target] + chunk.toString()).slice(-LOG_LIMIT);
+  const text = chunk.toString();
+  slot[target] = (slot[target] + text).slice(-LOG_LIMIT);
   if (target === "studentLog" && slot.studentLog.trim()) slot.starting = false;
+  if (target === "navLog" && slot.navRun) slot.navRunLog = (slot.navRunLog + text).slice(-LOG_LIMIT);
 }
 
 function rosBash(command: string, limit = LOG_LIMIT): Promise<{ code: number; out: string }> {
@@ -203,10 +211,15 @@ function watch(child: ChildProcess, target: "studentLog" | "navLog", gen: number
   child.stderr?.on("data", onData);
 }
 
+function endNavRun() {
+  slot.navRun = false;
+}
+
 async function stopStudent() {
   slot.studentGen += 1;
   const child = slot.student;
   slot.student = null;
+  endNavRun();
   await stopProcess(child);
 }
 
@@ -321,6 +334,7 @@ async function ensureNav(navKey: string, treePath: string, paramsPath: string): 
   slot.nav = null;
   slot.navKey = "";
   slot.navLog = "";
+  slot.navRunLog = "";
   const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
   const pluginSetup = path.join(pluginWorkspace(), "install", "setup.bash");
   const command = [
@@ -400,16 +414,20 @@ async function runStudent(
     return { ok: false as const, error: navError };
   }
   const studentGen = slot.studentGen;
+  slot.navRunLog = "";
+  slot.navRun = true;
   const child = startGroup([rosPrelude(), `exec python3 -u ${sh(sourcePath)}`].join("\n"));
   slot.student = child;
   watch(child, "studentLog", studentGen);
   child.once("exit", () => {
     if (slot.student === child) slot.student = null;
+    endNavRun();
     stopStarting(gen);
   });
   const early = await exitWithin(child, 1500);
   if (early !== null && early !== 0) {
     if (slot.student === child) slot.student = null;
+    endNavRun();
     stopStarting(gen);
     return { ok: false as const, error: slot.studentLog.trim() || "Der Knoten ist sofort beendet." };
   }
@@ -418,7 +436,7 @@ async function runStudent(
 }
 
 function navErrors(): string {
-  return slot.navLog
+  return slot.navRunLog
     .split("\n")
     .filter((line) => /\[ERROR\]|\[FATAL\]/.test(line))
     .slice(-8)

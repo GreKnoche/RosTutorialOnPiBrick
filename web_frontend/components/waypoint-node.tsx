@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from "react";
 import { CodeEditor } from "@/components/code-editor";
-import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
+import { readLessonText, serverText, subscribeDrafts, writeLessonText } from "@/lib/browser-draft";
 
 const SOURCE = `"""Wegpunkten folgen. Sammle alle Melonen."""
 
@@ -152,12 +152,8 @@ if __name__ == "__main__":
     main()
 `;
 
-function readWaypoint() {
-  return readNav2Text("waypoint");
-}
-
-function readThrough() {
-  return readNav2Text("through");
+function readLesson(missionId: string, field: "waypoint" | "through") {
+  return readLessonText(missionId, field);
 }
 
 export function WaypointNode({
@@ -166,6 +162,7 @@ export function WaypointNode({
   follower,
   plugin,
   through = false,
+  missionId = "folgen",
   driveRef,
   onBusy,
 }: {
@@ -174,9 +171,12 @@ export function WaypointNode({
   follower?: string;
   plugin: string;
   through?: boolean;
+  missionId?: string;
   driveRef: RefObject<() => void>;
   onBusy?: (busy: boolean) => void;
 }) {
+  const readWaypoint = useCallback(() => readLesson(missionId, "waypoint"), [missionId]);
+  const readThrough = useCallback(() => readLesson(missionId, "through"), [missionId]);
   const stored = useSyncExternalStore(subscribeDrafts, readWaypoint, serverText);
   const storedThrough = useSyncExternalStore(subscribeDrafts, readThrough, serverText);
   const source = through ? (storedThrough ?? THROUGH) : (stored ?? SOURCE);
@@ -251,10 +251,14 @@ export function WaypointNode({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-base font-semibold">waypoint_lesson</h2>
+      <h2 className="text-base font-semibold">waypoint_client</h2>
       <CodeEditor
         value={source}
-        onChange={(value) => writeNav2Text(through ? "through" : "waypoint", value === (through ? THROUGH : SOURCE) ? null : value)}
+        onChange={(value) => {
+          const field = through ? "through" : "waypoint";
+          const base = through ? THROUGH : SOURCE;
+          writeLessonText(missionId, field, value === base ? null : value);
+        }}
         label="ROS-Knoten"
         language="python"
         height="h-[36rem]"

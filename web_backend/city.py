@@ -187,6 +187,9 @@ class City:
     def set_clutter(self, enabled: bool) -> None:
         self.live.set_clutter(enabled)
 
+    def set_obstacles(self, points: list[tuple[float, ...]]) -> None:
+        self.live.set_obstacles(points)
+
     def advance_runner(self, dt: float) -> None:
         self.live.advance_runner(dt)
 

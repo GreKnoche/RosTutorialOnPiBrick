@@ -1,4 +1,4 @@
-"""One lap: start line, four gates, the finish line, and no grass."""
+"""One lap: ordered gates, and no grass. A halt gate wants a stop on the line."""
 
 from __future__ import annotations
 
@@ -9,12 +9,33 @@ from city import Gate
 
 _PROMPTS = {
     "start": "Überfahre die Startlinie.",
+    "schikane": "Schikane, erste Lücke, oben-unten.",
+    "schikane-2": "Schikane, zweite Lücke, oben-unten.",
     "quer": "Checkpoint auf der Querstraße, oben-unten.",
+    "ecke": "Enge Ecke.",
+    "reihe": "Kegelreihe, links-rechts.",
     "ost": "Checkpoint auf der Oststraße, links-rechts.",
     "kehre": "Checkpoint in der Kehre, oben-unten.",
+    "halten": "Halt in der Kehre. Nase nach Westen.",
     "stamm": "Checkpoint auf dem Rückweg, links-rechts.",
+    "wende": "Halt. Nase nach Osten.",
+    "rueck": "Zurück über die Linie, nach Osten.",
     "ziel": "Zurück über die Ziellinie.",
 }
+
+
+def _wrap(angle: float) -> float:
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _near_gate(x: float, y: float, gate: Gate, limit: float) -> bool:
+    dx = gate.x1 - gate.x0
+    dy = gate.y1 - gate.y0
+    length2 = dx * dx + dy * dy
+    if length2 < 1e-12:
+        return math.hypot(x - gate.x0, y - gate.y0) <= limit
+    t = max(0.0, min(1.0, ((x - gate.x0) * dx + (y - gate.y0) * dy) / length2))
+    return math.hypot(x - (gate.x0 + t * dx), y - (gate.y0 + t * dy)) <= limit
 
 
 def crosses(ax: float, ay: float, bx: float, by: float, cx: float, cy: float, dx: float, dy: float) -> bool:
@@ -62,7 +83,15 @@ class Lap:
         self.done = False
         self.grass = False
 
-    def observe(self, x0: float, y0: float, x1: float, y1: float) -> None:
+    def observe(
+        self,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+        theta: float | None = None,
+        speed: float | None = None,
+    ) -> None:
         if not self.active or self.done or self.grass:
             return
         length = math.hypot(x1 - x0, y1 - y0)
@@ -76,22 +105,30 @@ class Lap:
                 self.grass = True
                 return
             self._advance(px, py, x, y)
+            self._halt(x, y, theta, speed)
             if self.done:
                 return
             px, py = x, y
 
     def _advance(self, x0: float, y0: float, x1: float, y1: float) -> None:
-        while self.index < len(self.gates) and crosses(
-            x0,
-            y0,
-            x1,
-            y1,
-            self.gates[self.index].x0,
-            self.gates[self.index].y0,
-            self.gates[self.index].x1,
-            self.gates[self.index].y1,
-        ):
+        while self.index < len(self.gates):
+            gate = self.gates[self.index]
+            if gate.halt:
+                return
+            if not crosses(x0, y0, x1, y1, gate.x0, gate.y0, gate.x1, gate.y1):
+                return
             self.index += 1
+        self.done = True
+
+    def _halt(self, x: float, y: float, theta: float | None, speed: float | None) -> None:
+        if theta is None or speed is None or self.index >= len(self.gates):
+            return
+        gate = self.gates[self.index]
+        if not gate.halt or abs(speed) > 0.08:
+            return
+        if abs(_wrap(theta - gate.yaw)) > 0.6 or not _near_gate(x, y, gate, 0.18):
+            return
+        self.index += 1
         if self.index >= len(self.gates):
             self.done = True
 
@@ -103,4 +140,5 @@ class Lap:
         if self.done:
             return {"text": "Runde geschafft.", "done": True, "grass": False, "next": ""}
         gate = self.gates[self.index]
-        return {"text": _PROMPTS[gate.id], "done": False, "grass": False, "next": gate.id}
+        text = _PROMPTS.get(gate.id, gate.id)
+        return {"text": text, "done": False, "grass": False, "next": gate.id}

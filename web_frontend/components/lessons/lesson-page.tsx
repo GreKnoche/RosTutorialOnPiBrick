@@ -7,6 +7,7 @@ import { CopySection } from "@/components/lessons/copy-section";
 import { lessonModule, type LessonModule } from "@/components/lessons/registry";
 import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { RobotLab } from "@/components/robot-lab";
+import { readCatalog } from "@/lib/catalog-file";
 import {
   getTrackMeta,
   lessonHref,
@@ -28,9 +29,10 @@ export function LessonPage({
   lesson: Lesson;
   level?: LessonLevel;
 }) {
-  const track = getTrackMeta(lesson.track);
-  const { next, index, total } = lessonNeighbors(lesson);
-  const lessons = lessonsForTrack(lesson.track);
+  const catalog = readCatalog();
+  const track = getTrackMeta(lesson.track, catalog);
+  const { next, index, total } = lessonNeighbors(lesson, catalog);
+  const lessons = lessonsForTrack(lesson.track, catalog);
   const active = lessonModule(lesson.track, lesson.slug);
   const copy = loadLessonCopy(lesson.track, lesson.id, lesson.slug);
   const terms = freshGlossaryTerms(lesson);
@@ -38,7 +40,7 @@ export function LessonPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumbs items={trackCrumbs(lesson.track, lesson)} />
+      <Breadcrumbs items={trackCrumbs(lesson.track, lesson, catalog)} />
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <section className="flex flex-col gap-3">

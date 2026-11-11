@@ -59,16 +59,20 @@ function Driveway({ side }: { side: "left" | "right" }) {
 
 export function MissionPath({
   onStart,
+  onSelect,
   onComplete,
   active = false,
   done = 1,
   runningId = null,
+  heldId = null,
 }: {
   onStart?: (id: string) => void;
+  onSelect?: (id: string) => void;
   onComplete?: (done: number) => void;
   active?: boolean;
   done?: number;
   runningId?: string | null;
+  heldId?: string | null;
 }) {
   const current = Math.min(done, STEPS.length - 1);
   const fromIndex = Math.max(0, done - 1);
@@ -158,13 +162,15 @@ export function MissionPath({
                     state={state}
                     passed={passed}
                     live={runningId === item.id}
-                    armed={openId === item.id}
+                    held={heldId === item.id}
+                    armed={openId === item.id || (heldId === item.id && runningId !== item.id)}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
                       if (active || state === "locked" || passed) return;
                       setOpenId(item.id);
+                      onSelect?.(item.id);
                     }}
                     onStart={() => onStart?.(item.id)}
                   />
@@ -180,13 +186,15 @@ export function MissionPath({
                     state={state}
                     passed={passed}
                     live={runningId === item.id}
-                    armed={openId === item.id}
+                    held={heldId === item.id}
+                    armed={openId === item.id || (heldId === item.id && runningId !== item.id)}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
                       if (active || state === "locked" || passed) return;
                       setOpenId(item.id);
+                      onSelect?.(item.id);
                     }}
                     onStart={() => onStart?.(item.id)}
                   />
@@ -227,6 +235,7 @@ function NodeButton({
   state,
   passed,
   live,
+  held,
   armed,
   onClick,
   onStart,
@@ -236,6 +245,7 @@ function NodeButton({
   state: "done" | "current" | "locked";
   passed: boolean;
   live: boolean;
+  held: boolean;
   armed: boolean;
   onClick: () => void;
   onStart: () => void;
@@ -250,14 +260,18 @@ function NodeButton({
         aria-current={state === "current" ? "step" : undefined}
         aria-expanded={state !== "locked" && !passed && !live ? armed : undefined}
         aria-label={
-          passed || (state === "done" && !live)
-            ? `${item.title}, geschafft`
-            : state === "locked"
-              ? `${item.title}, zu`
-              : item.title
+          held && !live
+            ? `${item.title}, ausgewählt`
+            : passed || (state === "done" && !live)
+              ? `${item.title}, geschafft`
+              : state === "locked"
+                ? `${item.title}, zu`
+                : item.title
         }
         onClick={onClick}
         className={`relative z-10 flex size-12 items-center justify-center rounded-full ${
+          held && !live ? "ring-2 ring-[#e6b325] ring-offset-2 ring-offset-background " : ""
+        }${
           passed
             ? "border-2 border-dashed border-[#2f6b4f] bg-transparent text-[#2f6b4f]"
             : live
