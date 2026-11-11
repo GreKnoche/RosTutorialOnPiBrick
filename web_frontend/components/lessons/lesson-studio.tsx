@@ -6,6 +6,7 @@ import { LessonSection } from "@/components/lesson-section";
 import { MissionBoard, type MissionItem } from "@/components/mission-board";
 import { MissionBanner, MissionStamp } from "@/components/mission-success";
 import { RobotLab, type PathDrive, type RulerDrive, type TurnDrive } from "@/components/robot-lab";
+import type { LabKind, TrackId } from "@/lib/types";
 
 export function LessonStudio({
   id,
@@ -17,6 +18,13 @@ export function LessonStudio({
   ruler,
   turn,
   path,
+  lab = "none",
+  track = "autonom",
+  showTopics = false,
+  driveLabel = "Fahren",
+  showDrive = true,
+  poseResetId,
+  onGoalReached,
   stampHref,
   allDone,
   banner,
@@ -46,6 +54,13 @@ export function LessonStudio({
   ruler?: RulerDrive;
   turn?: TurnDrive;
   path?: PathDrive;
+  lab?: LabKind;
+  track?: TrackId;
+  showTopics?: boolean;
+  driveLabel?: string;
+  showDrive?: boolean;
+  poseResetId?: number;
+  onGoalReached?: () => void;
   stampHref?: string;
   allDone: boolean;
   banner: "task" | "success" | "hidden";
@@ -71,13 +86,15 @@ export function LessonStudio({
       <MissionBoard intro={boardIntro} missions={missions} />
       {before}
       <RobotLab
-        lab="none"
+        lab={lab}
         lessonId={lessonId}
-        track="autonom"
-        showTopics={false}
+        track={track}
+        showTopics={showTopics}
         ruler={ruler}
         turn={turn}
         path={path}
+        poseResetId={poseResetId}
+        onGoalReached={onGoalReached}
         overlay={
           allDone ? (
             <MissionStamp href={stampHref} onRestart={onRestart} />
@@ -94,9 +111,11 @@ export function LessonStudio({
       />
       {children}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" disabled={running || driveDisabled} onClick={onDrive}>
-          Fahren
-        </Button>
+        {showDrive ? (
+          <Button type="button" disabled={running || driveDisabled} onClick={onDrive}>
+            {driveLabel}
+          </Button>
+        ) : null}
         <Button type="button" onClick={onReset}>
           Zurücksetzen
         </Button>

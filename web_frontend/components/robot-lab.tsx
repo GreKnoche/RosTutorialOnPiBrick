@@ -50,6 +50,8 @@ type Props = {
   turn?: TurnDrive;
   path?: PathDrive;
   overlay?: ReactNode;
+  poseResetId?: number;
+  onGoalReached?: () => void;
 };
 
 const WORLD_W = 1.35;
@@ -136,7 +138,18 @@ function jumped(reduced = true) {
   return reduced && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn, path, overlay }: Props) {
+export function RobotLab({
+  lab,
+  lessonId,
+  track,
+  showTopics = true,
+  ruler,
+  turn,
+  path,
+  overlay,
+  poseResetId = 0,
+  onGoalReached,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const clientId = useRef(useId());
@@ -149,6 +162,8 @@ export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn,
   const rulerRef = useRef(ruler);
   const turnRef = useRef(turn);
   const pathRef = useRef(path);
+  const onGoalReachedRef = useRef(onGoalReached);
+  const wasReachedRef = useRef(false);
   const followRef = useRef(false);
   const viewRef = useRef<DrawTwin>({
     odom: { pose: { x: 0, y: 0, theta: 0 } },
@@ -181,6 +196,10 @@ export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn,
   useEffect(() => {
     pathRef.current = path;
   }, [path]);
+
+  useEffect(() => {
+    onGoalReachedRef.current = onGoalReached;
+  }, [onGoalReached]);
 
   const mirror = useCallback((payload: Record<string, unknown>) => {
     linkRef.current?.send(payload);
@@ -219,6 +238,10 @@ export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn,
         else if (turnSpec) turnSpec.onDone(shown.theta);
         else if (pathSpec) pathSpec.onDone(shown, trail);
       }
+    }
+    if (lab === "goal") {
+      if (plant.reached && !wasReachedRef.current) onGoalReachedRef.current?.();
+      wasReachedRef.current = plant.reached;
     }
     const goal = view.goal ? { ...view.goal } : null;
     const cmd = { ...plant.command };
@@ -439,6 +462,11 @@ export function RobotLab({ lab, lessonId, track, showTopics = true, ruler, turn,
     if (!pathEnabled || !spec || spec.resetId === 0) return;
     resetOrigin(0, 0, 0, radiusM(spec.circumferenceCm), spec.separationCm / 100);
   }, [pathEnabled, path?.resetId, resetOrigin]);
+
+  useEffect(() => {
+    if (rulerEnabled || turnEnabled || pathEnabled || !poseResetId) return;
+    resetOrigin(0, 0, 0, DEFAULT_CHASSIS.wheelRadius, DEFAULT_CHASSIS.wheelSeparation);
+  }, [poseResetId, rulerEnabled, turnEnabled, pathEnabled, resetOrigin]);
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
