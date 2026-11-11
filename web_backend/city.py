@@ -2,936 +2,207 @@
 
 Houses are axis-aligned boxes. The same rectangles stop the chassis, return
 from the lidar, and show up in the camera. Lane paint is only paint.
+
+The map itself does not change. Cones, the arch, the dock, and the runner
+live on the scene.
 """
 
 from __future__ import annotations
 
 import math
-import struct
-from dataclasses import dataclass
 
-BODY_LENGTH_M = 0.128
-BODY_WIDTH_M = 0.084
-
-SCAN_MIN = -math.pi / 2.0
-SCAN_INCREMENT = math.pi / 180.0
-SCAN_COUNT = int(round((math.pi / 2.0 - SCAN_MIN) / SCAN_INCREMENT)) + 1
-RANGE_MIN_M = 0.05
-RANGE_MAX_M = 4.0
-
-IMAGE_W = 320
-IMAGE_H = 240
-CAMERA_HEIGHT_M = 0.2
-CAMERA_HFOV_RAD = 1.047
-CAMERA_NEAR_M = 0.12
-HOUSE_HEIGHT_M = 1.15
-
-SKY = (142, 196, 232)
-GRASS = (116, 206, 167)
-TUFT = (73, 168, 122)
-WATER = (64, 152, 216)
-ROAD = (60, 59, 56)
-EDGE = (244, 244, 242)
-LANE = (244, 214, 120)
-CHECK_LIGHT = (244, 244, 242)
-CHECK_DARK = (28, 28, 26)
-FINISH_A = (1.76, 5.89)
-FINISH_B = (1.8, 5.21)
-
-_VFOV = 2.0 * math.atan(math.tan(CAMERA_HFOV_RAD / 2.0) * IMAGE_H / IMAGE_W)
-_TAN_H = math.tan(CAMERA_HFOV_RAD / 2.0)
-_TAN_V = math.tan(_VFOV / 2.0)
-
-
-@dataclass(frozen=True)
-class House:
-    name: str
-    x: float
-    y: float
-    w: float
-    h: float
-    color: tuple[int, int, int]
-    height: float = HOUSE_HEIGHT_M
-
-    @property
-    def bounds(self) -> tuple[float, float, float, float]:
-        return (self.x, self.y, self.x + self.w, self.y + self.h)
-
-
-@dataclass(frozen=True)
-class Segment:
-    x0: float
-    y0: float
-    x1: float
-    y1: float
-
-
-@dataclass(frozen=True)
-class Gate:
-    """A line the car has to drive across. Start and finish share one segment."""
-
-    id: str
-    x0: float
-    y0: float
-    x1: float
-    y1: float
-
-
-@dataclass(frozen=True)
-class Place:
-    id: str
-    x: float
-    y: float
-    theta: float
-
-
-@dataclass(frozen=True)
-class GraphEdge:
-    id: str
-    points: tuple[tuple[float, float], ...]
-    short: bool = False
-
-
-@dataclass(frozen=True)
-class Arch:
-    x: float
-    y: float
-    w: float
-    h: float
-    z0: float
-    z1: float
-    color: tuple[int, int, int]
-
-
-@dataclass(frozen=True)
-class Mark:
-    x: float
-    y: float
-    w: float
-    h: float
-
-
-def foot_radius() -> float:
-    """Half the body diagonal, so a corner does not sit inside a wall."""
-    return 0.5 * math.hypot(BODY_LENGTH_M, BODY_WIDTH_M)
-
-
-def push_circle(
-    x: float,
-    y: float,
-    radius: float,
-    rects: list[tuple[float, float, float, float]],
-) -> tuple[float, float]:
-    """Push a circle out of each rectangle. Motion along a wall stays."""
-    if radius <= 0.0 or not math.isfinite(x) or not math.isfinite(y):
-        return x, y
-    for _ in range(4):
-        for rect in rects:
-            x, y = _push_one(x, y, radius, rect)
-    return x, y
-
-
-def ray_rect(
-    ox: float,
-    oy: float,
-    dx: float,
-    dy: float,
-    rect: tuple[float, float, float, float],
-    reach: float,
-) -> float | None:
-    """Distance to the first hit, or None. A start inside the box is 0."""
-    xmin, ymin, xmax, ymax = rect
-    tmin = 0.0
-    tmax = reach
-    for origin, direction, lo, hi in ((ox, dx, xmin, xmax), (oy, dy, ymin, ymax)):
-        if abs(direction) <= 1e-12:
-            if origin < lo or origin > hi:
-                return None
-            continue
-        inv = 1.0 / direction
-        t1 = (lo - origin) * inv
-        t2 = (hi - origin) * inv
-        if t1 > t2:
-            t1, t2 = t2, t1
-        tmin = max(tmin, t1)
-        tmax = min(tmax, t2)
-        if tmin > tmax:
-            return None
-    if tmax < 0.0:
-        return None
-    if tmin < 0.0:
-        return 0.0
-    return tmin
-
-
-def _push_one(
-    x: float,
-    y: float,
-    radius: float,
-    rect: tuple[float, float, float, float],
-) -> tuple[float, float]:
-    xmin, ymin, xmax, ymax = rect
-    cx = min(max(x, xmin), xmax)
-    cy = min(max(y, ymin), ymax)
-    dx = x - cx
-    dy = y - cy
-    dist2 = dx * dx + dy * dy
-    if dist2 >= radius * radius:
-        return x, y
-    if dist2 <= 1e-12:
-        options = (
-            (x - xmin + radius, -1.0, 0.0),
-            (xmax - x + radius, 1.0, 0.0),
-            (y - ymin + radius, 0.0, -1.0),
-            (ymax - y + radius, 0.0, 1.0),
-        )
-        pen, nx, ny = min(options, key=lambda item: item[0])
-        return x + nx * pen, y + ny * pen
-    dist = math.sqrt(dist2)
-    scale = (radius - dist) / dist
-    return x + dx * scale, y + dy * scale
-
-
-def _dashes(x0: float, y0: float, x1: float, y1: float) -> list[Segment]:
-    length = math.hypot(x1 - x0, y1 - y0)
-    if length <= 1e-6:
-        return []
-    dx = (x1 - x0) / length
-    dy = (y1 - y0) / length
-    dash = 0.22
-    gap = 0.2
-    t = 0.18
-    marks: list[Segment] = []
-    while t + dash < length - 0.12:
-        marks.append(Segment(x0 + dx * t, y0 + dy * t, x0 + dx * (t + dash), y0 + dy * (t + dash)))
-        t += dash + gap
-    return marks
-
-
-ROAD_W = 0.72
-CONE_COLOR = (232, 120, 32)
-CONE_SIZE = 0.22
-CONE_HEIGHT = 0.28
-
-
-def _arc_points(cx: float, cy: float, radius: float, a0: float, a1: float, steps: int) -> list[tuple[float, float]]:
-    points: list[tuple[float, float]] = []
-    for index in range(steps + 1):
-        angle = a0 + (a1 - a0) * index / steps
-        points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
-    return points
-
-
-def _straight(x0: float, y0: float, x1: float, y1: float) -> list[tuple[float, float]]:
-    return [(x0, y0), (x1, y1)]
-
-
-def _bend(cx: float, cy: float, radius: float, a0: float, a1: float) -> list[tuple[float, float]]:
-    steps = max(16, int(abs(a1 - a0) / 0.08))
-    return _arc_points(cx, cy, radius, a0, a1, steps)
-
-
-def _extended(points: list[tuple[float, float]], extra: float) -> list[tuple[float, float]]:
-    """Push both ends along the tangent so a curve meets the straight without a grass wedge."""
-    if len(points) < 2 or extra <= 0.0:
-        return points
-
-    def outward(tip: tuple[float, float], nxt: tuple[float, float]) -> tuple[float, float]:
-        dx = tip[0] - nxt[0]
-        dy = tip[1] - nxt[1]
-        length = math.hypot(dx, dy) or 1.0
-        return (tip[0] + dx / length * extra, tip[1] + dy / length * extra)
-
-    return [outward(points[0], points[1]), *points, outward(points[-1], points[-2])]
-
-
-def _chain(points: list[tuple[float, float]]) -> list[Segment]:
-    return [
-        Segment(points[index][0], points[index][1], points[index + 1][0], points[index + 1][1])
-        for index in range(len(points) - 1)
-    ]
-
-
-def _dist_point_seg(px: float, py: float, x0: float, y0: float, x1: float, y1: float) -> float:
-    dx = x1 - x0
-    dy = y1 - y0
-    length2 = dx * dx + dy * dy
-    if length2 < 1e-12:
-        return math.hypot(px - x0, py - y0)
-    t = max(0.0, min(1.0, ((px - x0) * dx + (py - y0) * dy) / length2))
-    return math.hypot(px - (x0 + t * dx), py - (y0 + t * dy))
-
-
-def _dist_ribbon(px: float, py: float, points: list[tuple[float, float]]) -> float:
-    best = 1e9
-    for index in range(len(points) - 1):
-        dist = _dist_point_seg(px, py, points[index][0], points[index][1], points[index + 1][0], points[index + 1][1])
-        if dist < best:
-            best = dist
-    return best
-
-
-def _near_ribbon(
-    px: float,
-    py: float,
-    ribbons: list[list[tuple[float, float]]],
-    skip: int,
-    limit: float,
-) -> bool:
-    for index, ribbon in enumerate(ribbons):
-        if index == skip:
-            continue
-        if _dist_ribbon(px, py, ribbon) < limit:
-            return True
-    return False
-
-
-def _unit_normals(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    normals: list[tuple[float, float]] = []
-    for index in range(len(points) - 1):
-        dx = points[index + 1][0] - points[index][0]
-        dy = points[index + 1][1] - points[index][1]
-        length = math.hypot(dx, dy)
-        if length < 1e-9:
-            normals.append((0.0, 1.0))
-        else:
-            normals.append((-dy / length, dx / length))
-    return normals
-
-
-def _offset_side(points: list[tuple[float, float]], sign: float) -> list[tuple[float, float]]:
-    """Left (sign +1) or right edge of a road ribbon. Joins stay close to the corner."""
-    half = ROAD_W / 2.0
-    normals = _unit_normals(points)
-    side: list[tuple[float, float]] = []
-    for index, (x, y) in enumerate(points):
-        if index == 0:
-            nx, ny = normals[0]
-            side.append((x + sign * nx * half, y + sign * ny * half))
-            continue
-        if index == len(points) - 1:
-            nx, ny = normals[-1]
-            side.append((x + sign * nx * half, y + sign * ny * half))
-            continue
-        ax, ay = normals[index - 1]
-        bx, by = normals[index]
-        nx, ny = ax + bx, ay + by
-        norm = math.hypot(nx, ny)
-        if norm < 1e-6:
-            side.append((x + sign * bx * half, y + sign * by * half))
-            continue
-        nx /= norm
-        ny /= norm
-        dot = nx * bx + ny * by
-        if dot < 0.35:
-            side.append((x + sign * ax * half, y + sign * ay * half))
-            side.append((x + sign * bx * half, y + sign * by * half))
-            continue
-        scale = min(half / dot, half * 3.0)
-        side.append((x + sign * nx * scale, y + sign * ny * scale))
-    return side
-
-
-def _finish_line(
-    a: tuple[float, float] = FINISH_A,
-    b: tuple[float, float] = FINISH_B,
-    cols: int = 8,
-    rows: int = 2,
-) -> tuple[list[tuple[list[tuple[float, float]], tuple[int, int, int]]], tuple[float, float, float]]:
-    """Checker band from ``a`` to ``b``, and a spawn just in front of its middle.
-
-    The band is centered on the segment. The spawn faces across it, one gap
-    clear of the near edge, so the nose sits in the middle of the street.
-    """
-    ax, ay = a
-    bx, by = b
-    dx, dy = bx - ax, by - ay
-    length = math.hypot(dx, dy)
-    ux, uy = dx / length, dy / length
-    px, py = -uy, ux
-    if px < 0.0:
-        px, py = -px, -py
-    cell = length / cols
-    squares: list[tuple[list[tuple[float, float]], tuple[int, int, int]]] = []
-    for col in range(cols):
-        for row in range(rows):
-            ox = ax + ux * cell * col + px * cell * (row - rows / 2.0)
-            oy = ay + uy * cell * col + py * cell * (row - rows / 2.0)
-            quad = [
-                (ox, oy),
-                (ox + ux * cell, oy + uy * cell),
-                (ox + ux * cell + px * cell, oy + uy * cell + py * cell),
-                (ox + px * cell, oy + py * cell),
-            ]
-            color = CHECK_LIGHT if (col + row) % 2 == 0 else CHECK_DARK
-            squares.append((quad, color))
-    mid_x = (ax + bx) / 2.0
-    mid_y = (ay + by) / 2.0
-    back = cell * (rows / 2.0) + 0.03 + BODY_LENGTH_M / 2.0
-    spawn = (mid_x - px * back, mid_y - py * back, 0.0)
-    return squares, spawn
-
-
-def _ribbon_polygon(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    left = _offset_side(points, 1.0)
-    right = _offset_side(points, -1.0)
-    return left + right[::-1]
-
-
-def _gap_edges(
-    edges: list[Segment],
-    ribbons: list[list[tuple[float, float]]],
-    skip: int,
-) -> list[Segment]:
-    limit = ROAD_W / 2.0 - 0.04
-    kept: list[Segment] = []
-    for edge in edges:
-        length = math.hypot(edge.x1 - edge.x0, edge.y1 - edge.y0)
-        steps = max(1, int(length / 0.12))
-        run: tuple[float, float] | None = None
-        prev: tuple[float, float] | None = None
-        for step in range(steps + 1):
-            t = step / steps
-            point = (edge.x0 + t * (edge.x1 - edge.x0), edge.y0 + t * (edge.y1 - edge.y0))
-            open_here = not _near_ribbon(point[0], point[1], ribbons, skip, limit)
-            if open_here and run is None:
-                run = point
-            if (not open_here) and run is not None and prev is not None:
-                if math.hypot(prev[0] - run[0], prev[1] - run[1]) > 0.08:
-                    kept.append(Segment(run[0], run[1], prev[0], prev[1]))
-                run = None
-            prev = point
-        if run is not None and prev is not None and math.hypot(prev[0] - run[0], prev[1] - run[1]) > 0.08:
-            kept.append(Segment(run[0], run[1], prev[0], prev[1]))
-    return kept
-
-
-def _dashes_along(points: list[tuple[float, float]]) -> list[Segment]:
-    marks: list[Segment] = []
-    dash = 0.22
-    gap = 0.2
-    painting = True
-    left = dash
-    for index in range(len(points) - 1):
-        x0, y0 = points[index]
-        x1, y1 = points[index + 1]
-        length = math.hypot(x1 - x0, y1 - y0)
-        if length < 1e-9:
-            continue
-        dx = (x1 - x0) / length
-        dy = (y1 - y0) / length
-        traveled = 0.0
-        while traveled < length - 1e-9:
-            take = min(left, length - traveled)
-            if painting and take > 0.04:
-                marks.append(
-                    Segment(x0 + dx * traveled, y0 + dy * traveled, x0 + dx * (traveled + take), y0 + dy * (traveled + take))
-                )
-            traveled += take
-            left -= take
-            if left <= 1e-9:
-                painting = not painting
-                left = dash if painting else gap
-    return marks
-
-
-def _shade(color: tuple[int, int, int], scale: float) -> tuple[int, int, int]:
-    return tuple(max(0, min(255, int(channel * scale))) for channel in color)  # type: ignore[return-value]
-
-
-# Lawn on the map, wider than the houses: from x=-7 west to x=18 east.
-SHORE_X0 = -7.0
-SHORE_X1 = 18.0
-
-
-def _shore(
-    roads: list[list[tuple[float, float]]],
-    houses: tuple[House, ...],
-) -> tuple[float, float, float, float]:
-    xs = [point[0] for road in roads for point in road]
-    ys = [point[1] for road in roads for point in road]
-    for house in houses:
-        xs.extend((house.x, house.x + house.w))
-        ys.extend((house.y, house.y + house.h))
-    margin = max(house.w for house in houses)
-    x0, y0, x1, y1 = (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
-    return (min(x0, SHORE_X0), y0, max(x1, SHORE_X1), y1)
-
-
-TUFT_CELL = 0.34
-
-
-def _tile_hash(ix: int, iy: int) -> int:
-    return (ix * 374761393 + iy * 668265263) & 1023
-
-
-def tuft_blades(ix: int, iy: int) -> tuple[tuple[float, float, float, float], ...]:
-    """A few short blades on a flat field. Empty when this cell stays plain."""
-    kind = _tile_hash(ix, iy)
-    if kind % 3 == 2:
-        return ()
-    ox = (kind % 7) * 0.016
-    oy = ((kind // 3) % 5) * 0.018
-    x = ix * TUFT_CELL + 0.05 + ox
-    y = iy * TUFT_CELL + 0.04 + oy
-    return ((x, y, 0.03, 0.055), (x + 0.038, y + 0.014, 0.026, 0.046))
-
-
-def ground_color(wx: float, wy: float, shore: tuple[float, float, float, float]) -> tuple[int, int, int]:
-    x0, y0, x1, y1 = shore
-    if not (x0 <= wx <= x1 and y0 <= wy <= y1):
-        return WATER
-    ix = math.floor(wx / TUFT_CELL)
-    iy = math.floor(wy / TUFT_CELL)
-    for bx, by, bw, bh in tuft_blades(ix, iy):
-        if bx <= wx <= bx + bw and by <= wy <= by + bh:
-            return TUFT
-    return GRASS
-
-
-def _dress_ground(
-    buf: bytearray,
-    x: float,
-    y: float,
-    theta: float,
-    shore: tuple[float, float, float, float],
-) -> None:
-    x0, y0, x1, y1 = shore
-    c = math.cos(theta)
-    s = math.sin(theta)
-    scale_v = (IMAGE_H / 2.0) / _TAN_V
-    scale_u = _TAN_H / (IMAGE_W / 2.0)
-    for row in range(IMAGE_H):
-        denom = (row + 0.5) - IMAGE_H / 2.0
-        if denom <= 1.0:
-            continue
-        forward = CAMERA_HEIGHT_M * scale_v / denom
-        base = row * IMAGE_W * 3
-        for col in range(IMAGE_W):
-            i = base + col * 3
-            if buf[i] != GRASS[0] or buf[i + 1] != GRASS[1] or buf[i + 2] != GRASS[2]:
-                continue
-            left = (col + 0.5 - IMAGE_W / 2.0) * forward * scale_u
-            wx = x + forward * c - left * s
-            wy = y + forward * s + left * c
-            color = ground_color(wx, wy, (x0, y0, x1, y1))
-            if color == GRASS:
-                continue
-            buf[i] = color[0]
-            buf[i + 1] = color[1]
-            buf[i + 2] = color[2]
-
-
-def _fill(buf: bytearray, color: tuple[int, int, int]) -> None:
-    pixel = bytes(color)
-    view = memoryview(buf)
-    span = pixel * IMAGE_W
-    for y in range(IMAGE_H):
-        view[y * IMAGE_W * 3 : (y + 1) * IMAGE_W * 3] = span
-
-
-def _fill_polygon(buf: bytearray, points: list[tuple[float, float]], color: tuple[int, int, int]) -> None:
-    if len(points) < 3:
-        return
-    ys = [point[1] for point in points]
-    y0 = max(0, int(math.floor(min(ys))))
-    y1 = min(IMAGE_H - 1, int(math.ceil(max(ys))))
-    if y1 < y0:
-        return
-    r, g, b = color
-    row_bytes = IMAGE_W * 3
-    for y in range(y0, y1 + 1):
-        xs: list[float] = []
-        for index, (x_a, y_a) in enumerate(points):
-            x_b, y_b = points[(index + 1) % len(points)]
-            if (y_a <= y < y_b) or (y_b <= y < y_a):
-                denom = y_b - y_a
-                if abs(denom) < 1e-12:
-                    continue
-                t = (y + 0.5 - y_a) / denom
-                xs.append(x_a + t * (x_b - x_a))
-        xs.sort()
-        row = y * row_bytes
-        for index in range(0, len(xs) - 1, 2):
-            left = max(0, int(math.ceil(xs[index])))
-            right = min(IMAGE_W - 1, int(math.floor(xs[index + 1])))
-            for x in range(left, right + 1):
-                i = row + x * 3
-                buf[i] = r
-                buf[i + 1] = g
-                buf[i + 2] = b
-
-
-def _clip_line(
-    x0: float, y0: float, x1: float, y1: float
-) -> tuple[float, float, float, float] | None:
-    dx = x1 - x0
-    dy = y1 - y0
-    p = (-dx, dx, -dy, dy)
-    q = (x0, IMAGE_W - 1 - x0, y0, IMAGE_H - 1 - y0)
-    u0 = 0.0
-    u1 = 1.0
-    for pi, qi in zip(p, q, strict=True):
-        if abs(pi) < 1e-12:
-            if qi < 0.0:
-                return None
-            continue
-        t = qi / pi
-        if pi < 0.0:
-            if t > u1:
-                return None
-            u0 = max(u0, t)
-        else:
-            if t < u0:
-                return None
-            u1 = min(u1, t)
-    if u0 > u1:
-        return None
-    return (x0 + u0 * dx, y0 + u0 * dy, x0 + u1 * dx, y0 + u1 * dy)
-
-
-def _draw_line(buf: bytearray, x0: float, y0: float, x1: float, y1: float, color: tuple[int, int, int]) -> None:
-    clipped = _clip_line(x0, y0, x1, y1)
-    if clipped is None:
-        return
-    x0, y0, x1, y1 = clipped
-    r, g, b = color
-    steps = int(max(abs(x1 - x0), abs(y1 - y0)))
-    if steps < 1:
-        steps = 1
-    for step in range(steps + 1):
-        t = step / steps
-        x = int(round(x0 + t * (x1 - x0)))
-        y = int(round(y0 + t * (y1 - y0)))
-        for ox, oy in ((0, 0), (1, 0), (0, 1)):
-            px = x + ox
-            py = y + oy
-            if px < 0 or py < 0 or px >= IMAGE_W or py >= IMAGE_H:
-                continue
-            i = (py * IMAGE_W + px) * 3
-            buf[i] = r
-            buf[i + 1] = g
-            buf[i + 2] = b
-
-
-def _clip_near(points: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
-    if not points:
-        return []
-    kept: list[tuple[float, float, float]] = []
-    for index, curr in enumerate(points):
-        prev = points[index - 1]
-        curr_in = curr[0] >= CAMERA_NEAR_M
-        prev_in = prev[0] >= CAMERA_NEAR_M
-        if curr_in != prev_in:
-            denom = curr[0] - prev[0]
-            t = 0.0 if abs(denom) < 1e-12 else (CAMERA_NEAR_M - prev[0]) / denom
-            kept.append(
-                (
-                    CAMERA_NEAR_M,
-                    prev[1] + t * (curr[1] - prev[1]),
-                    prev[2] + t * (curr[2] - prev[2]),
-                )
-            )
-        if curr_in:
-            kept.append(curr)
-    return kept
-
-
-def _project(forward: float, left: float, up: float) -> tuple[float, float]:
-    u = IMAGE_W / 2.0 + (left / forward) * (IMAGE_W / 2.0) / _TAN_H
-    v = IMAGE_H / 2.0 - (up / forward) * (IMAGE_H / 2.0) / _TAN_V
-    return u, v
-
-
-def _to_cam(x: float, y: float, theta: float, wx: float, wy: float, wz: float) -> tuple[float, float, float]:
-    dx = wx - x
-    dy = wy - y
-    c = math.cos(theta)
-    s = math.sin(theta)
-    forward = dx * c + dy * s
-    left = -dx * s + dy * c
-    return forward, left, wz - CAMERA_HEIGHT_M
-
-
-def _ground_poly(
-    x: float, y: float, theta: float, corners: list[tuple[float, float]]
-) -> list[tuple[float, float]] | None:
-    cam = [_to_cam(x, y, theta, wx, wy, 0.0) for wx, wy in corners]
-    clipped = _clip_near(cam)
-    if len(clipped) < 3:
-        return None
-    return [_project(*point) for point in clipped]
-
-
-def bmp_bytes(rgb: bytes, width: int, height: int) -> bytes:
-    """24-bit BMP, bottom-up, so a browser can show the camera frame."""
-    stride = (width * 3 + 3) & ~3
-    pixels = bytearray(stride * height)
-    for y in range(height):
-        src = y * width * 3
-        dst = (height - 1 - y) * stride
-        for x in range(width):
-            i = src + x * 3
-            j = dst + x * 3
-            pixels[j] = rgb[i + 2]
-            pixels[j + 1] = rgb[i + 1]
-            pixels[j + 2] = rgb[i]
-    image = bytes(pixels)
-    header = struct.pack("<2sIHHI", b"BM", 54 + len(image), 0, 0, 54)
-    info = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0, len(image), 2835, 2835, 0, 0)
-    return header + info + image
-
-
-def _graph(
-    ribbons: list[list[tuple[float, float]]],
-    stem_x: float,
-    mid_y: float,
-) -> tuple[GraphEdge, ...]:
-    names = (
-        "nordrand",
-        "bogen-nw",
-        "west",
-        "bogen-no",
-        "ost",
-        "quer",
-        "stamm",
-        "bogen-sw",
-        "zufahrt",
-        "kehre",
-    )
-    edges: list[GraphEdge] = []
-    for name, points in zip(names, ribbons, strict=True):
-        if name != "stamm":
-            edges.append(GraphEdge(name, tuple(points), False))
-            continue
-        ys = [point[1] for point in points]
-        edges.append(GraphEdge("stamm-nord", ((stem_x, max(ys)), (stem_x, mid_y)), True))
-        edges.append(GraphEdge("stamm-sued", ((stem_x, mid_y), (stem_x, min(ys))), False))
-    return tuple(edges)
+from city_camera import (
+    IMAGE_H,
+    IMAGE_W,
+    ROAD,
+    SKY,
+    bmp_bytes,
+    ground_color,
+    render as render_frame,
+    tuft_blades,
+)
+from city_geom import (
+    BODY_LENGTH_M,
+    BODY_WIDTH_M,
+    RANGE_MAX_M,
+    RANGE_MIN_M,
+    SCAN_COUNT,
+    SCAN_INCREMENT,
+    SCAN_MIN,
+    foot_radius,
+    push_circle,
+    ray_rect,
+)
+from city_map import (
+    FINISH_A,
+    FINISH_B,
+    ROAD_W,
+    Arch,
+    CityMap,
+    Gate,
+    GraphEdge,
+    House,
+    Mark,
+    Place,
+    Segment,
+    build_city_map,
+)
+from city_scene import CityScene
+
+__all__ = [
+    "BODY_LENGTH_M",
+    "BODY_WIDTH_M",
+    "CITY",
+    "FINISH_A",
+    "FINISH_B",
+    "IMAGE_H",
+    "IMAGE_W",
+    "RANGE_MAX_M",
+    "RANGE_MIN_M",
+    "ROAD",
+    "ROAD_W",
+    "SCAN_COUNT",
+    "SCAN_INCREMENT",
+    "SCAN_MIN",
+    "SKY",
+    "Arch",
+    "City",
+    "CityMap",
+    "Gate",
+    "GraphEdge",
+    "House",
+    "Mark",
+    "Place",
+    "Segment",
+    "bmp_bytes",
+    "foot_radius",
+    "ground_color",
+    "push_circle",
+    "ray_rect",
+    "tuft_blades",
+]
 
 
 class City:
     def __init__(self) -> None:
-        # Centerlines measured on the reference sheet. 56 px of asphalt is one road width.
-        scale = ROAD_W / 56.0
+        self.map = build_city_map()
+        self.live = CityScene(self.map)
 
-        def xp(px: float) -> float:
-            return 1.4 + (px - 52.0) * scale
+    @property
+    def start_x(self) -> float:
+        return self.map.start_x
 
-        def yp(py: float) -> float:
-            return 0.9 + (620.0 - py) * scale
+    @property
+    def start_y(self) -> float:
+        return self.map.start_y
 
-        left_x, right_x = xp(52.0), xp(618.0)
-        top_y, mid_y = yp(82.0), yp(258.0)
-        stem_x, ustem_x = xp(266.0), xp(404.0)
-        corner, u_r = 108.0 * scale, 107.0 * scale
-        corner_y, left_u_y, right_u_y = yp(190.0), yp(328.0), yp(464.0)
-        top_left, top_right = xp(160.0), xp(510.0)
-        left_u_x, right_u_x = xp(159.0), xp(511.0)
-        spur_end = yp(577.0)
-        self.width = right_x - left_x + 2.4
-        self.height = top_y - spur_end + 2.2
-        self.finish, spawn = _finish_line()
-        self.start_x, self.start_y, self.start_theta = spawn
-        self._lane_x = left_x + 1.05
-        self._ribbons = [
-            _straight(top_left, top_y, top_right, top_y),
-            _bend(top_left, corner_y, corner, math.pi, math.pi / 2.0),
-            _straight(left_x, corner_y, left_x, left_u_y),
-            _bend(top_right, corner_y, corner, math.pi / 2.0, 0.0),
-            _straight(right_x, corner_y, right_x, spur_end),
-            _straight(left_x, mid_y, right_x, mid_y),
-            _straight(stem_x, top_y, stem_x, left_u_y),
-            _bend(left_u_x, left_u_y, u_r, math.pi, math.tau),
-            _straight(ustem_x, mid_y, ustem_x, right_u_y),
-            _bend(right_u_x, right_u_y, u_r, math.pi, math.tau),
-        ]
-        self.roads = [_ribbon_polygon(_extended(ribbon, 0.22)) for ribbon in self._ribbons]
-        gap = ROAD_W / 2.0 + 0.14
-        outer = ROAD_W / 2.0 + 0.18
-        self.houses = (
-            House("nordblock", stem_x + gap, mid_y + gap + 0.5, 1.05, 0.68, (74, 116, 168)),
-            House("mitte", left_x + gap + 0.12, mid_y + gap, 1.25, 0.58, (212, 160, 54)),
-            House("ostblock", right_u_x - 1.15, mid_y + gap + 0.22, 1.15, 0.58, (150, 112, 74)),
-            House("sued", left_u_x - 0.26, left_u_y - 0.62, 0.52, 0.34, (120, 116, 96)),
-            House("i-haus", right_u_x - 0.24, right_u_y - 0.84, 0.48, (mid_y - 0.52) - (right_u_y - 0.84), (42, 74, 120)),
-            House("i-west", right_u_x - 0.88, mid_y - 1.42, 0.50, 0.68, (214, 164, 64)),
-            House("i-ost", right_u_x + 0.34, right_u_y - 0.50, 0.32, 0.46, (168, 78, 72)),
-            House("winkel", top_left - 0.2, top_y + outer, 1.45, 0.46, (176, 78, 92)),
-            House("winkel-b", top_left - 0.2, top_y + outer, 0.46, 1.18, (176, 78, 92)),
-            House("westaus", left_x - outer - 0.74, mid_y - 0.2, 0.7, 0.58, (96, 124, 88)),
-            House("ostaus", right_x + outer, right_u_y + 0.85, 0.66, 0.72, (96, 104, 148)),
-            House("suedaus", left_u_x - 0.32, left_u_y - u_r - outer - 0.5, 0.82, 0.46, (168, 132, 78)),
-            House("nordwest", left_x - outer - 0.7, top_y - 0.9, 0.66, 0.52, (188, 164, 92)),
-            House("suedost", right_u_x - 0.15, right_u_y - u_r - outer - 0.5, 0.74, 0.44, (120, 78, 140)),
-            House("kehre-west", ustem_x - outer - 0.62, right_u_y + 0.08, 0.56, 0.46, (196, 112, 72)),
-            House("kehre-ost", right_x + outer, right_u_y - 0.62, 0.54, 0.48, (72, 140, 120)),
-            House("kehre-sued", right_u_x - 1.2, right_u_y - u_r - outer - 0.46, 0.58, 0.4, (150, 96, 150)),
-        )
-        self.edges = []
-        self.lanes = []
-        for index, ribbon in enumerate(self._ribbons):
-            left = _offset_side(ribbon, 1.0)
-            right = _offset_side(ribbon, -1.0)
-            sides = _chain(left) + _chain(right)
-            self.edges.extend(_gap_edges(sides, self._ribbons, index))
-            if not _near_ribbon(ribbon[0][0], ribbon[0][1], self._ribbons, index, ROAD_W / 2.0 + 0.08):
-                self.edges.append(Segment(left[0][0], left[0][1], right[0][0], right[0][1]))
-            if not _near_ribbon(ribbon[-1][0], ribbon[-1][1], self._ribbons, index, ROAD_W / 2.0 + 0.08):
-                self.edges.append(Segment(left[-1][0], left[-1][1], right[-1][0], right[-1][1]))
-            for mark in _dashes_along(ribbon):
-                mid_x = (mark.x0 + mark.x1) / 2.0
-                mid_y_mark = (mark.y0 + mark.y1) / 2.0
-                if not _near_ribbon(mid_x, mid_y_mark, self._ribbons, index, ROAD_W * 0.8):
-                    self.lanes.append(mark)
-        self._spots = (
-            (self._lane_x + 2.15, mid_y),
-            (right_x - 1.15, mid_y),
-            (stem_x, (top_y + mid_y) / 2.0),
-            (left_u_x, left_u_y - u_r),
-            (right_u_x, right_u_y - u_r),
-        )
-        self.clutter: list[House] = []
-        self._rects = [house.bounds for house in self.houses]
-        self.shore = _shore(self.roads, self.houses)
-        self.left_x = left_x
-        self.right_x = right_x
-        self.mid_y = mid_y
-        self.top_y = top_y
-        self.stem_x = stem_x
-        self.ustem_x = ustem_x
-        self.right_u_y = right_u_y
-        self.corner_y = corner_y
-        self.scene = "leer"
-        self.arch_on = False
-        self.dock_on = False
-        self.runner_on = False
-        self.runner_dir = 1.0
-        span = ROAD_W * 0.9
-        self.arch = Arch(
-            ustem_x - span / 2.0,
-            right_u_y + 0.32,
-            span,
-            0.14,
-            0.62,
-            0.8,
-            (72, 78, 88),
-        )
-        mark_w, mark_h = 0.26, 0.1
-        mark_x = self._lane_x + 1.7
-        mark_y = mid_y - ROAD_W / 2.0 - mark_h - 0.02
-        self.dock = Mark(mark_x, mark_y, mark_w, mark_h)
-        dock_x = mark_x + mark_w / 2.0
-        self.places = (
-            Place("start", self.start_x, self.start_y, self.start_theta),
-            Place("kreuzung", stem_x, mid_y, math.pi / 2.0),
-            Place("nord", stem_x, top_y, math.pi / 2.0),
-            Place("kehre", right_u_x, right_u_y - u_r, 0.0),
-            Place("kehre-an", ustem_x, right_u_y + 0.85, -math.pi / 2.0),
-            Place("west", left_x, mid_y, math.pi),
-            Place("nordwest", left_x, top_y, 0.0),
-            Place("ost", right_x, mid_y, 0.0),
-            Place("dock", dock_x, mid_y, 0.0),
-        )
-        self.cones = tuple(self._spots)
-        self.graph = _graph(self._ribbons, stem_x, mid_y)
-        self.runner_s = (self._lane_x + 0.55) - left_x
-        half = ROAD_W / 2.0
-        ax, ay = FINISH_A
-        bx, by = FINISH_B
-        start = Gate("start", ax, ay, bx, by)
-        # The return stem is the north-south road after the hairpin. No coordinate
-        # was given for that left-right line, so it sits on the middle of the stem.
-        stem_y = (mid_y + right_u_y) / 2.0
-        self.gates = (
-            start,
-            Gate("quer", 7.16, mid_y - half, 7.16, mid_y + half),
-            Gate("ost", right_x - half, 3.95, right_x + half, 3.95),
-            Gate("kehre", right_u_x, right_u_y - u_r - half, right_u_x, right_u_y - u_r + half),
-            Gate("stamm", ustem_x - half, stem_y, ustem_x + half, stem_y),
-            Gate("ziel", ax, ay, bx, by),
-        )
+    @property
+    def start_theta(self) -> float:
+        return self.map.start_theta
+
+    @property
+    def finish(self) -> tuple[tuple[tuple[tuple[float, float], ...], tuple[int, int, int]], ...]:
+        return self.map.finish
+
+    @property
+    def roads(self) -> tuple[tuple[tuple[float, float], ...], ...]:
+        return self.map.roads
+
+    @property
+    def edges(self) -> tuple[Segment, ...]:
+        return self.map.edges
+
+    @property
+    def lanes(self) -> tuple[Segment, ...]:
+        return self.map.lanes
+
+    @property
+    def houses(self) -> tuple[House, ...]:
+        return self.map.houses
+
+    @property
+    def shore(self) -> tuple[float, float, float, float]:
+        return self.map.shore
+
+    @property
+    def gates(self) -> tuple[Gate, ...]:
+        return self.map.gates
+
+    @property
+    def places(self) -> tuple[Place, ...]:
+        return self.map.places
+
+    @property
+    def cones(self) -> tuple[tuple[float, float], ...]:
+        return self.map.cones
+
+    @property
+    def graph(self) -> tuple[GraphEdge, ...]:
+        return self.map.graph
+
+    @property
+    def arch(self) -> Arch:
+        return self.map.arch
+
+    @property
+    def dock(self) -> Mark:
+        return self.map.dock
+
+    @property
+    def scene(self) -> str:
+        return self.live.name
+
+    @property
+    def arch_on(self) -> bool:
+        return self.live.arch_on
+
+    @property
+    def dock_on(self) -> bool:
+        return self.live.dock_on
+
+    @property
+    def runner_on(self) -> bool:
+        return self.live.runner_on
+
+    @property
+    def clutter(self) -> list[House]:
+        return self.live.clutter
 
     def on_asphalt(self, x: float, y: float) -> bool:
         """True when the point is on a road, with a small margin at the white edge."""
-        limit = ROAD_W / 2.0 + 0.02
-        return any(_dist_ribbon(x, y, ribbon) <= limit for ribbon in self._ribbons)
+        return self.map.on_asphalt(x, y)
 
     def place(self, name: str) -> Place:
-        for item in self.places:
-            if item.id == name:
-                return item
-        raise KeyError(name)
+        return self.map.place(name)
 
     def edge(self, name: str) -> GraphEdge:
-        for item in self.graph:
-            if item.id == name:
-                return item
-        raise KeyError(name)
-
-    def set_scene(self, scene: str) -> None:
-        self.scene = scene if scene in {"leer", "kegel", "kehre", "dock"} else "leer"
-        self.set_clutter(self.scene == "kegel")
-        self.arch_on = self.scene == "kehre"
-        self.dock_on = self.scene == "dock"
-        self.runner_on = self.scene == "dock"
-        if self.runner_on:
-            self.runner_s = (self._lane_x + 0.55) - self.left_x
-            self.runner_dir = 1.0
-
-    def advance_runner(self, dt: float) -> None:
-        if not self.runner_on or dt <= 0.0:
-            return
-        limit = self.right_x - self.left_x - 0.35
-        self.runner_s += self.runner_dir * 0.22 * dt
-        if self.runner_s > limit:
-            self.runner_s = limit
-            self.runner_dir = -1.0
-        elif self.runner_s < 0.35:
-            self.runner_s = 0.35
-            self.runner_dir = 1.0
-
-    def runner_pose(self) -> tuple[float, float, float]:
-        return (
-            self.left_x + self.runner_s,
-            self.mid_y,
-            0.0 if self.runner_dir > 0.0 else math.pi,
-        )
-
-    def runner_bounds(self) -> tuple[float, float, float, float]:
-        x, y, _theta = self.runner_pose()
-        return (x - 0.08, y - 0.09, x + 0.08, y + 0.09)
-
-    def runner_dict(self) -> dict[str, float | str]:
-        x, y, theta = self.runner_pose()
-        return {"x": x - 0.08, "y": y - 0.09, "w": 0.16, "h": 0.18, "theta": theta, "color": "#ece8d6"}
-
-    def _scan_rects(self) -> list[tuple[float, float, float, float]]:
-        if not self.runner_on:
-            return self._rects
-        return [*self._rects, self.runner_bounds()]
-
-    def set_clutter(self, enabled: bool) -> None:
-        if enabled:
-            half = CONE_SIZE / 2.0
-            self.clutter = [
-                House(f"kegel-{index}", x - half, y - half, CONE_SIZE, CONE_SIZE, CONE_COLOR, CONE_HEIGHT)
-                for index, (x, y) in enumerate(self._spots)
-            ]
-        else:
-            self.clutter = []
-        self._rects = [house.bounds for house in (*self.houses, *self.clutter)]
+        return self.map.edge(name)
 
     def house(self, name: str) -> House:
-        for house in self.houses:
-            if house.name == name:
-                return house
-        raise KeyError(name)
+        return self.map.house(name)
+
+    def set_scene(self, scene: str) -> None:
+        self.live.set_scene(scene)
+
+    def set_clutter(self, enabled: bool) -> None:
+        self.live.set_clutter(enabled)
+
+    def advance_runner(self, dt: float) -> None:
+        self.live.advance_runner(dt)
+
+    def runner_pose(self) -> tuple[float, float, float]:
+        return self.live.runner_pose()
+
+    def runner_dict(self) -> dict[str, float | str]:
+        return self.live.runner_dict()
+
+    def collision_rects(self) -> list[tuple[float, float, float, float]]:
+        return self.live.collision_rects()
 
     def resolve(self, pose: object, radius: float) -> None:
         x = float(getattr(pose, "x"))
         y = float(getattr(pose, "y"))
-        nx, ny = push_circle(x, y, radius, self._rects)
+        nx, ny = push_circle(x, y, radius, self.live.collision_rects())
         setattr(pose, "x", nx)
         setattr(pose, "y", ny)
 
@@ -943,7 +214,7 @@ class City:
             dist = None
             dx = math.cos(world)
             dy = math.sin(world)
-            for rect in self._scan_rects():
+            for rect in self.live.scan_rects():
                 hit = ray_rect(x, y, dx, dy, rect, RANGE_MAX_M)
                 if hit is None:
                     continue
@@ -958,241 +229,64 @@ class City:
         return ranges
 
     def render(self, x: float, y: float, theta: float) -> bytes:
-        buf = bytearray(IMAGE_W * IMAGE_H * 3)
-        _fill(buf, SKY)
-        c = math.cos(theta)
-        s = math.sin(theta)
-        ground: list[tuple[float, float, float]] = []
-        for forward, left in ((0.2, -6.0), (14.0, -12.0), (14.0, 12.0), (0.2, 6.0)):
-            wx = x + forward * c - left * s
-            wy = y + forward * s + left * c
-            ground.append(_to_cam(x, y, theta, wx, wy, 0.0))
-        clipped = _clip_near(ground)
-        if len(clipped) >= 3:
-            _fill_polygon(buf, [_project(*point) for point in clipped], GRASS)
-        for road in self.roads:
-            poly = _ground_poly(x, y, theta, road)
-            if poly is not None:
-                _fill_polygon(buf, poly, ROAD)
-        if self.dock_on:
-            mark = self.dock
-            corners = (
-                (mark.x, mark.y),
-                (mark.x + mark.w, mark.y),
-                (mark.x + mark.w, mark.y + mark.h),
-                (mark.x, mark.y + mark.h),
-            )
-            painted = _ground_poly(x, y, theta, corners)
-            if painted is not None:
-                _fill_polygon(buf, painted, (196, 64, 58))
-        for edge in self.edges:
-            self._paint_ground_line(buf, x, y, theta, edge, EDGE)
-        for lane in self.lanes:
-            self._paint_ground_line(buf, x, y, theta, lane, LANE)
-        for corners, color in self.finish:
-            painted = _ground_poly(x, y, theta, corners)
-            if painted is not None:
-                _fill_polygon(buf, painted, color)
-        for gate in self.gates:
-            if gate.id in {"start", "ziel"}:
-                continue
-            self._paint_ground_line(buf, x, y, theta, Segment(gate.x0, gate.y0, gate.x1, gate.y1), (255, 176, 64))
-        faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
-        extras: list[House] = []
-        if self.runner_on:
-            rx, ry, _theta = self.runner_pose()
-            extras.append(House("laeufer", rx - 0.08, ry - 0.09, 0.16, 0.18, (236, 232, 214), 0.55))
-        for house in (*self.houses, *self.clutter, *extras):
-            faces.extend(self._house_faces(x, y, theta, house))
-        if self.arch_on:
-            faces.extend(self._arch_faces(x, y, theta))
-        faces.sort(key=lambda item: item[0], reverse=True)
-        for _dist, poly, color in faces:
-            _fill_polygon(buf, poly, color)
-        _dress_ground(buf, x, y, theta, self.shore)
-        return bytes(buf)
+        return render_frame(self.map, self.live, x, y, theta)
 
     def render_bmp(self, x: float, y: float, theta: float) -> bytes:
         return bmp_bytes(self.render(x, y, theta), IMAGE_W, IMAGE_H)
-
-    def _paint_ground_line(
-        self,
-        buf: bytearray,
-        x: float,
-        y: float,
-        theta: float,
-        segment: Segment,
-        color: tuple[int, int, int],
-    ) -> None:
-        length = math.hypot(segment.x1 - segment.x0, segment.y1 - segment.y0)
-        steps = max(1, int(length / 0.1))
-        previous: tuple[float, float] | None = None
-        for step in range(steps + 1):
-            t = step / steps
-            wx = segment.x0 + t * (segment.x1 - segment.x0)
-            wy = segment.y0 + t * (segment.y1 - segment.y0)
-            forward, left, up = _to_cam(x, y, theta, wx, wy, 0.0)
-            if forward < CAMERA_NEAR_M:
-                previous = None
-                continue
-            point = _project(forward, left, up)
-            if previous is not None:
-                _draw_line(buf, previous[0], previous[1], point[0], point[1], color)
-            previous = point
-
-    def _arch_faces(
-        self,
-        x: float,
-        y: float,
-        theta: float,
-    ) -> list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]]:
-        arch = self.arch
-        corners = (
-            (arch.x, arch.y),
-            (arch.x + arch.w, arch.y),
-            (arch.x + arch.w, arch.y + arch.h),
-            (arch.x, arch.y + arch.h),
-        )
-        faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
-        for a, b, shade in ((0, 1, 0.8), (1, 2, 0.7), (2, 3, 0.9), (3, 0, 0.66)):
-            face = self._face(x, y, theta, corners[a], corners[b], arch.z0, arch.z1, _shade(arch.color, shade))
-            if face is not None:
-                faces.append(face)
-        roof = self._roof(x, y, theta, corners, arch.z1, _shade(arch.color, 0.84))
-        if roof is not None:
-            faces.append(roof)
-        return faces
-
-    def _house_faces(
-        self,
-        x: float,
-        y: float,
-        theta: float,
-        house: House,
-    ) -> list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]]:
-        x0, y0, x1, y1 = house.bounds
-        corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
-        walls = ((0, 1, 0.86), (1, 2, 0.74), (2, 3, 0.95), (3, 0, 0.68))
-        faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
-        for a, b, shade in walls:
-            if self._wall_inside_other(corners[a], corners[b], house):
-                continue
-            face = self._face(x, y, theta, corners[a], corners[b], 0.0, house.height, _shade(house.color, shade))
-            if face is not None:
-                faces.append(face)
-        roof = self._roof(x, y, theta, corners, house.height, _shade(house.color, 0.8))
-        if roof is not None:
-            faces.append(roof)
-        return faces
-
-    def _wall_inside_other(self, a: tuple[float, float], b: tuple[float, float], house: House) -> bool:
-        mx = (a[0] + b[0]) / 2.0
-        my = (a[1] + b[1]) / 2.0
-        for other in self.houses:
-            if other is house or other.color != house.color:
-                continue
-            if other.x < mx < other.x + other.w and other.y < my < other.y + other.h:
-                return True
-        return False
-
-    def _face(
-        self,
-        x: float,
-        y: float,
-        theta: float,
-        a: tuple[float, float],
-        b: tuple[float, float],
-        z0: float,
-        z1: float,
-        color: tuple[int, int, int],
-    ) -> tuple[float, list[tuple[float, float]], tuple[int, int, int]] | None:
-        world = (
-            (a[0], a[1], z0),
-            (b[0], b[1], z0),
-            (b[0], b[1], z1),
-            (a[0], a[1], z1),
-        )
-        return self._projected(x, y, theta, world, color)
-
-    def _roof(
-        self,
-        x: float,
-        y: float,
-        theta: float,
-        corners: tuple[tuple[float, float], ...],
-        height: float,
-        color: tuple[int, int, int],
-    ) -> tuple[float, list[tuple[float, float]], tuple[int, int, int]] | None:
-        world = tuple((wx, wy, height) for wx, wy in corners)
-        return self._projected(x, y, theta, world, color)
-
-    def _projected(
-        self,
-        x: float,
-        y: float,
-        theta: float,
-        world: tuple[tuple[float, float, float], ...],
-        color: tuple[int, int, int],
-    ) -> tuple[float, list[tuple[float, float]], tuple[int, int, int]] | None:
-        cam = [_to_cam(x, y, theta, wx, wy, wz) for wx, wy, wz in world]
-        forward = min(point[0] for point in cam)
-        clipped = _clip_near(cam)
-        if len(clipped) < 3:
-            return None
-        return forward, [_project(*point) for point in clipped], color
 
     def to_dict(self) -> dict[str, object]:
         def color_hex(color: tuple[int, int, int]) -> str:
             return "#{:02x}{:02x}{:02x}".format(*color)
 
+        chart = self.map
         return {
-            "width": self.width,
-            "height": self.height,
-            "start": {"x": self.start_x, "y": self.start_y, "theta": self.start_theta},
+            "width": chart.width,
+            "height": chart.height,
+            "start": {"x": chart.start_x, "y": chart.start_y, "theta": chart.start_theta},
             "view": {"width": 1.9, "height": 1.3},
             "shore": {
-                "x": self.shore[0],
-                "y": self.shore[1],
-                "w": self.shore[2] - self.shore[0],
-                "h": self.shore[3] - self.shore[1],
+                "x": chart.shore[0],
+                "y": chart.shore[1],
+                "w": chart.shore[2] - chart.shore[0],
+                "h": chart.shore[3] - chart.shore[1],
             },
-            "roads": [{"points": [{"x": px, "y": py} for px, py in road]} for road in self.roads],
-            "edges": [{"x0": edge.x0, "y0": edge.y0, "x1": edge.x1, "y1": edge.y1} for edge in self.edges],
-            "lanes": [{"x0": lane.x0, "y0": lane.y0, "x1": lane.x1, "y1": lane.y1} for lane in self.lanes],
+            "roads": [{"points": [{"x": px, "y": py} for px, py in road]} for road in chart.roads],
+            "edges": [{"x0": edge.x0, "y0": edge.y0, "x1": edge.x1, "y1": edge.y1} for edge in chart.edges],
+            "lanes": [{"x0": lane.x0, "y0": lane.y0, "x1": lane.x1, "y1": lane.y1} for lane in chart.lanes],
             "finish": [
                 {
                     "points": [{"x": px, "y": py} for px, py in corners],
                     "color": color_hex(color),
                 }
-                for corners, color in self.finish
+                for corners, color in chart.finish
             ],
             "gates": [
                 {"id": gate.id, "x0": gate.x0, "y0": gate.y0, "x1": gate.x1, "y1": gate.y1}
-                for gate in self.gates
+                for gate in chart.gates
             ],
             "houses": [
                 {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}
-                for house in self.houses
+                for house in chart.houses
             ],
             "places": [
-                {"id": place.id, "x": place.x, "y": place.y, "theta": place.theta} for place in self.places
+                {"id": place.id, "x": place.x, "y": place.y, "theta": place.theta} for place in chart.places
             ],
-            "cones": [{"x": px, "y": py} for px, py in self.cones],
+            "cones": [{"x": px, "y": py} for px, py in chart.cones],
             "graph": [
                 {
                     "id": edge.id,
                     "short": edge.short,
                     "points": [{"x": px, "y": py} for px, py in edge.points],
                 }
-                for edge in self.graph
+                for edge in chart.graph
             ],
             "arch": {
-                "x": self.arch.x,
-                "y": self.arch.y,
-                "w": self.arch.w,
-                "h": self.arch.h,
+                "x": chart.arch.x,
+                "y": chart.arch.y,
+                "w": chart.arch.w,
+                "h": chart.arch.h,
             },
-            "dock": {"x": self.dock.x, "y": self.dock.y, "w": self.dock.w, "h": self.dock.h},
+            "dock": {"x": chart.dock.x, "y": chart.dock.y, "w": chart.dock.w, "h": chart.dock.h},
             "runner": self.runner_dict(),
         }
 
@@ -1202,7 +296,7 @@ class City:
 
         return [
             {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}
-            for house in self.clutter
+            for house in self.live.clutter
         ]
 
 

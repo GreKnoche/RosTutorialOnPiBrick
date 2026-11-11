@@ -127,7 +127,9 @@ def _path(city: City, kapitel: str) -> list[tuple[float, float]]:
     if kapitel in {"10", "13"}:
         return _kehre_arc(city, outward=0.12 if kapitel == "13" else 0.0)
     if kapitel == "11":
-        return [(city.place("start").x, city.place("start").y), (city.right_x - 0.25, city.mid_y)]
+        start = city.place("start")
+        east = city.place("ost")
+        return [(start.x, start.y), (east.x - 0.25, east.y)]
     if kapitel == "12":
         return _fillet(city, 0.5)
     if kapitel == "16":
@@ -243,24 +245,33 @@ def _ahead(path: list[tuple[float, float]]) -> dict[str, float] | None:
     return {"x": x0 + (x1 - x0) * step / length, "y": y0 + (y1 - y0) * step / length}
 
 
+def _corner_y(city: City) -> float:
+    west = city.edge("west")
+    return max(point[1] for point in west.points)
+
+
 def _around(city: City) -> list[tuple[float, float]]:
     start = city.place("start")
     west = city.place("west")
-    points = [(start.x, start.y), (west.x, west.y), (west.x, city.corner_y)]
+    cross = city.place("kreuzung")
+    points = [(start.x, start.y), (west.x, west.y), (west.x, _corner_y(city))]
     points.extend(_drop_first(list(city.edge("bogen-nw").points)))
-    points.extend(_drop_first(_until_x(list(city.edge("nordrand").points), city.stem_x)))
+    points.extend(_drop_first(_until_x(list(city.edge("nordrand").points), cross.x)))
     return points
 
 
 def _via_kehre(city: City) -> list[tuple[float, float]]:
     start = city.place("start")
-    points = [(start.x, start.y), (city.ustem_x, city.mid_y)]
+    cross = city.place("kreuzung")
+    approach = city.place("kehre-an")
+    east = city.place("ost")
+    points = [(start.x, start.y), (approach.x, cross.y)]
     points.extend(_drop_first(_kehre_arc(city, 0.0)))
-    points.append((city.right_x, city.corner_y))
+    points.append((east.x, _corner_y(city)))
     bend = list(reversed(city.edge("bogen-no").points))
     points.extend(_drop_first(bend))
     north = list(reversed(city.edge("nordrand").points))
-    points.extend(_drop_first(_until_x(north, city.stem_x, direction=-1)))
+    points.extend(_drop_first(_until_x(north, cross.x, direction=-1)))
     return points
 
 
@@ -277,8 +288,9 @@ def _kehre_arc(city: City, outward: float) -> list[tuple[float, float]]:
 
 
 def _fillet(city: City, radius: float) -> list[tuple[float, float]]:
-    corner_x = city.stem_x
-    corner_y = city.mid_y
+    corner = city.place("kreuzung")
+    corner_x = corner.x
+    corner_y = corner.y
     center_x = corner_x - radius
     center_y = corner_y + radius
     arc = [
@@ -338,8 +350,8 @@ def _ok(
     if kapitel == "10":
         return _clear(path, city.houses, 0.05) and len(path) > 8
     if kapitel == "12":
-        corner = (city.stem_x, city.mid_y)
-        return _clear(path, city.houses, 0.12) and _min_dist(path, [corner]) > 0.2
+        corner = city.place("kreuzung")
+        return _clear(path, city.houses, 0.12) and _min_dist(path, [(corner.x, corner.y)]) > 0.2
     if kapitel == "13":
         return _clear(path, city.houses, 0.2) and len(path) > 8
     if kapitel == "08":

@@ -206,10 +206,10 @@ def test_the_lap_crosses_the_gates_in_order_and_grass_ends_it() -> None:
     assert abs(((CITY.gates[2].y0 + CITY.gates[2].y1) / 2.0) - 3.95) < 1e-6
     assert abs(((CITY.gates[3].y0 + CITY.gates[3].y1) / 2.0) - 1.53) < 0.02
 
-    mid_y = CITY.mid_y
-    right_x = CITY.right_x
-    bend = CITY._ribbons[9]
-    stem_x = CITY.ustem_x
+    mid_y = CITY.place("kreuzung").y
+    right_x = CITY.place("ost").x
+    bend = CITY.edge("kehre").points
+    stem_x = CITY.place("kehre-an").x
     _walk(
         lap,
         [
@@ -226,8 +226,8 @@ def test_the_lap_crosses_the_gates_in_order_and_grass_ends_it() -> None:
 
     fresh = Lap(CITY.gates, CITY.on_asphalt)
     fresh.reset(CITY.start_x, CITY.start_y, True)
-    fresh.observe(CITY.start_x, CITY.start_y, 4.8, CITY.mid_y)
-    fresh.observe(4.8, CITY.mid_y, 4.8, CITY.mid_y + 1.2)
+    fresh.observe(CITY.start_x, CITY.start_y, 4.8, mid_y)
+    fresh.observe(4.8, mid_y, 4.8, mid_y + 1.2)
     assert fresh.grass
     assert fresh.status()["text"] == "Gras. Die Runde zählt nicht."
     fresh.reset(CITY.start_x, CITY.start_y, False)
@@ -275,9 +275,6 @@ def test_city_route_returns_the_same_map() -> None:
 
 
 def test_houses_stay_off_the_asphalt() -> None:
-    from city import ROAD_W, _dist_ribbon
-
-    limit = ROAD_W / 2.0 + 0.08
     for house in CITY.houses:
         samples = (
             (house.x, house.y),
@@ -287,8 +284,7 @@ def test_houses_stay_off_the_asphalt() -> None:
             (house.x + house.w / 2.0, house.y + house.h / 2.0),
         )
         for px, py in samples:
-            nearest = min(_dist_ribbon(px, py, ribbon) for ribbon in CITY._ribbons)
-            assert nearest > limit, house.name
+            assert not CITY.on_asphalt(px, py), house.name
 
 
 def test_the_camera_stays_off_until_the_holder_asks() -> None:
@@ -335,7 +331,7 @@ def test_clutter_is_a_lidar_hit_until_the_holder_clears_it() -> None:
         plant = CanvasPlant()
         apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
         apply_message(plant, {"type": "flags", "client": "labor", "clutter": True})
-        spot_x = CITY._spots[0][0]
+        spot_x = CITY.cones[0][0]
         hit = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[ahead]
         assert math.isinf(clear)
         assert math.isclose(hit, spot_x - 0.11 - CITY.start_x, abs_tol=1e-3)
@@ -427,7 +423,7 @@ def test_the_arch_misses_the_scan_and_the_runner_moves() -> None:
     sample_y = dock.y + dock.h / 2.0
     from city import push_circle
 
-    moved_x, moved_y = push_circle(sample_x, sample_y, 0.02, CITY._rects)
+    moved_x, moved_y = push_circle(sample_x, sample_y, 0.02, CITY.collision_rects())
     assert math.isclose(moved_x, sample_x, abs_tol=1e-6)
     assert math.isclose(moved_y, sample_y, abs_tol=1e-6)
     frame = CITY.render(pose[0] - 0.8, pose[1], 0.0)
