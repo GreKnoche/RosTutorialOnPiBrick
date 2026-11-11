@@ -36,6 +36,21 @@ def _params_source() -> str:
     )
 
 
+def _through_bt() -> str:
+    return os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "companion",
+            "src",
+            "brick_nav",
+            "behavior_trees",
+            "through_poses.xml",
+        )
+    )
+
+
 def _widen(src: str, dest: str) -> None:
     with open(src, encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
@@ -83,7 +98,13 @@ def _setup(context, *_args, **_kwargs):
             executable="bt_navigator",
             name="bt_navigator",
             output="screen",
-            parameters=[*common, {"default_nav_to_pose_bt_xml": bt_xml}],
+            parameters=[
+                *common,
+                {
+                    "default_nav_to_pose_bt_xml": bt_xml,
+                    "default_nav_through_poses_bt_xml": _through_bt(),
+                },
+            ],
             remappings=remappings,
         ),
         Node(

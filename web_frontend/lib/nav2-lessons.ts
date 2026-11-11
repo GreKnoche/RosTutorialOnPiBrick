@@ -9,7 +9,7 @@ export type NodeMission = {
 };
 
 /** Lesson id that first draws the node. */
-export type NodeShow = "folgen" | "controller" | "baum-1";
+export type NodeShow = "folgen" | "controller" | "planner" | "baum-1";
 
 export type NavNode = {
   id: string;
@@ -57,6 +57,14 @@ export const NAV_NODES: NavNode[] = [
     missions: [{ id: "controller", title: "Controller", kind: "gates" }],
   },
   {
+    id: "planner",
+    name: "planner_server",
+    x: 22,
+    y: 88,
+    show: "planner",
+    missions: [{ id: "planner", title: "Planner", kind: null }],
+  },
+  {
     id: "mission",
     name: "mission",
     x: 50,
@@ -67,7 +75,7 @@ export const NAV_NODES: NavNode[] = [
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-const MISSION_ORDER = ["folgen", "controller", "baum-1", "nochmal", "anhalten"] as const;
+const MISSION_ORDER = ["folgen", "controller", "planner", "baum-1", "nochmal", "anhalten"] as const;
 
 const owned = new Map(
   NAV_NODES.flatMap((node) => node.missions.map((mission) => [mission.id, { mission, node }] as const)),
@@ -85,17 +93,25 @@ export const PATH_STEPS: { id: string; title: string }[] = [
 export function missionAt(done: number): { id: string; kind: MissionKind | null; node: string } | null {
   const step = PATH_STEPS[done];
   if (!step || step.id === "start") return null;
-  const found = owned.get(step.id);
-  if (!found) return null;
-  return { id: found.mission.id, kind: found.mission.kind, node: found.node.id };
+  return missionById(step.id);
 }
 
-export function missionKind(done: number): MissionKind | null {
-  return missionAt(done)?.kind ?? null;
+export function missionById(id: string): { id: string; kind: MissionKind | null; node: string } | null {
+  const found = owned.get(id);
+  if (!found) return null;
+  return { id: found.mission.id, kind: found.mission.kind, node: found.node.id };
 }
 
 /** A node is on the graph once its opening lesson is the current station or already passed. */
 export function nodeOpen(done: number, show: NodeShow): boolean {
   const index = PATH_STEPS.findIndex((step) => step.id === show);
   return index >= 0 && done >= index;
+}
+
+/** From the controller lesson on, one path is driven and the maneuver is out. */
+export function usesThroughPath(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const here = PATH_STEPS.findIndex((step) => step.id === id);
+  const gate = PATH_STEPS.findIndex((step) => step.id === "controller");
+  return gate >= 0 && here >= gate;
 }

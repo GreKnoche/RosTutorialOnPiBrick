@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { LocateFixed } from "lucide-react";
+import { LocateFixed, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { paintProbe } from "@/lib/city-layer";
 import {
@@ -634,6 +634,9 @@ export function CityLab({
   gates = false,
   onMelonsCleared,
   onGatesCleared,
+  onPlay,
+  playBusy = false,
+  playReady = false,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
@@ -641,6 +644,9 @@ export function CityLab({
   gates?: boolean;
   onMelonsCleared?: () => void;
   onGatesCleared?: () => void;
+  onPlay?: () => void;
+  playBusy?: boolean;
+  playReady?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -687,6 +693,7 @@ export function CityLab({
   const gatesClearedRef = useRef(onGatesCleared);
   gatesClearedRef.current = onGatesCleared;
   const lapDoneRef = useRef(false);
+  const lapArmedRef = useRef(false);
   const [probe, setProbe] = useState<CityProbe | null>(null);
   const [statusText, setStatusText] = useState("");
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
@@ -770,6 +777,19 @@ export function CityLab({
   }, []);
 
   useEffect(() => {
+    const lap = lapRef.current;
+    if (!gates || !lap || (!lap.done && !lap.grass)) return;
+    const start = cityRef.current?.start ?? { x: 1.6, y: 5.54, theta: 0 };
+    linkRef.current?.send({
+      type: "reset",
+      client: sessionRef.current,
+      x: start.x,
+      y: start.y,
+      theta: start.theta,
+    });
+  }, [gates]);
+
+  useEffect(() => {
     let painted = "";
     const step = () => {
       const pose = poseRef.current;
@@ -834,9 +854,12 @@ export function CityLab({
           if (left === 0) clearedRef.current?.();
         }
       }
-      const lapDone = Boolean(gatesOnRef.current && lapRef.current?.done);
-      if (lapDone && !lapDoneRef.current) gatesClearedRef.current?.();
-      lapDoneRef.current = lapDone;
+      const gatesOn = gatesOnRef.current;
+      const lapDone = Boolean(lapRef.current?.done);
+      if (!gatesOn) lapArmedRef.current = false;
+      else if (!lapDone) lapArmedRef.current = true;
+      if (gatesOn && lapDone && lapArmedRef.current && !lapDoneRef.current) gatesClearedRef.current?.();
+      lapDoneRef.current = gatesOn && lapDone;
       const current = probeRef.current;
       if (current) {
         const runner = runnerRef.current;
@@ -1157,16 +1180,29 @@ export function CityLab({
             Zurücksetzen
           </Button>
         </div>
-        <div className="relative">
-          <pre
-            ref={logRef}
-            aria-label="Ausgabe von waypoint_lesson"
-            aria-busy={booting}
-            className="box-content h-8 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
-          >
-            {booting ? "" : nodeLog}
-          </pre>
-          {booting ? <TwinOrbit /> : null}
+        <div className={`flex items-center gap-2 ${onPlay ? "w-[85%]" : ""}`}>
+          {onPlay ? (
+            <button
+              type="button"
+              aria-label="Code abspielen"
+              onClick={onPlay}
+              disabled={!playReady || playBusy}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#2f6b4f] text-white shadow-sm disabled:opacity-60"
+            >
+              <Play className="size-4 translate-x-px fill-current" />
+            </button>
+          ) : null}
+          <div className="relative min-w-0 flex-1">
+            <pre
+              ref={logRef}
+              aria-label="Ausgabe von waypoint_lesson"
+              aria-busy={booting}
+              className="box-content h-8 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
+            >
+              {booting ? "" : nodeLog}
+            </pre>
+            {booting ? <TwinOrbit /> : null}
+          </div>
         </div>
       </div>
     </div>

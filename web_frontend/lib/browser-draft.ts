@@ -3,6 +3,7 @@ import { writeCompleted } from "@/lib/progress";
 const NAV2_PROGRESS_KEY = "learn2ros.nav2.progress";
 const NAV2_TEXT_KEYS = {
   waypoint: "learn2ros.nav2.waypoint",
+  through: "learn2ros.nav2.through",
   maneuver: "learn2ros.nav2.maneuver",
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",

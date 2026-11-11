@@ -62,14 +62,18 @@ export function MissionPath({
   onComplete,
   active = false,
   done = 1,
+  runningId = null,
 }: {
-  onStart?: () => void;
+  onStart?: (id: string) => void;
   onComplete?: (done: number) => void;
   active?: boolean;
   done?: number;
+  runningId?: string | null;
 }) {
   const current = Math.min(done, STEPS.length - 1);
   const fromIndex = Math.max(0, done - 1);
+  const runningIndex = runningId ? STEPS.findIndex((step) => step.id === runningId) : -1;
+  const focus = runningIndex >= 0 ? runningIndex : current;
   const [pose, setPose] = useState<Pose>({ x: 0, y: 0, heading: 90 });
   const [placed, setPlaced] = useState(false);
   const [glide, setGlide] = useState(false);
@@ -77,7 +81,7 @@ export function MissionPath({
   const roadRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const phaseRef = useRef<Phase>("wait");
-  const stepKey = `${done}:${active}`;
+  const stepKey = `${done}:${active}:${runningId ?? ""}`;
   const [openKey, setOpenKey] = useState(stepKey);
   const [openId, setOpenId] = useState<string | null>(null);
   if (openKey !== stepKey) {
@@ -88,7 +92,7 @@ export function MissionPath({
   placeRef.current = () => {
     const list = listRef.current;
     const road = roadRef.current;
-    const index = phaseRef.current === "wait" ? fromIndex : current;
+    const index = phaseRef.current === "wait" ? fromIndex : focus;
     const node = nodeRefs.current[index];
     if (!list || !road || !node) return;
     setPose(measurePose(list, road, node, phaseRef.current === "dock", index));
@@ -109,7 +113,7 @@ export function MissionPath({
       placeRef.current();
     }, 720);
     return () => window.clearTimeout(id);
-  }, [active, current, fromIndex]);
+  }, [active, current, fromIndex, focus]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -153,16 +157,16 @@ export function MissionPath({
                     item={item}
                     state={state}
                     passed={passed}
-                    live={active && state === "current"}
+                    live={runningId === item.id}
                     armed={openId === item.id}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
-                      if (state !== "current" || active) return;
+                      if (active || state === "locked" || passed) return;
                       setOpenId(item.id);
                     }}
-                    onStart={() => onStart?.()}
+                    onStart={() => onStart?.(item.id)}
                   />
                 ) : null}
               </div>
@@ -175,16 +179,16 @@ export function MissionPath({
                     item={item}
                     state={state}
                     passed={passed}
-                    live={active && state === "current"}
+                    live={runningId === item.id}
                     armed={openId === item.id}
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
                     onClick={() => {
-                      if (state !== "current" || active) return;
+                      if (active || state === "locked" || passed) return;
                       setOpenId(item.id);
                     }}
-                    onStart={() => onStart?.()}
+                    onStart={() => onStart?.(item.id)}
                   />
                 ) : null}
               </div>
@@ -244,24 +248,28 @@ function NodeButton({
         type="button"
         disabled={state === "locked" || passed}
         aria-current={state === "current" ? "step" : undefined}
-        aria-expanded={state === "current" && !live ? armed : undefined}
+        aria-expanded={state !== "locked" && !passed && !live ? armed : undefined}
         aria-label={
-          passed || state === "done" ? `${item.title}, geschafft` : state === "locked" ? `${item.title}, zu` : item.title
+          passed || (state === "done" && !live)
+            ? `${item.title}, geschafft`
+            : state === "locked"
+              ? `${item.title}, zu`
+              : item.title
         }
         onClick={onClick}
         className={`relative z-10 flex size-12 items-center justify-center rounded-full ${
           passed
             ? "border-2 border-dashed border-[#2f6b4f] bg-transparent text-[#2f6b4f]"
-            : state === "done"
-              ? "border-b-4 border-b-[#1e4634] bg-[#2f6b4f] text-white"
-              : state === "current"
-                ? live
-                  ? "border-b-4 border-b-[#6e4e08] bg-[#a67c12] text-[#2a1c08]"
-                  : "border-b-4 border-b-[#a67c12] bg-[#e6b325] text-[#3c3214]"
-                : "cursor-not-allowed border-b-4 border-b-[#c6c6c4] bg-[#e4e4e2] text-[#8a877c]"
+            : live
+              ? "border-b-4 border-b-[#6e4e08] bg-[#a67c12] text-[#2a1c08]"
+              : state === "done"
+                ? "border-b-4 border-b-[#1e4634] bg-[#2f6b4f] text-white"
+                : state === "current"
+                  ? "border-b-4 border-b-[#a67c12] bg-[#e6b325] text-[#3c3214]"
+                  : "cursor-not-allowed border-b-4 border-b-[#c6c6c4] bg-[#e4e4e2] text-[#8a877c]"
         }`}
       >
-        {passed || state === "done" ? (
+        {passed || (state === "done" && !live) ? (
           <Check className="size-5" />
         ) : state === "locked" ? (
           <Lock className="size-4" />
@@ -282,7 +290,7 @@ function NodeButton({
           onClick={onStart}
           className="mt-1 rounded-full bg-[#e6b325] px-2 py-0.5 text-[0.7rem] font-semibold text-[#1c1404]"
         >
-          Start
+          {state === "done" ? "Nochmal" : "Start"}
         </button>
       ) : null}
     </>

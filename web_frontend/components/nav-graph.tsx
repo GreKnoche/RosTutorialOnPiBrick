@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { WaypointNode } from "@/components/waypoint-node";
 import { CodeEditor } from "@/components/code-editor";
 import { readNav2Text, serverText, subscribeDrafts, writeNav2Text } from "@/lib/browser-draft";
-import { followPathError } from "@/lib/controller-yaml";
+import { absorbFollowPath, followPathError } from "@/lib/controller-yaml";
 import { followerError } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 import { NAV_NODES, type NavNode } from "@/lib/nav2-lessons";
 
-type LinkShow = "always" | "tree" | "path";
+type LinkShow = "poses" | "tree" | "direct" | "path" | "through" | "throughPlan" | "throughTree" | "planned" | "plannedDrive";
 
 type GraphLink = {
   from: string;
@@ -19,11 +19,16 @@ type GraphLink = {
 };
 
 const LINKS: GraphLink[] = [
-  { from: "waypoint_lesson", to: "waypoint_follower", label: "follow_waypoints", show: "always" },
-  { from: "waypoint_follower", to: "maneuver", label: "processAtWaypoint", show: "always" },
+  { from: "waypoint_lesson", to: "waypoint_follower", label: "follow_waypoints", show: "poses" },
+  { from: "waypoint_follower", to: "maneuver", label: "processAtWaypoint", show: "poses" },
   { from: "waypoint_follower", to: "mission", label: "navigate_to_pose", show: "tree" },
   { from: "waypoint_follower", to: "controller", label: "follow_path", show: "path" },
-  { from: "mission", to: "controller", label: "follow_path", show: "tree" },
+  { from: "waypoint_lesson", to: "controller", label: "navigate_through_poses", show: "through" },
+  { from: "waypoint_lesson", to: "planner", label: "compute_path_through_poses", show: "throughPlan" },
+  { from: "waypoint_lesson", to: "mission", label: "navigate_through_poses", show: "throughTree" },
+  { from: "mission", to: "controller", label: "follow_path", show: "direct" },
+  { from: "mission", to: "planner", label: "compute_path_through_poses", show: "planned" },
+  { from: "planner", to: "controller", label: "follow_path", show: "plannedDrive" },
 ];
 
 function readManeuver() {
@@ -35,9 +40,7 @@ function readMission() {
 }
 
 function readController() {
-  const text = readNav2Text("controller");
-  if (text && followPathError(text)) return null;
-  return text;
+  return readNav2Text("controller");
 }
 
 function readFollower() {
@@ -46,9 +49,22 @@ function readFollower() {
   return text;
 }
 
-function placeNode(node: NavNode, controller: boolean, tree: boolean): NavNode {
-  if (node.id === "controller" && tree) return { ...node, x: 78 };
-  if (node.id === "mission" && controller) return { ...node, x: 22 };
+function placeNode(node: NavNode, controller: boolean, planner: boolean, tree: boolean, through: boolean): NavNode {
+  if (through && tree && planner) {
+    if (node.id === "waypoint_lesson") return { ...node, x: 8 };
+    if (node.id === "mission") return { ...node, x: 34 };
+    if (node.id === "planner") return { ...node, x: 60 };
+    if (node.id === "controller") return { ...node, x: 86 };
+  }
+  if (through && planner) {
+    if (node.id === "planner") return { ...node, x: 50 };
+    if (node.id === "controller") return { ...node, x: 84 };
+  }
+  if (through && node.id === "controller") return { ...node, x: 72 };
+  if (node.id === "controller" && tree) return { ...node, x: planner ? 84 : 78 };
+  if (node.id === "controller" && planner) return { ...node, x: 78 };
+  if (node.id === "planner") return { ...node, x: tree ? 50 : 22 };
+  if (node.id === "mission" && controller) return { ...node, x: planner ? 16 : 22 };
   return node;
 }
 
@@ -59,21 +75,34 @@ function nodeTone(selected: boolean) {
 
 export function NavGraph({
   controller = false,
+  planner = false,
   tree = false,
+  through = false,
   active = "",
+  playRef,
+  onPlayBusy,
 }: {
   controller?: boolean;
+  planner?: boolean;
   tree?: boolean;
+  through?: boolean;
   active?: string;
+  playRef?: RefObject<() => void>;
+  onPlayBusy?: (busy: boolean) => void;
 }) {
   const visible = NAV_NODES.filter((node) => {
+    if (through && (node.id === "maneuver" || node.id === "waypoint_follower")) return false;
     if (node.show === "controller") return controller;
+    if (node.show === "planner") return planner;
     if (node.show === "baum-1") return tree;
     return true;
-  }).map((node) => placeNode(node, controller, tree));
+  }).map((node) => placeNode(node, controller, planner, tree, through));
   const span = visible.reduce((high, node) => Math.max(high, node.y), 0) - visible.reduce((low, node) => Math.min(low, node.y), 100);
   const graphHeight = span === 0 ? "3rem" : `${4 + span * 0.25}rem`;
   const [selected, setSelected] = useState("waypoint_lesson");
+  useEffect(() => {
+    if (through && (selected === "maneuver" || selected === "waypoint_follower")) setSelected("waypoint_lesson");
+  }, [through, selected]);
   const missionDraft = useSyncExternalStore(subscribeDrafts, readMission, serverText);
   const maneuverDraft = useSyncExternalStore(subscribeDrafts, readManeuver, serverText);
   const controllerDraft = useSyncExternalStore(subscribeDrafts, readController, serverText);
@@ -84,17 +113,27 @@ export function NavGraph({
   const [controllerStatus, setControllerStatus] = useState("Lade Controller…");
   const [fileFollower, setFileFollower] = useState<string | null>(null);
   const [followerStatus, setFollowerStatus] = useState("Lade waypoint_follower…");
-  const [busy, setBusy] = useState(false);
-  const driveRef = useRef<() => void>(() => {});
+  const ownDrive = useRef<() => void>(() => {});
+  const driveRef = playRef ?? ownDrive;
   const xml = missionDraft ?? fileXml ?? "";
   const maneuver = maneuverDraft ?? MANEUVER_PLUGIN_SOURCE;
-  const controllerYaml = controllerDraft ?? fileController ?? "";
+  const controllerYaml = absorbFollowPath(fileController ?? "", controllerDraft ?? fileController ?? "");
+  const controllerProblem = controllerYaml.trim() ? followPathError(controllerYaml) : null;
   const followerYaml = followerDraft ?? fileFollower ?? "";
   const placed = span === 0 ? visible.map((node) => ({ ...node, x: 0, y: 50 })) : visible;
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
   const edges = LINKS.flatMap((link) => {
-    const shown = link.show === "always" || (link.show === "tree" && tree) || (link.show === "path" && controller && !tree);
+    const shown =
+      (link.show === "poses" && !through) ||
+      (link.show === "tree" && tree && !through) ||
+      (link.show === "direct" && tree && !planner) ||
+      (link.show === "planned" && tree && planner) ||
+      (link.show === "plannedDrive" && planner && (through || tree)) ||
+      (link.show === "path" && controller && !tree && !through) ||
+      (link.show === "through" && through && !planner && !tree) ||
+      (link.show === "throughPlan" && through && planner && !tree) ||
+      (link.show === "throughTree" && through && tree);
     if (!shown) return [];
     const from = byId.get(link.from);
     const to = byId.get(link.to);
@@ -232,23 +271,16 @@ export function NavGraph({
           controller={controller && controllerStatus === "" ? controllerYaml : undefined}
           follower={followerStatus === "" ? followerYaml : undefined}
           plugin={maneuver}
+          through={through}
           driveRef={driveRef}
-          onBusy={setBusy}
+          onBusy={onPlayBusy}
         />
       </div>
       {current.id === "waypoint_follower" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">waypoint_follower</h3>
-            <button
-              type="button"
-              onClick={() => driveRef.current()}
-              disabled={busy || followerStatus !== ""}
-              className="rounded-xl bg-[#e6b325] px-4 py-2 text-sm font-semibold text-[#1c1404] shadow-sm disabled:opacity-60"
-            >
-              Fahren
-            </button>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">waypoint_follower</h3>
+      </div>
           <CodeEditor
             value={followerYaml}
             onChange={(value) => writeNav2Text("follower", value === fileFollower ? null : value)}
@@ -264,27 +296,32 @@ export function NavGraph({
       ) : null}
       {current.id === "controller" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">controller_server</h3>
-            <button
-              type="button"
-              onClick={() => driveRef.current()}
-              disabled={busy || controllerStatus !== ""}
-              className="rounded-xl bg-[#e6b325] px-4 py-2 text-sm font-semibold text-[#1c1404] shadow-sm disabled:opacity-60"
-            >
-              Fahren
-            </button>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">controller_server</h3>
+      </div>
           <CodeEditor
             value={controllerYaml}
-            onChange={(value) => writeNav2Text("controller", value === fileController ? null : value)}
+            onChange={(value) => {
+              const next = absorbFollowPath(controllerYaml, value);
+              writeNav2Text("controller", next === fileController ? null : next);
+            }}
             label="FollowPath"
             language="yaml"
             height="h-[28rem]"
           />
           {controllerStatus ? <p className="text-sm leading-6">{controllerStatus}</p> : null}
+          {controllerProblem ? <p className="text-sm leading-6">{controllerProblem}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
             FollowPath macht aus dem Pfad /cmd_vel. Tempo, Lookahead und die Drehung vor der Fahrt stehen hier.
+            Mehrere Zeilen auf einmal einfügen geht, auch ohne Einrückung. Neue Parameter bleiben erhalten.
+          </p>
+        </div>
+      ) : null}
+      {current.id === "planner" ? (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-base font-semibold">planner_server</h3>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Der Planner rechnet den Pfad zum Ziel. Die Lektion dazu kommt noch.
           </p>
         </div>
       ) : null}
@@ -303,17 +340,9 @@ export function NavGraph({
       ) : null}
       {current.id === "maneuver" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
-            <button
-              type="button"
-              onClick={() => driveRef.current()}
-              disabled={busy}
-              className="rounded-xl bg-[#e6b325] px-4 py-2 text-sm font-semibold text-[#1c1404] shadow-sm disabled:opacity-60"
-            >
-              Fahren
-            </button>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
+      </div>
           <CodeEditor
             value={maneuver}
             onChange={(value) => writeNav2Text("maneuver", value === MANEUVER_PLUGIN_SOURCE ? null : value)}

@@ -80,8 +80,84 @@ if __name__ == "__main__":
     main()
 `;
 
+const THROUGH = `"""Ein Pfad durch alle Wegpunkte. Kein Halt an den Zwischenpunkten."""
+
+import math
+
+import rclpy
+from action_msgs.msg import GoalStatus
+from geometry_msgs.msg import PoseStamped
+from nav2_msgs.action import NavigateThroughPoses
+from rclpy.action import ActionClient
+from rclpy.node import Node
+
+# Rechtsklick auf der Karte kopiert (x, y, 0.0). Das dritte Feld ist die Ankunftsrichtung.
+POINTS = [
+    # (1.4, 5.59, 0.0),
+]
+
+
+def pose(node, x, y, theta):
+    msg = PoseStamped()
+    msg.header.stamp = node.get_clock().now().to_msg()
+    msg.header.frame_id = "odom"
+    msg.pose.position.x = float(x)
+    msg.pose.position.y = float(y)
+    half = float(theta) * 0.5
+    msg.pose.orientation.z = math.sin(half)
+    msg.pose.orientation.w = math.cos(half)
+    return msg
+
+
+class Waypoints(Node):
+    def __init__(self):
+        super().__init__("waypoint_lesson")
+        self._client = ActionClient(self, NavigateThroughPoses, "navigate_through_poses")
+
+    def run(self):
+        self.get_logger().info("warte auf navigate_through_poses")
+        self._client.wait_for_server()
+        if not POINTS:
+            self.get_logger().error("keine Wegpunkte")
+            return
+        goal = NavigateThroughPoses.Goal()
+        goal.poses = [pose(self, x, y, theta) for x, y, theta in POINTS]
+        self.get_logger().info(f"{len(goal.poses)} Wegpunkte, ein Pfad")
+        send = self._client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self, send)
+        handle = send.result()
+        if handle is None or not handle.accepted:
+            self.get_logger().error("Ziel abgelehnt")
+            return
+        done = handle.get_result_async()
+        rclpy.spin_until_future_complete(self, done)
+        outcome = done.result()
+        if outcome is None or outcome.status != GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().error("Pfad nicht gefahren")
+            return
+        self.get_logger().info("Pfad gefahren")
+
+
+def main():
+    rclpy.init()
+    node = Waypoints()
+    try:
+        node.run()
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
+`;
+
 function readWaypoint() {
   return readNav2Text("waypoint");
+}
+
+function readThrough() {
+  return readNav2Text("through");
 }
 
 export function WaypointNode({
@@ -89,6 +165,7 @@ export function WaypointNode({
   controller,
   follower,
   plugin,
+  through = false,
   driveRef,
   onBusy,
 }: {
@@ -96,14 +173,23 @@ export function WaypointNode({
   controller?: string;
   follower?: string;
   plugin: string;
+  through?: boolean;
   driveRef: RefObject<() => void>;
   onBusy?: (busy: boolean) => void;
 }) {
   const stored = useSyncExternalStore(subscribeDrafts, readWaypoint, serverText);
-  const source = stored ?? SOURCE;
+  const storedThrough = useSyncExternalStore(subscribeDrafts, readThrough, serverText);
+  const source = through ? (storedThrough ?? THROUGH) : (stored ?? SOURCE);
   const [note, setNote] = useState("Rechtsklick kopiert einen Punkt. Füg die Melonen in POINTS ein.");
-  const [busy, setBusy] = useState(false);
   const [watching, setWatching] = useState(false);
+
+  useEffect(() => {
+    setNote(
+      through
+        ? "Rechtsklick kopiert einen Punkt. Die Liste wird ein Pfad."
+        : "Rechtsklick kopiert einen Punkt. Füg die Melonen in POINTS ein.",
+    );
+  }, [through]);
 
   useEffect(() => {
     if (!watching) return;
@@ -128,10 +214,9 @@ export function WaypointNode({
   }, [watching]);
 
   const drive = useCallback(async (text = source, routine = plugin) => {
-    setBusy(true);
     onBusy?.(true);
     setWatching(false);
-    setNote("Baue maneuver_at_waypoint und starte Nav2.");
+    setNote(through ? "Starte Nav2." : "Baue maneuver_at_waypoint und starte Nav2.");
     try {
       const response = await fetch("/api/waypoint-run", {
         method: "POST",
@@ -154,10 +239,9 @@ export function WaypointNode({
     } catch {
       setNote("Der Knoten ist nicht gestartet.");
     } finally {
-      setBusy(false);
       onBusy?.(false);
     }
-  }, [controller, follower, onBusy, plugin, source, tree]);
+  }, [controller, follower, onBusy, plugin, source, through, tree]);
 
   useEffect(() => {
     driveRef.current = () => {
@@ -167,20 +251,10 @@ export function WaypointNode({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">waypoint_lesson</h2>
-        <button
-          type="button"
-          onClick={() => void drive()}
-          disabled={busy}
-          className="rounded-xl bg-[#e6b325] px-4 py-2 text-sm font-semibold text-[#1c1404] shadow-sm disabled:opacity-60"
-        >
-          Fahren
-        </button>
-      </div>
+      <h2 className="text-base font-semibold">waypoint_lesson</h2>
       <CodeEditor
         value={source}
-        onChange={(value) => writeNav2Text("waypoint", value === SOURCE ? null : value)}
+        onChange={(value) => writeNav2Text(through ? "through" : "waypoint", value === (through ? THROUGH : SOURCE) ? null : value)}
         label="ROS-Knoten"
         language="python"
         height="h-[36rem]"

@@ -80,6 +80,103 @@ export function followPathSection(params: string): string | null {
   return annotate(`${text.replace(/\n*$/, "")}\n`);
 }
 
+const FOREIGN_ROOT = /^(controller_server|planner_server|bt_navigator|waypoint_follower|local_costmap|global_costmap)\s*:/;
+
+type Item = { comments: string[]; key: string; value: string };
+
+function tidy(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\t/g, "  ");
+}
+
+function withNewline(text: string): string {
+  return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+function parseItems(text: string): Item[] | null {
+  const items: Item[] = [];
+  let comments: string[] = [];
+  for (const raw of text.split("\n")) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("#")) {
+      comments.push(trimmed);
+      continue;
+    }
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/.exec(trimmed);
+    if (!match) return null;
+    items.push({ comments, key: match[1], value: match[2].trim() });
+    comments = [];
+  }
+  if (comments.length > 0 && items.length > 0) items[items.length - 1].comments.push(...comments);
+  return items;
+}
+
+function extractFollowPath(text: string): string | null {
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => /^\s*FollowPath:\s*$/.test(line));
+  if (start < 0) return null;
+  const indent = lines[start].match(/^ */)?.[0].length ?? 0;
+  const block = [lines[start].trim()];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) {
+      block.push("");
+      continue;
+    }
+    const spaces = line.match(/^ */)?.[0].length ?? 0;
+    if (spaces <= indent) break;
+    block.push(line.slice(indent));
+  }
+  while (block.length > 0 && !block[block.length - 1].trim()) block.pop();
+  return block.join("\n");
+}
+
+function pluginValue(items: Item[], current: string): string {
+  const own = items.find((item) => item.key === "plugin" && item.value.includes(PLUGIN));
+  if (own) return own.value;
+  const previous = parseItems(current)?.find((item) => item.key === "plugin" && item.value.includes(PLUGIN));
+  return previous?.value ?? `"${PLUGIN}"`;
+}
+
+function rebuild(text: string, current: string): string | null {
+  const items = parseItems(text);
+  if (!items) return null;
+  const parameters = new Map<string, Item>();
+  const order: string[] = [];
+  for (const item of items) {
+    if (item.key === "FollowPath" || item.key === "plugin") continue;
+    if (!parameters.has(item.key)) order.push(item.key);
+    parameters.set(item.key, item);
+  }
+  if (order.length === 0 && !items.some((item) => item.key === "plugin" || item.key === "FollowPath")) return null;
+  const header = items.find((item) => item.key === "FollowPath");
+  const plugin = items.find((item) => item.key === "plugin");
+  const lines = [...(header?.comments ?? [])];
+  lines.push("FollowPath:");
+  for (const comment of plugin?.comments ?? []) lines.push(`  ${comment}`);
+  lines.push(`  plugin: ${pluginValue(items, current)}`);
+  for (const key of order) {
+    const item = parameters.get(key);
+    if (!item) continue;
+    for (const comment of item.comments) lines.push(`  ${comment}`);
+    lines.push(`  ${item.key}: ${item.value}`);
+  }
+  return lines.join("\n");
+}
+
+/** Keep a pasted block. Bare key: value lines land under FollowPath; a whole params file keeps only that section. */
+export function absorbFollowPath(current: string, incoming: string): string {
+  if (!incoming.trim()) return incoming;
+  let text = tidy(incoming);
+  if (text.split("\n").some((line) => FOREIGN_ROOT.test(line))) {
+    text = extractFollowPath(text) ?? text;
+  }
+  if (!followPathError(withNewline(text))) return withNewline(text);
+  const rebuilt = rebuild(text, tidy(current));
+  if (rebuilt && !followPathError(withNewline(rebuilt))) return withNewline(rebuilt);
+  return withNewline(text);
+}
+
 export function followPathError(section: string): string | null {
   if (!section.trim() || section.includes("\0") || section.length > 100_000) {
     return "FollowPath ist leer.";
