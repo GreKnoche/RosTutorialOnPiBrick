@@ -29,6 +29,7 @@ export type NodeMission = {
   checkpoints: MissionCheckpoint[];
   laterObstacles?: MissionObstacle[];
   trigger?: ObstacleTrigger;
+  ghost?: boolean;
 };
 
 /** Lesson id that first draws the node. */
@@ -87,17 +88,32 @@ const TREE_TRIGGER: ObstacleTrigger = { x: 5.35, yMin: 5.19, yMax: 5.92 };
 /** Controller lap. Straight, then a weave, a pinched corner, a cone row, a stop, and a turn-back. */
 const MID = 5.554;
 const HALF = 0.36;
+const ROAD_EAST = 8.677;
 
-/** Eastbound stretch of the mid road, from the start line to the cross-street gate. */
-const MAIN_STRETCH: Pick<NodeMission, "obstacles" | "checkpoints"> = {
-  obstacles: [],
+/**
+ * Right turn off the mid road into the east street, then a dead end.
+ * The inner box clears a 0.40 m arc and cuts a 0.80 m arc. The wall closes
+ * the street; a U-turn of radius 0.40 needs 0.80 m and the street is 0.72 m.
+ */
+const POCKET_GOAL_Y = 4.22;
+const POCKET_COURSE: Pick<NodeMission, "obstacles" | "checkpoints"> = {
+  obstacles: [
+    { x: 8.357, y: 5.234, w: 0.2, h: 0.2 },
+    { x: ROAD_EAST, y: 3.9, w: 0.9, h: 0.16 },
+  ],
   checkpoints: [
     { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
-    { id: "mitte", x0: 4.8, y0: MID - HALF, x1: 4.8, y1: MID + HALF },
-    { id: "quer", x0: 7.16, y0: MID - HALF, x1: 7.16, y1: MID + HALF },
+    {
+      id: "tasche",
+      x0: ROAD_EAST - HALF,
+      y0: POCKET_GOAL_Y,
+      x1: ROAD_EAST + HALF,
+      y1: POCKET_GOAL_Y,
+      halt: true,
+      yaw: Math.PI / 2,
+    },
   ],
 };
-const ROAD_EAST = 8.677;
 const HAIRPIN_X = 7.301;
 const HAIRPIN_Y = 1.53;
 const CONTROLLER_COURSE: Pick<NodeMission, "obstacles" | "checkpoints"> = {
@@ -176,7 +192,15 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "planner",
-    missions: [{ id: "planner", title: "Smac Hybrid", kind: "gates", spawn: HOME, ...MAIN_STRETCH }],
+    missions: [{ id: "planner", title: "Smac Hybrid", kind: "gates", spawn: HOME, ghost: false, ...POCKET_COURSE }],
+  },
+  {
+    id: "goal",
+    name: "goal_checker",
+    x: 84,
+    y: 88,
+    show: "plugin",
+    missions: [],
   },
   {
     id: "mission",
@@ -239,6 +263,7 @@ export function missionById(id: string): {
   checkpoints: MissionCheckpoint[];
   laterObstacles?: MissionObstacle[];
   trigger?: ObstacleTrigger;
+  ghost?: boolean;
 } | null {
   const found = owned.get(id);
   if (!found) return null;
@@ -252,6 +277,7 @@ export function missionById(id: string): {
     checkpoints: found.mission.checkpoints,
     laterObstacles: found.mission.laterObstacles,
     trigger: found.mission.trigger,
+    ghost: found.mission.ghost,
   };
 }
 

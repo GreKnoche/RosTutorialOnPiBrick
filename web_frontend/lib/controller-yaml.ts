@@ -267,8 +267,122 @@ export function absorbProgress(incoming: string): string {
 /** Splice progress_checker into the lab params. FollowPath and the rest stay. */
 export function mergeProgress(params: string, section: string): string | null {
   if (progressError(section)) return null;
+  return spliceBlock(params, progressBounds, section);
+}
+
+const GOAL = "nav2_controller::SimpleGoalChecker";
+
+const GOAL_NOTES: Record<string, string> = {
+  plugin: "SimpleGoalChecker prüft Ort und Blickrichtung der letzten Pfadpose.",
+  stateful: "true merkt sich den Ort beim ersten Treffer. false prüft Ort und Blickrichtung zusammen.",
+  xy_goal_tolerance: "Meter. So nah muss das Auto am Zielort sein.",
+  yaw_goal_tolerance: "Bogenmaß. So nah muss die Blickrichtung am Ziel liegen.",
+};
+
+function annotateGoal(text: string): string {
+  const out: string[] = [];
+  for (const line of text.replace(/\n$/, "").split("\n")) {
+    const key = line.match(/^\s*([A-Za-z0-9_]+):/)?.[1];
+    const note = key ? GOAL_NOTES[key] : undefined;
+    if (note) out.push(`${line.match(/^ */)?.[0] ?? ""}# ${note}`);
+    out.push(line);
+  }
+  return `${out.join("\n")}\n`;
+}
+
+function goalBounds(lines: string[]): Bounds | null {
+  const start = lines.findIndex((line) => /^(\s*)general_goal_checker:[ \t]*$/.test(line));
+  if (start < 0) return null;
+  const indent = lines[start].match(/^ */)?.[0].length ?? 0;
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (!lines[index].trim()) continue;
+    const spaces = lines[index].match(/^ */)?.[0].length ?? 0;
+    if (spaces <= indent) {
+      end = index;
+      break;
+    }
+  }
+  return { start, end, indent };
+}
+
+function extractGoal(text: string): string | null {
+  const lines = text.split("\n");
+  const bounds = goalBounds(lines);
+  if (!bounds) return null;
+  const body = lines.slice(bounds.start, bounds.end);
+  while (body.length > 0 && !body[body.length - 1].trim()) body.pop();
+  return body
+    .map((line) => {
+      if (!line.trim()) return "";
+      const spaces = line.match(/^ */)?.[0].length ?? 0;
+      return line.slice(Math.min(spaces, bounds.indent));
+    })
+    .join("\n");
+}
+
+function nonNegative(section: string, key: string): boolean {
+  const match = section.match(new RegExp(`^\\s*${key}:\\s*([0-9]*\\.?[0-9]+)\\s*$`, "m"));
+  if (!match) return false;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value >= 0;
+}
+
+/** general_goal_checker, dedented, with a trailing newline. */
+export function goalSection(params: string): string | null {
+  const text = extractGoal(params);
+  if (!text) return null;
+  return annotateGoal(`${text.replace(/\n*$/, "")}\n`);
+}
+
+export function goalError(section: string): string | null {
+  if (!section.trim() || section.includes("\0") || section.length > 100_000) {
+    return "Goal Checker ist leer.";
+  }
+  if (section.includes("\t")) return "Goal Checker darf keine Tabulatoren enthalten.";
+  const keys = section.split(/\r?\n/).filter((line) => /^[A-Za-z0-9_]+:/.test(line));
+  if (keys.length !== 1 || keys[0].trim() !== "general_goal_checker:") {
+    return "Sichtbar ist nur general_goal_checker.";
+  }
+  if (!section.includes(GOAL)) {
+    return "general_goal_checker muss SimpleGoalChecker bleiben.";
+  }
+  if (!/^\s*stateful:\s*(true|false)\s*$/m.test(section)) {
+    return "stateful ist true oder false.";
+  }
+  if (!nonNegative(section, "xy_goal_tolerance") || !nonNegative(section, "yaw_goal_tolerance")) {
+    return "xy_goal_tolerance und yaw_goal_tolerance brauchen eine Zahl ab 0.";
+  }
+  for (const line of section.split(/\r?\n/)) {
+    if (!line.trim() || line.trim() === "general_goal_checker:" || line.trim().startsWith("#")) continue;
+    if (!/^\s+\S/.test(line)) return "Die Parameter von general_goal_checker müssen eingerückt sein.";
+  }
+  return null;
+}
+
+/** Keep a pasted block. A whole params file keeps only general_goal_checker. */
+export function absorbGoal(incoming: string): string {
+  if (!incoming.trim()) return incoming;
+  let text = tidy(incoming);
+  if (
+    text.split("\n").some((line) => FOREIGN_ROOT.test(line)) ||
+    /^\s*FollowPath:\s*$/m.test(text) ||
+    /^\s*progress_checker:\s*$/m.test(text)
+  ) {
+    text = extractGoal(text) ?? text;
+  }
+  return withNewline(text);
+}
+
+/** Splice general_goal_checker into the lab params. FollowPath and the rest stay. */
+export function mergeGoal(params: string, section: string): string | null {
+  if (goalError(section)) return null;
+  return spliceBlock(params, goalBounds, section);
+}
+
+function spliceBlock(params: string, boundsOf: (lines: string[]) => Bounds | null, section: string): string | null {
   const lines = params.split(/\r?\n/);
-  const bounds = progressBounds(lines);
+  const bounds = boundsOf(lines);
   if (!bounds) return null;
   const body = withoutComments(section)
     .trimEnd()

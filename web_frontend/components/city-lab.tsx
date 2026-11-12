@@ -200,6 +200,7 @@ export function CityLab({
   notice = null,
   melons = false,
   gates = false,
+  ghost = false,
   course = null,
   needBackup = false,
   missionKey = "",
@@ -220,6 +221,7 @@ export function CityLab({
   notice?: ReactNode;
   melons?: boolean;
   gates?: boolean;
+  ghost?: boolean;
   course?: Course | null;
   needBackup?: boolean;
   missionKey?: string;
@@ -279,6 +281,8 @@ export function CityLab({
   spawnRef.current = spawn;
   const gatesOnRef = useRef(gates);
   gatesOnRef.current = gates;
+  const ghostOnRef = useRef(ghost);
+  ghostOnRef.current = ghost;
   const courseRef = useRef(course);
   courseRef.current = course;
   const needBackupRef = useRef(needBackup);
@@ -373,14 +377,15 @@ export function CityLab({
   };
 
   useEffect(() => {
-    if (!gates) {
+    if (!ghost) {
       takeGhostRef.current = false;
       stopGhostRef.current("Aufnahme aus.");
     }
-  }, [gates]);
+  }, [ghost]);
 
   useEffect(() => {
-    if (!gates) {
+    if (!ghost) {
+      ghostLapRef.current = [];
       ghostHoldRef.current = null;
       ghostRunRef.current = null;
       ghostSawStart.current = false;
@@ -389,6 +394,7 @@ export function CityLab({
         raceNoteRef.current = "";
         setRaceNote("");
       }
+      setGhostNote("");
       return;
     }
     let cancel = false;
@@ -403,7 +409,7 @@ export function CityLab({
     return () => {
       cancel = true;
     };
-  }, [gates]);
+  }, [ghost]);
 
   const [mapPin, setMapPin] = useState<MapPin | null>(null);
   const pinTimer = useRef<number | null>(null);
@@ -506,7 +512,7 @@ export function CityLab({
       const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
       const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
       const run = ghostRunRef.current;
-      if (ghostHoldRef.current !== null && !run && gatesOnRef.current) {
+      if (ghostHoldRef.current !== null && !run && ghostOnRef.current) {
         const next = lapRef.current?.next ?? "";
         if (next === "start") ghostSawStart.current = true;
         else if (ghostSawStart.current && next) {
@@ -517,15 +523,15 @@ export function CityLab({
       }
       const clock = ghostRunRef.current;
       const held = ghostHoldRef.current;
-      const ghost =
-        gatesOnRef.current && (held !== null || clock)
+      const ghostPose =
+        ghostOnRef.current && (held !== null || clock)
           ? ghostAt(ghostLapRef.current, clock ? (performance.now() - clock.t0) / 1000 : (held ?? 0))
           : null;
       let signature = [
         pose.x.toFixed(3),
         pose.y.toFixed(3),
         pose.theta.toFixed(3),
-        ghost ? `${ghost.x.toFixed(2)}:${ghost.y.toFixed(2)}:${ghost.theta.toFixed(2)}` : "",
+        ghostPose ? `${ghostPose.x.toFixed(2)}:${ghostPose.y.toFixed(2)}:${ghostPose.theta.toFixed(2)}` : "",
         view.x.toFixed(3),
         view.y.toFixed(3),
         zoomRef.current,
@@ -567,7 +573,7 @@ export function CityLab({
           gatesOnRef.current ? lapRef.current : null,
           gatesOnRef.current,
           courseRef.current?.checkpoints ?? null,
-          ghost,
+          ghostPose,
           spotsRef.current,
         );
       }
@@ -613,7 +619,7 @@ export function CityLab({
         const run = ghostRunRef.current;
         const limit = ghostLimitRef.current;
         const student = run ? (performance.now() - run.t0) / 1000 - run.line : Number.POSITIVE_INFINITY;
-        if (limit > 0 && student > limit + 0.05) {
+        if (ghostOnRef.current && limit > 0 && student > limit + 0.05) {
           const text = `Zu langsam. ${formatDe(student, 1)} s, der Geist ${formatDe(limit, 1)} s.`;
           if (raceNoteRef.current !== text) {
             raceNoteRef.current = text;
@@ -738,7 +744,7 @@ export function CityLab({
       take.last = -1;
       take.points = [];
     }
-    const keepGhostHold = gatesOnRef.current && performance.now() - ghostArmAt.current < 800;
+    const keepGhostHold = ghostOnRef.current && performance.now() - ghostArmAt.current < 800;
     ghostRunRef.current = null;
     if (!keepGhostHold) {
       ghostHoldRef.current = null;
@@ -1065,13 +1071,13 @@ export function CityLab({
               autoComplete="off"
               onClick={() => {
                 reset();
-                if (gates && takeGhostRef.current) {
+                if (ghost && takeGhostRef.current) {
                   ghostGen.current += 1;
                   seenRunRef.current = false;
                   ghostRef.current = { on: true, settled: false, t0: 0, last: -1, points: [] };
                   setGhostNote("Aufnahme läuft.");
                 }
-                const armGhost = gates && ghostLapRef.current.length > 1;
+                const armGhost = ghost && ghostLapRef.current.length > 1;
                 if (raceNoteRef.current) {
                   raceNoteRef.current = "";
                   setRaceNote("");

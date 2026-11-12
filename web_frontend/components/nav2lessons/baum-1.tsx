@@ -1,4 +1,4 @@
-import { FOLLOW_PATH, NAVFN, PROGRESS, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import { GOAL, NAVFN, PROGRESS, REVERSE_PATH, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
 import type { Nav2Station } from "./types";
 
 const baum1: Nav2Station = {
@@ -15,19 +15,22 @@ const baum1: Nav2Station = {
     { id: "mission", x: 36, y: 50 },
     { id: "planner", x: 66, y: 18 },
     { id: "controller", x: 86, y: 74 },
+    { id: "goal", x: 86, y: 18 },
   ],
   edges: [
     { from: "waypoint_lesson", to: "mission", label: "navigate_through_poses" },
     { from: "mission", to: "planner", label: "compute_path_through_poses" },
     { from: "mission", to: "controller", label: "follow_path" },
     { from: "planner", to: "controller", label: "follow_path" },
+    { from: "controller", to: "goal", label: "is_goal_reached" },
   ],
-  fields: ["through", "controller", "planner", "progress", "mission"],
+  fields: ["through", "controller", "planner", "progress", "goal", "mission"],
   defaults: {
     through: THROUGH_SOURCE,
-    controller: FOLLOW_PATH,
+    controller: REVERSE_PATH,
     planner: NAVFN,
     progress: PROGRESS,
+    goal: GOAL,
     mission: THROUGH_XML,
   },
 };

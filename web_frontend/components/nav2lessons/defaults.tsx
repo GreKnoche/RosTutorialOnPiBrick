@@ -1,4 +1,4 @@
-import { followPathSection, progressSection } from "@/lib/controller-yaml";
+import { followPathSection, goalSection, progressSection } from "@/lib/controller-yaml";
 import { followerSection } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 import { pluginSection } from "@/lib/planner-yaml";
@@ -14,10 +14,10 @@ const PARAMS = `controller_server:
       required_movement_radius: 0.03
       movement_time_allowance: 20.0
     general_goal_checker:
-      stateful: true
+      stateful: false
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.05
-      yaw_goal_tolerance: 0.6
+      yaw_goal_tolerance: 0.4
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.5
@@ -68,7 +68,12 @@ function take(section: string | null, name: string): string {
 }
 
 export const FOLLOW_PATH = take(followPathSection(PARAMS), "FollowPath");
+export const REVERSE_PATH = FOLLOW_PATH.replace("allow_reversing: false", "allow_reversing: true");
+if (REVERSE_PATH === FOLLOW_PATH || !REVERSE_PATH.includes("allow_reversing: true")) {
+  throw new Error("Rückwärtsfahrt fehlt");
+}
 export const PROGRESS = take(progressSection(PARAMS), "progress_checker");
+export const GOAL = take(goalSection(PARAMS), "general_goal_checker");
 export const FOLLOWER = take(followerSection(PARAMS), "waypoint_follower");
 export const NAVFN = take(pluginSection(PARAMS), "GridBased");
 export const HYBRID = NAVFN.replace(
@@ -77,7 +82,7 @@ export const HYBRID = NAVFN.replace(
 );
 
 export const SMAC = `plugin: "nav2_smac_planner::SmacPlannerHybrid"
-tolerance: 0.5
+tolerance: 0.20
 downsample_costmap: false
 downsampling_factor: 1
 allow_unknown: true

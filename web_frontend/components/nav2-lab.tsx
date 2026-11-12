@@ -124,6 +124,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                 : openPlanners(pluginDone)
           }
           gates={kind === "gates"}
+          ghost={kind === "gates" && station?.ghost !== false}
           course={course}
           needBackup={station?.id === "baum-1"}
           spawn={station?.spawn ?? null}
@@ -184,9 +185,9 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                   </ul>
                 ) : station?.id === "planner" ? (
                   <ul className="list-disc space-y-1 pl-4">
-                    <li>Fahre die Hauptstrecke nach Osten.</li>
-                    <li>Überfahre Start, Mitte und die Querlinie.</li>
-                    <li>Smac Hybrid sucht in (x, y, θ) und hält den Mindestradius.</li>
+                    <li>Rechts in die Oststraße, Halt in der Sackgasse, Nase nach Norden.</li>
+                    <li>Radius 0,40 schafft die Ecke. Die Nase nach Norden nur mit REEDS_SHEPP.</li>
+                    <li>Radius 0,80 findet die Einfahrt nicht. DUBIN bleibt stehen.</li>
                     <li>Gras macht die Strecke ungültig.</li>
                   </ul>
                 ) : station?.id === "baum-1" ? (

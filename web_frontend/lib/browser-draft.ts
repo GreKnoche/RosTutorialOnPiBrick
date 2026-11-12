@@ -8,6 +8,7 @@ const NAV2_TEXT_KEYS = {
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",
   progress: "learn2ros.nav2.progress",
+  goal: "learn2ros.nav2.goal",
   follower: "learn2ros.nav2.follower",
   planner: "learn2ros.nav2.planner",
   smac: "learn2ros.nav2.smac",

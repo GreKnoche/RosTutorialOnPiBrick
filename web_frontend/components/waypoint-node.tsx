@@ -36,6 +36,7 @@ export function WaypointNode({
   const planner = useField(missionId, "planner");
   const smac = useField(missionId, "smac");
   const progress = useField(missionId, "progress");
+  const goal = useField(missionId, "goal");
   const base = station.defaults[field] ?? "";
   const stored = (throughClient ? through : waypoint) ?? base;
   const source = stored.replace(
@@ -54,6 +55,7 @@ export function WaypointNode({
     if (station.tree === "pose") body.pose = kept(mission, station.defaults.mission);
     if (has("controller")) body.controller = kept(controller, station.defaults.controller);
     if (has("progress")) body.progress = kept(progress, station.defaults.progress);
+    if (has("goal")) body.goal = kept(goal, station.defaults.goal);
     if (station.cityObstacles) body.cityObstacles = true;
     if (has("follower")) body.follower = kept(follower, station.defaults.follower);
     if (has("planner")) body.planner = kept(planner, station.defaults.planner);
@@ -75,7 +77,7 @@ export function WaypointNode({
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, has, maneuver, mission, onBusy, planner, progress, smac, source, station]);
+  }, [controller, follower, goal, has, maneuver, mission, onBusy, planner, progress, smac, source, station]);
 
   useEffect(() => {
     driveRef.current = () => {

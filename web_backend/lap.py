@@ -12,6 +12,7 @@ _PROMPTS = {
     "schikane": "Schikane, erste Lücke, oben-unten.",
     "schikane-2": "Schikane, zweite Lücke, oben-unten.",
     "mitte": "Weiter auf der Hauptstrecke.",
+    "tasche": "Halt in der Sackgasse. Nase nach Norden.",
     "quer": "Checkpoint auf der Querstraße, oben-unten.",
     "ecke": "Enge Ecke.",
     "reihe": "Kegelreihe, links-rechts.",

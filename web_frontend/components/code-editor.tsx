@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 export type CodeLanguage = "yaml" | "python" | "cpp" | "xml";
 
 type TokenKind = "plain" | "comment" | "key" | "string" | "keyword" | "number";
 
-const TEXT = "m-0 box-border p-4 font-mono text-[0.65rem] leading-5 whitespace-pre";
-const FIELD = `${TEXT} h-full w-full`;
+const TEXT =
+  "m-0 box-border border-0 px-4 pt-4 pb-10 font-mono text-[0.65rem] leading-5 whitespace-pre [font-variant-ligatures:none]";
 
 const COLOR: Record<TokenKind, string> = {
   plain: "",
@@ -290,6 +290,11 @@ export function ResetCodeButton({ disabled, onClick }: { disabled?: boolean; onC
   );
 }
 
+function placeHighlight(view: HTMLPreElement | null, box: HTMLTextAreaElement | null) {
+  if (!view || !box) return;
+  view.style.transform = `translate(${-box.scrollLeft}px, ${-box.scrollTop}px)`;
+}
+
 export function CodeEditor({
   value,
   onChange,
@@ -306,30 +311,37 @@ export function CodeEditor({
   readOnly?: boolean;
 }) {
   const backdrop = useRef<HTMLPreElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    placeHighlight(backdrop.current, field.current);
+  });
   if (readOnly) {
     return (
       <pre aria-label={label} className={`overflow-auto rounded-lg border border-border bg-[#1c1404] text-[#f4efe4] ${TEXT}`}>
         <Highlighted source={value} language={language} />
+        {"\n"}
       </pre>
     );
   }
   return (
     <div className={`relative ${height} min-h-[16rem] resize-y overflow-hidden rounded-lg border border-border bg-[#1c1404]`}>
-      <pre ref={backdrop} aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden text-[#f4efe4] ${FIELD}`}>
+      <pre
+        ref={backdrop}
+        aria-hidden
+        className={`pointer-events-none absolute top-0 left-0 w-max min-w-full text-[#f4efe4] ${TEXT}`}
+      >
         <Highlighted source={value} language={language} />
+        {"\n"}
       </pre>
       <textarea
+        ref={field}
         value={value}
+        wrap="off"
         onChange={(event) => onChange?.(event.target.value)}
-        onScroll={(event) => {
-          const view = backdrop.current;
-          if (!view) return;
-          view.scrollTop = event.currentTarget.scrollTop;
-          view.scrollLeft = event.currentTarget.scrollLeft;
-        }}
+        onScroll={(event) => placeHighlight(backdrop.current, event.currentTarget)}
         spellCheck={false}
         aria-label={label}
-        className={`absolute inset-0 resize-none overflow-auto bg-transparent text-transparent caret-[#f4efe4] outline-none ${FIELD}`}
+        className={`absolute inset-0 z-10 h-full w-full resize-none overflow-auto overscroll-contain bg-transparent text-transparent caret-[#f4efe4] outline-none selection:bg-[#e6b325]/35 selection:text-transparent ${TEXT}`}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlin
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withCityObstacles } from "@/lib/city-costmap";
-import { followPathError, mergeFollowPath, mergeProgress, progressError } from "@/lib/controller-yaml";
+import { followPathError, goalError, mergeFollowPath, mergeGoal, mergeProgress, progressError } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
 import { mergePlugin, mergeSmac, pluginError, smacError } from "@/lib/planner-yaml";
 
@@ -161,11 +161,12 @@ async function resolveParams(
   follower: string | null,
   planner: string | null,
   progress: string | null,
+  goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
 ): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null && follower === null && planner === null && progress === null && smac === null && !cityObstacles) {
+  if (controller === null && follower === null && planner === null && progress === null && goal === null && smac === null && !cityObstacles) {
     return { file: stock, error: null };
   }
   let merged = await readFile(stock, "utf8").catch(() => "");
@@ -202,6 +203,13 @@ async function resolveParams(
     if (shape) return { file: stock, error: shape };
     const next = mergeProgress(merged, progress);
     if (!next) return { file: stock, error: "progress_checker fehlt in nav2_params.yaml." };
+    merged = next;
+  }
+  if (goal !== null) {
+    const shape = goalError(goal);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeGoal(merged, goal);
+    if (!next) return { file: stock, error: "general_goal_checker fehlt in nav2_params.yaml." };
     merged = next;
   }
   if (cityObstacles) {
@@ -598,6 +606,7 @@ async function runStudent(
   follower: string | null,
   planner: string | null,
   progress: string | null,
+  goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
 ) {
@@ -609,7 +618,7 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower, planner, progress, cityObstacles, smac);
+  const params = await resolveParams(controller, follower, planner, progress, goal, cityObstacles, smac);
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
@@ -766,8 +775,18 @@ export async function POST(request: Request) {
     const shape = progressError(progress);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
+  let goal: string | null = null;
+  if (body && typeof body === "object" && "goal" in body && (body as { goal?: unknown }).goal !== undefined) {
+    const raw = (body as { goal?: unknown }).goal;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Goal Checker ist leer." }, { status: 400 });
+    }
+    goal = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = goalError(goal);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
   const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
-  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, cityObstacles, smac));
+  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, goal, cityObstacles, smac));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

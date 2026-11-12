@@ -5,11 +5,49 @@ import { WaypointNode } from "@/components/waypoint-node";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import type { Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
-import { absorbFollowPath, absorbProgress, followPathError, progressError } from "@/lib/controller-yaml";
+import { absorbFollowPath, absorbGoal, absorbProgress, followPathError, goalError, progressError } from "@/lib/controller-yaml";
 import { absorbPlugin, pluginError, smacError } from "@/lib/planner-yaml";
 import { NAV_NODES } from "@/lib/nav2-lessons";
 
 const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
+
+function GoalCheckerEditor({
+  missionId,
+  goalYaml,
+  goalDefault,
+  goalProblem,
+}: {
+  missionId: string;
+  goalYaml: string;
+  goalDefault: string;
+  goalProblem: string | null;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">general_goal_checker</h3>
+        <ResetCodeButton
+          disabled={!goalDefault || goalYaml === goalDefault}
+          onClick={() => writeLessonText(missionId, "goal", null)}
+        />
+      </div>
+      <CodeEditor
+        value={goalYaml}
+        onChange={(value) => {
+          const next = absorbGoal(value);
+          writeLessonText(missionId, "goal", next === goalDefault ? null : next);
+        }}
+        label="general_goal_checker"
+        language="yaml"
+        height="h-[14rem]"
+      />
+      {goalProblem ? <p className="text-sm leading-6">{goalProblem}</p> : null}
+      <p className="text-sm leading-6 text-muted-foreground">
+        stateful merkt sich den Ort beim ersten Treffer. false prüft Ort und Blickrichtung zusammen.
+      </p>
+    </>
+  );
+}
 
 function useField(missionId: string, field: Nav2TextField) {
   const read = useCallback(() => readLessonText(missionId, field), [missionId, field]);
@@ -24,6 +62,7 @@ const NODE_FILL: Record<string, string> = {
   planner: "bg-[#c9b4ee]",
   planner_plugin: "bg-[#ddc8f4]",
   mission: "bg-[#f0a3bc]",
+  goal: "bg-[#9fd0c4]",
 };
 
 function nodeTone(id: string, state: "on" | "focus" | "idle") {
@@ -67,6 +106,7 @@ export function NavGraph({
   const plannerDraft = useField(missionId, "planner");
   const smacDraft = useField(missionId, "smac");
   const progressDraft = useField(missionId, "progress");
+  const goalDraft = useField(missionId, "goal");
   const ownDrive = useRef<() => void>(() => {});
   const driveRef = playRef ?? ownDrive;
   const missionDefault = graph.defaults.mission ?? "";
@@ -76,6 +116,7 @@ export function NavGraph({
   const plannerDefault = graph.defaults.planner ?? "";
   const smacDefault = graph.defaults.smac ?? "";
   const progressDefault = graph.defaults.progress ?? "";
+  const goalDefault = graph.defaults.goal ?? "";
   const xml = missionDraft ?? missionDefault;
   const maneuver = maneuverDraft ?? maneuverDefault;
   const controllerYaml = absorbFollowPath(controllerDefault, controllerDraft ?? controllerDefault);
@@ -87,6 +128,8 @@ export function NavGraph({
   const smacProblem = smacYaml.trim() ? smacError(smacYaml) : null;
   const progressYaml = absorbProgress(progressDraft ?? progressDefault);
   const progressProblem = progressYaml.trim() ? progressError(progressYaml) : null;
+  const goalYaml = absorbGoal(goalDraft ?? goalDefault);
+  const goalProblem = goalYaml.trim() ? goalError(goalYaml) : null;
   const showProgress = graph.showProgress && placed.some((node) => node.id === "controller");
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
@@ -221,6 +264,11 @@ export function NavGraph({
               </p>
             </>
           ) : null}
+        </div>
+      ) : null}
+      {current?.id === "goal" ? (
+        <div className="flex flex-col gap-3">
+          <GoalCheckerEditor missionId={missionId} goalYaml={goalYaml} goalDefault={goalDefault} goalProblem={goalProblem} />
         </div>
       ) : null}
       {current?.id === "planner_plugin" ? (
