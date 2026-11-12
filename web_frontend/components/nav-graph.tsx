@@ -1,61 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { WaypointNode } from "@/components/waypoint-node";
-import { CodeEditor } from "@/components/code-editor";
-import { readLessonText, serverText, subscribeDrafts, writeLessonText } from "@/lib/browser-draft";
-import { absorbFollowPath, followPathError } from "@/lib/controller-yaml";
-import { followerError } from "@/lib/follower-yaml";
-import { absorbPlannerSettings, plannerSettingsError } from "@/lib/planner-yaml";
-import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
-import { NAV_NODES, type NavNode, type StationGraph } from "@/lib/nav2-lessons";
+import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
+import type { Nav2Station } from "@/components/nav2lessons";
+import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
+import { absorbFollowPath, absorbProgress, followPathError, progressError } from "@/lib/controller-yaml";
+import { absorbPlugin, pluginError } from "@/lib/planner-yaml";
+import { NAV_NODES, missionById } from "@/lib/nav2-lessons";
 
-type LinkShow = "poses" | "tree" | "direct" | "path" | "through" | "throughPlan" | "throughTree" | "planned" | "plannedDrive" | "plugin";
+const COMPARISON = `# (x, y), Raster
+NavfnPlanner: "nav2_navfn_planner::NavfnPlanner"
+# (x, y), acht Nachbarn
+SmacPlanner2D: "nav2_smac_planner::SmacPlanner2D"
+# (x, y), Sichtlinie
+ThetaStarPlanner: "nav2_theta_star_planner::ThetaStarPlanner"
+# (x, y, theta), Mindestradius
+SmacPlannerHybrid: "nav2_smac_planner::SmacPlannerHybrid"
+# (x, y, theta), Manöverdatei
+SmacPlannerLattice: "nav2_smac_planner::SmacPlannerLattice"
+`;
 
-type GraphLink = {
-  from: string;
-  to: string;
-  label: string;
-  show: LinkShow;
-};
+const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
 
-const LINKS: GraphLink[] = [
-  { from: "waypoint_lesson", to: "waypoint_follower", label: "follow_waypoints", show: "poses" },
-  { from: "waypoint_follower", to: "maneuver", label: "processAtWaypoint", show: "poses" },
-  { from: "waypoint_follower", to: "mission", label: "navigate_to_pose", show: "tree" },
-  { from: "waypoint_follower", to: "controller", label: "follow_path", show: "path" },
-  { from: "waypoint_lesson", to: "controller", label: "navigate_through_poses", show: "through" },
-  { from: "waypoint_lesson", to: "planner", label: "compute_path_through_poses", show: "throughPlan" },
-  { from: "waypoint_lesson", to: "mission", label: "navigate_through_poses", show: "throughTree" },
-  { from: "mission", to: "controller", label: "follow_path", show: "direct" },
-  { from: "mission", to: "planner", label: "compute_path_through_poses", show: "planned" },
-  { from: "planner", to: "controller", label: "follow_path", show: "plannedDrive" },
-  { from: "planner", to: "planner_plugin", label: "GridBased", show: "plugin" },
-];
-
-function readField(missionId: string, field: "maneuver" | "mission" | "controller" | "follower" | "planner") {
-  const text = readLessonText(missionId, field);
-  if (field === "follower" && text && followerError(text)) return null;
-  return text;
-}
-
-function placeNode(node: NavNode, controller: boolean, planner: boolean, tree: boolean, through: boolean): NavNode {
-  if (through && tree && planner) {
-    if (node.id === "waypoint_lesson") return { ...node, x: 8 };
-    if (node.id === "mission") return { ...node, x: 34 };
-    if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: 60 };
-    if (node.id === "controller") return { ...node, x: 86 };
-  }
-  if (through && planner) {
-    if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: 50 };
-    if (node.id === "controller") return { ...node, x: 84 };
-  }
-  if (through && node.id === "controller") return { ...node, x: 72 };
-  if (node.id === "controller" && tree) return { ...node, x: planner ? 84 : 78 };
-  if (node.id === "controller" && planner) return { ...node, x: 78 };
-  if (node.id === "planner" || node.id === "planner_plugin") return { ...node, x: tree ? 50 : 22 };
-  if (node.id === "mission" && controller) return { ...node, x: planner ? 16 : 22 };
-  return node;
+function useField(missionId: string, field: Nav2TextField) {
+  const read = useCallback(() => readLessonText(missionId, field), [missionId, field]);
+  return useSyncExternalStore(subscribeDrafts, read, serverText);
 }
 
 const NODE_FILL: Record<string, string> = {
@@ -83,20 +53,17 @@ export function NavGraph({
   graph,
   playRef,
   onPlayBusy,
-  onPick,
 }: {
-  graph: StationGraph;
+  graph: Nav2Station;
   playRef?: RefObject<() => void>;
   onPlayBusy?: (busy: boolean) => void;
-  onPick?: (id: string) => void;
 }) {
-  const { through, controller, planner, tree } = graph;
   const missionId = graph.id;
   const focusNode = graph.focus;
-  const open = new Set(graph.nodes);
-  const visible = NAV_NODES.filter((node) => open.has(node.id)).map((node) => placeNode(node, controller, planner, tree, through));
-  const span = visible.reduce((high, node) => Math.max(high, node.y), 0) - visible.reduce((low, node) => Math.min(low, node.y), 100);
-  const graphHeight = span === 0 ? "3rem" : `${4 + span * 0.25}rem`;
+  const placed = graph.nodes.map((node) => ({ ...node, name: NAMES.get(node.id) ?? node.id }));
+  const ys = placed.map((node) => node.y);
+  const span = ys.length === 0 ? 0 : Math.max(...ys) - Math.min(...ys);
+  const graphHeight = span < 1 ? "6rem" : `${4 + span * 0.25}rem`;
   const [pickedNode, setPickedNode] = useState<string | null>(null);
   const [pickedFocus, setPickedFocus] = useState(focusNode);
   if (pickedFocus !== focusNode) {
@@ -104,53 +71,34 @@ export function NavGraph({
     setPickedNode(null);
   }
   const wanted = pickedNode ?? focusNode;
-  const wantedHidden = through && (wanted === "maneuver" || wanted === "waypoint_follower");
-  const selected =
-    !wantedHidden && visible.some((node) => node.id === wanted) ? wanted : (visible[0]?.id ?? "waypoint_lesson");
-  const readManeuver = useCallback(() => readField(missionId, "maneuver"), [missionId]);
-  const readMission = useCallback(() => readField(missionId, "mission"), [missionId]);
-  const readController = useCallback(() => readField(missionId, "controller"), [missionId]);
-  const readFollower = useCallback(() => readField(missionId, "follower"), [missionId]);
-  const readPlanner = useCallback(() => readField(missionId, "planner"), [missionId]);
-  const missionDraft = useSyncExternalStore(subscribeDrafts, readMission, serverText);
-  const maneuverDraft = useSyncExternalStore(subscribeDrafts, readManeuver, serverText);
-  const controllerDraft = useSyncExternalStore(subscribeDrafts, readController, serverText);
-  const followerDraft = useSyncExternalStore(subscribeDrafts, readFollower, serverText);
-  const plannerDraft = useSyncExternalStore(subscribeDrafts, readPlanner, serverText);
-  const [fileXml, setFileXml] = useState<string | null>(null);
-  const [xmlStatus, setXmlStatus] = useState("Lade Behavior Tree…");
-  const [fileController, setFileController] = useState<string | null>(null);
-  const [controllerStatus, setControllerStatus] = useState("Lade Controller…");
-  const [fileFollower, setFileFollower] = useState<string | null>(null);
-  const [followerStatus, setFollowerStatus] = useState("Lade waypoint_follower…");
-  const [filePlanner, setFilePlanner] = useState<string | null>(null);
-  const [plannerStatus, setPlannerStatus] = useState("Lade Planner…");
-  const [pluginYaml, setPluginYaml] = useState<string | null>(null);
+  const selected = placed.some((node) => node.id === wanted) ? wanted : (placed[0]?.id ?? "waypoint_lesson");
+  const missionDraft = useField(missionId, "mission");
+  const maneuverDraft = useField(missionId, "maneuver");
+  const controllerDraft = useField(missionId, "controller");
+  const followerDraft = useField(missionId, "follower");
+  const plannerDraft = useField(missionId, "planner");
+  const progressDraft = useField(missionId, "progress");
   const ownDrive = useRef<() => void>(() => {});
   const driveRef = playRef ?? ownDrive;
-  const xml = missionDraft ?? fileXml ?? "";
-  const maneuver = maneuverDraft ?? MANEUVER_PLUGIN_SOURCE;
-  const controllerYaml = absorbFollowPath(fileController ?? "", controllerDraft ?? fileController ?? "");
+  const missionDefault = graph.defaults.mission ?? "";
+  const maneuverDefault = graph.defaults.maneuver ?? "";
+  const controllerDefault = graph.defaults.controller ?? "";
+  const followerDefault = graph.defaults.follower ?? "";
+  const plannerDefault = graph.defaults.planner ?? "";
+  const progressDefault = graph.defaults.progress ?? "";
+  const xml = missionDraft ?? missionDefault;
+  const maneuver = maneuverDraft ?? maneuverDefault;
+  const controllerYaml = absorbFollowPath(controllerDefault, controllerDraft ?? controllerDefault);
   const controllerProblem = controllerYaml.trim() ? followPathError(controllerYaml) : null;
-  const followerYaml = followerDraft ?? fileFollower ?? "";
-  const plannerYaml = absorbPlannerSettings(filePlanner ?? "", plannerDraft ?? filePlanner ?? "");
-  const plannerProblem = plannerYaml.trim() ? plannerSettingsError(plannerYaml) : null;
-  const placed = span === 0 ? visible.map((node) => ({ ...node, x: 0, y: 50 })) : visible;
+  const followerYaml = followerDraft ?? followerDefault;
+  const plannerYaml = absorbPlugin(plannerDefault, plannerDraft ?? plannerDefault);
+  const plannerProblem = plannerYaml.trim() ? pluginError(plannerYaml) : null;
+  const progressYaml = absorbProgress(progressDraft ?? progressDefault);
+  const progressProblem = progressYaml.trim() ? progressError(progressYaml) : null;
+  const showProgress = graph.showProgress && placed.some((node) => node.id === "controller");
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
-  const edges = LINKS.flatMap((link) => {
-    const shown =
-      (link.show === "poses" && !through) ||
-      (link.show === "tree" && tree && !through) ||
-      (link.show === "direct" && tree && !planner) ||
-      (link.show === "planned" && tree && planner) ||
-      (link.show === "plannedDrive" && planner && (through || tree)) ||
-      (link.show === "path" && controller && !tree && !through) ||
-      (link.show === "through" && through && !planner && !tree) ||
-      (link.show === "throughPlan" && through && planner && !tree) ||
-      (link.show === "throughTree" && through && tree) ||
-      (link.show === "plugin" && planner);
-    if (!shown) return [];
+  const edges = graph.edges.flatMap((link) => {
     const from = byId.get(link.from);
     const to = byId.get(link.to);
     if (!from || !to) return [];
@@ -168,100 +116,12 @@ export function NavGraph({
     ];
   });
 
-  useEffect(() => {
-    let cancel = false;
-    fetch("/api/ros-file?id=follower")
-      .then(async (response) => {
-        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
-        if (cancel) return;
-        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
-          setFollowerStatus(body.message ?? "Datei nicht gefunden");
-          return;
-        }
-        setFileFollower(body.source);
-        setFollowerStatus("");
-      })
-      .catch(() => {
-        if (!cancel) setFollowerStatus("Datei nicht gefunden");
-      });
-    return () => {
-      cancel = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!tree) return;
-    let cancel = false;
-    fetch("/api/ros-file?id=mission")
-      .then(async (response) => {
-        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
-        if (cancel) return;
-        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
-          setXmlStatus(body.message ?? "Datei nicht gefunden");
-          return;
-        }
-        setFileXml(body.source);
-        setXmlStatus("");
-      })
-      .catch(() => {
-        if (!cancel) setXmlStatus("Datei nicht gefunden");
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [tree]);
-
-  useEffect(() => {
-    if (!controller) return;
-    let cancel = false;
-    fetch("/api/ros-file?id=controller")
-      .then(async (response) => {
-        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
-        if (cancel) return;
-        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
-          setControllerStatus(body.message ?? "Datei nicht gefunden");
-          return;
-        }
-        setFileController(body.source);
-        setControllerStatus("");
-      })
-      .catch(() => {
-        if (!cancel) setControllerStatus("Datei nicht gefunden");
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [controller]);
-
-  useEffect(() => {
-    if (!planner) return;
-    let cancel = false;
-    const load = (id: "planner" | "planner_plugin") =>
-      fetch(`/api/ros-file?id=${id}`).then(async (response) => {
-        const body = (await response.json()) as { ok?: boolean; source?: string; message?: string };
-        if (cancel) return;
-        if (!response.ok || body.ok !== true || typeof body.source !== "string") {
-          if (id === "planner") setPlannerStatus(body.message ?? "Datei nicht gefunden");
-          return;
-        }
-        if (id === "planner") {
-          setFilePlanner(body.source);
-          setPlannerStatus("");
-        } else {
-          setPluginYaml(body.source);
-        }
-      });
-    Promise.all([load("planner"), load("planner_plugin")]).catch(() => {
-      if (!cancel) setPlannerStatus("Datei nicht gefunden");
-    });
-    return () => {
-      cancel = true;
-    };
-  }, [planner]);
+  const explain = missionById(graph.id)?.explain ?? "Erklärung zu diesem Schritt.";
 
   return (
     <section className="mt-6 flex flex-col gap-4">
-      <h2 className="text-base font-semibold">Kommunikation</h2>
+      <p className="text-sm leading-6 text-muted-foreground">{explain}</p>
+      <h2 className="text-base font-semibold">Code Graph</h2>
       <div className="overflow-x-auto">
         <div className="relative w-full" style={{ height: graphHeight }} role="group" aria-label="Verbundene Knoten">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
@@ -291,88 +151,106 @@ export function NavGraph({
             <button
               key={node.id}
               type="button"
-              aria-pressed={node.id === current.id}
-              onClick={() => {
-                setPickedNode(node.id);
-                onPick?.(node.id);
-              }}
-              className={`absolute z-20 w-28 -translate-y-1/2 rounded-full px-2.5 py-1.5 text-center ${span === 0 ? "" : "-translate-x-1/2"} ${nodeTone(
+              aria-pressed={node.id === current?.id}
+              onClick={() => setPickedNode(node.id)}
+              className={`absolute z-20 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full px-2.5 py-1.5 text-center ${nodeTone(
                 node.id,
-                node.id === current.id ? "on" : node.id === focusNode ? "focus" : "idle",
+                node.id === current?.id ? "on" : node.id === focusNode ? "focus" : "idle",
               )}`}
-              style={{ left: span === 0 ? "0" : `${node.x}%`, top: `${node.y}%` }}
+              style={{ left: `${node.x}%`, top: `${node.y}%` }}
             >
               <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{node.name}</span>
             </button>
           ))}
         </div>
       </div>
-      <div hidden={current.id !== "waypoint_lesson"}>
-        <WaypointNode
-          tree={tree && xmlStatus === "" ? xml : undefined}
-          controller={controller && controllerStatus === "" ? controllerYaml : undefined}
-          follower={followerStatus === "" ? followerYaml : undefined}
-          planner={planner && plannerStatus === "" ? plannerYaml : undefined}
-          plugin={maneuver}
-          through={through}
-          missionId={missionId}
-          driveRef={driveRef}
-          onBusy={onPlayBusy}
-        />
+      <div hidden={current?.id !== "waypoint_lesson"}>
+        <WaypointNode station={graph} driveRef={driveRef} onBusy={onPlayBusy} />
       </div>
-      {current.id === "waypoint_follower" ? (
+      {current?.id === "waypoint_follower" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">waypoint_follower</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">waypoint_follower</h3>
+            <ResetCodeButton
+              disabled={followerYaml === followerDefault}
+              onClick={() => writeLessonText(missionId, "follower", null)}
+            />
+          </div>
           <CodeEditor
             value={followerYaml}
-            onChange={(value) => writeLessonText(missionId, "follower", value === (fileFollower ?? "") ? null : value)}
+            onChange={(value) => writeLessonText(missionId, "follower", value === followerDefault ? null : value)}
             label="waypoint_follower"
             language="yaml"
             height="h-[16rem]"
           />
-          {followerStatus ? <p className="text-sm leading-6">{followerStatus}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
             Nach jedem erreichten Punkt ruft dieser Knoten maneuver() im Plugin auf.
           </p>
         </div>
       ) : null}
-      {current.id === "controller" ? (
+      {current?.id === "controller" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">controller_server</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">controller_server</h3>
+            <ResetCodeButton
+              disabled={!controllerDefault || controllerYaml === controllerDefault}
+              onClick={() => writeLessonText(missionId, "controller", null)}
+            />
+          </div>
           <CodeEditor
             value={controllerYaml}
             onChange={(value) => {
               const next = absorbFollowPath(controllerYaml, value);
-              writeLessonText(missionId, "controller", next === (fileController ?? "") ? null : next);
+              writeLessonText(missionId, "controller", next === controllerDefault ? null : next);
             }}
             label="FollowPath"
             language="yaml"
             height="h-[28rem]"
           />
-          {controllerStatus ? <p className="text-sm leading-6">{controllerStatus}</p> : null}
           {controllerProblem ? <p className="text-sm leading-6">{controllerProblem}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
             FollowPath macht aus dem Pfad /cmd_vel. Tempo, Lookahead und die Drehung vor der Fahrt stehen hier.
             Mehrere Zeilen auf einmal einfügen geht, auch ohne Einrückung. Neue Parameter bleiben erhalten.
           </p>
+          {showProgress ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold">progress_checker</h3>
+                <ResetCodeButton
+                  disabled={!progressDefault || progressYaml === progressDefault}
+                  onClick={() => writeLessonText(missionId, "progress", null)}
+                />
+              </div>
+              <CodeEditor
+                value={progressYaml}
+                onChange={(value) => {
+                  const next = absorbProgress(value);
+                  writeLessonText(missionId, "progress", next === progressDefault ? null : next);
+                }}
+                label="progress_checker"
+                language="yaml"
+                height="h-[12rem]"
+              />
+              {progressProblem ? <p className="text-sm leading-6">{progressProblem}</p> : null}
+              <p className="text-sm leading-6 text-muted-foreground">
+                FollowPath endet, wenn das Auto den Radius in der Zeit nicht schafft. Das Zeitfenster bleibt länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.
+              </p>
+            </>
+          ) : null}
         </div>
       ) : null}
-      {current.id === "planner_plugin" ? (
+      {current?.id === "planner_plugin" ? (
         <div className="flex flex-col gap-3">
           <h3 className="text-base font-semibold">planner_plugins</h3>
           <CodeEditor
-            value={pluginYaml ?? "planner_plugins: [\"GridBased\"]\nGridBased:\n  plugin: \"nav2_navfn_planner::NavfnPlanner\"\n"}
-            label="planner_plugins"
+            value={COMPARISON}
+            label="Planner im Vergleich"
             language="yaml"
-            height="h-[6rem]"
+            height="h-[8rem]"
             readOnly
           />
           <p className="text-sm leading-6 text-muted-foreground">
-            <span className="font-mono">GridBased</span> ist der Name in der Liste und im Behavior Tree.{" "}
-            <span className="font-mono">NavfnPlanner</span> ist die Klasse. Ein Pfadaufruf nutzt genau diesen einen Planer.
-          </p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            NavFn, SmacPlanner2D und Theta* suchen in Zellen <span className="font-mono">(x, y)</span>. Der EV3 dreht auf der Stelle, deshalb bleibt so ein Pfad fahrbar. Smac Hybrid und Smac Lattice suchen in <span className="font-mono">(x, y, θ)</span> und brauchen einen Mindestradius. Die sind für ein Auto mit Ackermann-Lenkung.
+            Ein Pfadaufruf nutzt genau eine Klasse. NavFn, SmacPlanner2D und Theta* suchen in Zellen <span className="font-mono">(x, y)</span>. Der EV3 dreht auf der Stelle, deshalb bleibt so ein Pfad fahrbar. Smac Hybrid und Smac Lattice suchen in <span className="font-mono">(x, y, θ)</span> und brauchen einen Mindestradius.
           </p>
           <ul className="list-disc space-y-1 pl-4 text-sm leading-6 text-muted-foreground">
             <li>Auf einer geraden Rasterzeile fallen NavFn, Smac2D und Theta* zusammen.</li>
@@ -380,48 +258,66 @@ export function NavGraph({
             <li>Um einen Block legt Theta* eine scharfe Ecke. Smac2D hält Abstand in den billigen Zellen.</li>
             <li>Eine Parklücke mit vorgeschriebener Blickrichtung zeigt Hybrid und Lattice. Die Zellplaner ignorieren die Nase am Ziel.</li>
           </ul>
-          <p className="text-sm leading-6 text-muted-foreground">Die Zahlen von NavFn stehen im Knoten planner_server.</p>
-        </div>
-      ) : null}
-      {current.id === "planner" ? (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">planner_server</h3>
-          <CodeEditor
-            value={plannerYaml}
-            onChange={(value) => {
-              const next = absorbPlannerSettings(plannerYaml, value);
-              writeLessonText(missionId, "planner", next === (filePlanner ?? "") ? null : next);
-            }}
-            label="Planner-Settings"
-            language="yaml"
-            height="h-[22rem]"
-          />
-          {plannerStatus ? <p className="text-sm leading-6">{plannerStatus}</p> : null}
-          {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
           <p className="text-sm leading-6 text-muted-foreground">
-            Frequenz, Wartezeit auf die Costmap, tolerance, use_astar und allow_unknown. Die Klasse bleibt NavfnPlanner und steht im Knoten planner_plugins. Neue Parameter landen unter GridBased.
+            Die Klasse steht im Knoten davor.
           </p>
         </div>
       ) : null}
-      {current.id === "mission" ? (
+      {current?.id === "planner" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">mission.xml</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">planner plugin</h3>
+            <ResetCodeButton
+              disabled={!plannerDefault || plannerYaml === plannerDefault}
+              onClick={() => writeLessonText(missionId, "planner", null)}
+            />
+          </div>
+          <CodeEditor
+            value={plannerYaml}
+            onChange={(value) => {
+              const next = absorbPlugin(plannerYaml, value);
+              writeLessonText(missionId, "planner", next === plannerDefault ? null : next);
+            }}
+            label="planner plugin"
+            language="yaml"
+            height="h-[12rem]"
+          />
+          {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
+          <p className="text-sm leading-6 text-muted-foreground">
+            Tausch die Klasse hinter GridBased. Der Name bleibt, den ruft der Baum auf.
+          </p>
+        </div>
+      ) : null}
+      {current?.id === "mission" ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">through_poses.xml</h3>
+            <ResetCodeButton disabled={!missionDefault || xml === missionDefault} onClick={() => writeLessonText(missionId, "mission", null)} />
+          </div>
           <CodeEditor
             value={xml}
-            onChange={(value) => writeLessonText(missionId, "mission", value === (fileXml ?? "") ? null : value)}
-            label="Behavior Tree mission"
+            onChange={(value) => writeLessonText(missionId, "mission", value === missionDefault ? null : value)}
+            label="Behavior Tree through_poses"
             language="xml"
             height="h-[20rem]"
           />
-          {xmlStatus ? <p className="text-sm leading-6">{xmlStatus}</p> : null}
+          <p className="text-sm leading-6 text-muted-foreground">
+            Dieser Baum fährt navigate_through_poses. Ein Pfad, dann FollowPath, ohne einen Timer, der neu plant.
+          </p>
         </div>
       ) : null}
-      {current.id === "maneuver" ? (
+      {current?.id === "maneuver" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">maneuver_at_waypoint.cpp</h3>
+            <ResetCodeButton
+              disabled={maneuver === maneuverDefault}
+              onClick={() => writeLessonText(missionId, "maneuver", null)}
+            />
+          </div>
           <CodeEditor
             value={maneuver}
-            onChange={(value) => writeLessonText(missionId, "maneuver", value === MANEUVER_PLUGIN_SOURCE ? null : value)}
+            onChange={(value) => writeLessonText(missionId, "maneuver", value === maneuverDefault ? null : value)}
             label="Manöver maneuver_at_waypoint"
             language="cpp"
             height="h-[36rem]"

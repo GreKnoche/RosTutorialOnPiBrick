@@ -1,24 +1,24 @@
 ## intro
 
-In diesem ersten Kapitel lernst du, wie der Roboter aus der Drehung seiner Räder eine gefahrene Strecke schätzt. Du leitest den Radumfang aus dem gemessenen Durchmesser ab und prüfst ihn anschließend mit einer 1-m-Fahrt. Damit legst du die Grundlage für die Odometrie und alle späteren Fahrbewegungen.
+In diesem ersten Kapitel lernst du, wie der Roboter aus der Drehung seiner Räder eine gefahrene Strecke schätzt. Du leitest den Radumfang aus dem gemessenen Durchmesser ab und prüfst ihn anschließend mit einer 1-m-Fahrt.
 
 ## animation
 
-title: Eine Umdrehung wird zur Strecke
+title: Vom Radumfang zur Strecke
 
 ## circumference-calc
 
 eyebrow: Rechnung
 title: Radumfang aus dem Durchmesser
 
-Den Durchmesser kann man am Rad messen. U = π · d, das ist dasselbe wie 2 · π · r.
+Den Durchmesser kann man am Rad messen. U = π · d
 
 ## real-calibration
 
 eyebrow: Kalibrierung
 title: Von der Rechnung zur 1-m-Fahrt
 
-Der berechnete Radumfang ist ein theoretischer Wert. Später lässt du den echten Roboter die berechnete Anzahl Umdrehungen auf einem Maßband fahren und misst die wirkliche Strecke. Aus dem Vergleich mit der geschätzten Strecke erhältst du einen Korrekturwert für die Kalibrierung des Umfangs. Ein Meter eignet sich dafür gut: Kleine Fehler werden messbar, und die Strecke passt auf einen Tisch oder in einen Flur. Über mehrere Meter summiert sich derselbe Fehler, und ein kalibrierter Umfang macht jede Strecke und Drehung genauer. Darum übst du denselben 1-m-Test zuerst hier im Twin: einmal mit 17,4 cm Umfang, einmal mit möglichst wenig Umdrehungen.
+Da der berechnete Umfang sehr theoretisch ist, muss dieser  Aus dem Vergleich mit der geschätzten Strecke erhältst du einen Korrekturwert für die Kalibrierung des Umfangs. Ein Meter eignet sich dafür gut: Kleine Fehler werden messbar, und die Strecke passt auf einen Tisch oder in einen Flur. Über mehrere Meter summiert sich derselbe Fehler, und ein kalibrierter Umfang macht jede Strecke und Drehung genauer. Darum übst du denselben 1-m-Test zuerst hier im Twin: einmal mit 17,4 cm Umfang, einmal mit möglichst wenig Umdrehungen.
 
 ## ruler-drive
 

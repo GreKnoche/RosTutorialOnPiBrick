@@ -1,10 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { followPathError, mergeFollowPath } from "@/lib/controller-yaml";
+import { withCityObstacles } from "@/lib/city-costmap";
+import { followPathError, mergeFollowPath, mergeProgress, progressError } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
-import { mergePlannerSettings, plannerSettingsError } from "@/lib/planner-yaml";
+import { mergePlugin, pluginError } from "@/lib/planner-yaml";
 
 export const runtime = "nodejs";
 
@@ -70,12 +72,65 @@ function rosPrelude(): string {
   ].join("\n");
 }
 
+let cacheDirPath: string | null = null;
+
+function writableDir(dir: string): boolean {
+  try {
+    mkdirSync(dir, { recursive: true });
+    const probe = path.join(dir, ".write-probe");
+    writeFileSync(probe, "");
+    unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function cacheDir(): string {
-  return path.join(process.cwd(), ".student");
+  if (cacheDirPath) return cacheDirPath;
+  const preferred = path.join(process.cwd(), ".student");
+  if (writableDir(preferred)) {
+    cacheDirPath = preferred;
+    return cacheDirPath;
+  }
+  const fallback = path.join(process.cwd(), ".student-cache");
+  if (!writableDir(fallback)) {
+    throw new Error(`${preferred} ist nicht beschreibbar.`);
+  }
+  const oldPlugin = path.join(preferred, "plugin_ws");
+  const newPlugin = path.join(fallback, "plugin_ws");
+  try {
+    if (existsSync(path.join(oldPlugin, "install", "setup.bash")) && !existsSync(newPlugin)) {
+      cpSync(oldPlugin, newPlugin, { recursive: true });
+    }
+  } catch (error) {
+    rmSync(newPlugin, { recursive: true, force: true });
+    console.warn(
+      `nav2: Plugin-Workspace konnte nicht kopiert werden (${error instanceof Error ? error.message : error}).`,
+    );
+  }
+  console.warn(`nav2: ${preferred} ist nicht beschreibbar, benutze ${fallback}.`);
+  cacheDirPath = fallback;
+  return cacheDirPath;
+}
+
+async function writeText(file: string, text: string) {
+  try {
+    await writeFile(file, text, "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "EACCES" && code !== "EPERM") throw error;
+    await rm(file, { force: true });
+    await writeFile(file, text, "utf8");
+  }
 }
 
 function missionFile(): string {
   return path.resolve(process.cwd(), "..", "companion/src/brick_nav/behavior_trees/mission.xml");
+}
+
+function throughFile(): string {
+  return path.resolve(process.cwd(), "..", "companion/src/brick_nav/behavior_trees/through_poses.xml");
 }
 
 function stockParams(): string {
@@ -105,15 +160,19 @@ async function resolveParams(
   controller: string | null,
   follower: string | null,
   planner: string | null,
+  progress: string | null,
+  cityObstacles: boolean,
 ): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null && follower === null && planner === null) return { file: stock, error: null };
+  if (controller === null && follower === null && planner === null && progress === null && !cityObstacles) {
+    return { file: stock, error: null };
+  }
   let merged = await readFile(stock, "utf8").catch(() => "");
   if (planner !== null) {
-    const shape = plannerSettingsError(planner);
+    const shape = pluginError(planner);
     if (shape) return { file: stock, error: shape };
-    const next = mergePlannerSettings(merged, planner);
-    if (!next) return { file: stock, error: "planner_server fehlt in nav2_params.yaml." };
+    const next = mergePlugin(merged, planner);
+    if (!next) return { file: stock, error: "planner_plugins fehlt in nav2_params.yaml." };
     merged = next;
   }
   if (controller !== null) {
@@ -130,11 +189,23 @@ async function resolveParams(
     if (!next) return { file: stock, error: "waypoint_follower fehlt in nav2_params.yaml." };
     merged = next;
   }
+  if (progress !== null) {
+    const shape = progressError(progress);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeProgress(merged, progress);
+    if (!next) return { file: stock, error: "progress_checker fehlt in nav2_params.yaml." };
+    merged = next;
+  }
+  if (cityObstacles) {
+    const next = withCityObstacles(merged);
+    if (!next) return { file: stock, error: "Die Costmap hat keine Inflation-Schicht." };
+    merged = next;
+  }
   const syntax = await yamlSyntaxError(merged);
   if (syntax) return { file: stock, error: syntax };
   const dest = path.join(cacheDir(), "nav2_params.yaml");
   await mkdir(cacheDir(), { recursive: true });
-  await writeFile(dest, merged, "utf8");
+  await writeText(dest, merged);
   return { file: dest, error: null };
 }
 
@@ -183,6 +254,73 @@ function rosBash(command: string, limit = LOG_LIMIT): Promise<{ code: number; ou
   });
 }
 
+function cmdline(pid: number): string {
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`).toString("utf8").replaceAll("\0", " ");
+  } catch {
+    return "";
+  }
+}
+
+function processGroup(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const end = stat.lastIndexOf(")");
+    if (end < 0) return null;
+    const group = Number(stat.slice(end + 2).split(" ")[2]);
+    return Number.isInteger(group) && group > 1 ? group : null;
+  } catch {
+    return null;
+  }
+}
+
+function labNavPids(): number[] {
+  let names: string[] = [];
+  try {
+    names = readdirSync("/proc");
+  } catch {
+    return [];
+  }
+  const found: number[] = [];
+  for (const name of names) {
+    if (!/^\d+$/.test(name)) continue;
+    const pid = Number(name);
+    if (pid === process.pid) continue;
+    const args = cmdline(pid);
+    if (args.includes("student_nav.launch.py") || args.includes(`${path.sep}.student${path.sep}nav2_params.yaml`)) {
+      found.push(pid);
+    }
+  }
+  return found;
+}
+
+function signalGroups(signal: NodeJS.Signals) {
+  const own = processGroup(process.pid);
+  const groups = new Set<number>();
+  for (const pid of labNavPids()) {
+    const group = processGroup(pid);
+    if (group == null || group === own) {
+      try {
+        process.kill(pid, signal);
+      } catch {
+        /* already gone */
+      }
+      continue;
+    }
+    if (groups.has(group)) continue;
+    groups.add(group);
+    try {
+      process.kill(-group, signal);
+    } catch {
+      try {
+        process.kill(pid, signal);
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+}
+
 function signalGroup(child: ChildProcess | null, signal: NodeJS.Signals) {
   if (!child || child.pid == null || child.exitCode !== null) return;
   try {
@@ -209,6 +347,21 @@ async function stopProcess(child: ChildProcess | null) {
   if (await waitExit(child, 4000)) return;
   signalGroup(child, "SIGKILL");
   await waitExit(child, 2000);
+}
+
+async function stopLabNav() {
+  await stopProcess(slot.nav);
+  signalGroups("SIGINT");
+  const polite = Date.now() + 4_000;
+  while (labNavPids().length > 0 && Date.now() < polite) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  if (labNavPids().length === 0) return;
+  signalGroups("SIGKILL");
+  const hard = Date.now() + 2_000;
+  while (labNavPids().length > 0 && Date.now() < hard) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
 }
 
 function watch(child: ChildProcess, target: "studentLog" | "navLog", gen: number | null) {
@@ -240,11 +393,30 @@ function startGroup(command: string): ChildProcess {
   });
 }
 
-function graphProbe(kind: "action" | "navigator"): string {
-  const ready =
-    kind === "action"
-      ? '"/follow_waypoints/_action/send_goal" in names'
-      : 'any(ns.rstrip("/") + "/" + name == "/bt_navigator" for name, ns in nodes)';
+function graphProbe(kind: "active" | "navigator"): string {
+  const setup =
+    kind === "active"
+      ? ["from std_srvs.srv import Trigger", "client = node.create_client(Trigger, '/lifecycle_manager_navigation/is_active')"].join(
+          "\n",
+        )
+      : "";
+  const step =
+    kind === "active"
+      ? [
+          "if client.service_is_ready():",
+          "    future = client.call_async(Trigger.Request())",
+          "    rclpy.spin_until_future_complete(node, future, timeout_sec=0.4)",
+          "    result = future.result() if future.done() else None",
+          "    found = bool(result and result.success)",
+          "else:",
+          "    rclpy.spin_once(node, timeout_sec=0.2)",
+        ].join("\n")
+      : [
+          "rclpy.spin_once(node, timeout_sec=0.2)",
+          "nodes = node.get_node_names_and_namespaces()",
+          'found = any(ns.rstrip("/") + "/" + name == "/bt_navigator" for name, ns in nodes)',
+        ].join("\n");
+  const mark = kind === "active" ? "NAV_READY" : "NAV_UP";
   return [
     "python3 - <<'PY'",
     "import time",
@@ -252,35 +424,48 @@ function graphProbe(kind: "action" | "navigator"): string {
     "from rclpy.node import Node",
     "rclpy.init()",
     "node = Node('nav_ready_probe')",
+    setup,
     "found = False",
-    "deadline = time.time() + 1.5",
+    "deadline = time.time() + 1.2",
     "while time.time() < deadline and not found:",
-    "    rclpy.spin_once(node, timeout_sec=0.2)",
-    "    names = [name for name, _types in node.get_service_names_and_types()]",
-    "    nodes = node.get_node_names_and_namespaces()",
-    `    found = ${ready}`,
-    "print('ready' if found else 'wait')",
+    ...step.split("\n").map((line) => `    ${line}`),
+    `print('${mark}' if found else 'NAV_WAIT')`,
     "node.destroy_node()",
     "rclpy.shutdown()",
     "PY",
   ].join("\n");
 }
 
+function probeHit(out: string, mark: string): boolean {
+  return out.split("\n").some((line) => line.trim() === mark);
+}
+
 async function navReady(child: ChildProcess): Promise<boolean> {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) return false;
-    const info = await rosBash(graphProbe("action"));
-    if (info.out.includes("ready")) return true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const info = await rosBash(graphProbe("active"));
+    if (probeHit(info.out, "NAV_READY")) return true;
+    await new Promise((resolve) => setTimeout(resolve, 300));
   }
   return false;
 }
 
-async function foreignNavigator(): Promise<boolean> {
-  if (slot.nav && slot.nav.exitCode === null) return false;
+async function navigatorGone(): Promise<boolean> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const listed = await rosBash(graphProbe("navigator"));
+    if (!probeHit(listed.out, "NAV_UP")) return true;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
   const listed = await rosBash(graphProbe("navigator"));
-  return listed.out.includes("ready");
+  return !probeHit(listed.out, "NAV_UP");
+}
+
+function liveLabNav(navKey: string): boolean {
+  const child = slot.nav;
+  if (!child || child.exitCode !== null || child.pid == null || slot.navKey !== navKey) return false;
+  return cmdline(child.pid).includes("student_nav.launch.py");
 }
 
 function pluginWorkspace(): string {
@@ -304,12 +489,15 @@ function hardenPlugin(source: string): string {
 async function buildPlugin(source: string, hash: string): Promise<string | null> {
   const setup = path.join(pluginWorkspace(), "install", "setup.bash");
   const builtCpp = path.join(pluginWorkspace(), "src", "maneuver_at_waypoint", "src", "maneuver_at_waypoint.cpp");
-  const previous = await readFile(builtCpp, "utf8").catch(() => "");
-  if (slot.pluginHash === hash && previous.includes("use_global_arguments(false)")) {
-    const existing = await readFile(setup, "utf8").catch(() => "");
-    if (existing) return null;
-  }
   source = hardenPlugin(source);
+  const previous = await readFile(builtCpp, "utf8").catch(() => "");
+  if (previous === source) {
+    const existing = await readFile(setup, "utf8").catch(() => "");
+    if (existing) {
+      slot.pluginHash = hash;
+      return null;
+    }
+  }
   const ws = pluginWorkspace();
   const pkg = path.join(ws, "src", "maneuver_at_waypoint");
   const skeleton = path.join(process.cwd(), "scripts", "maneuver_at_waypoint");
@@ -317,7 +505,7 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
   for (const name of ["package.xml", "CMakeLists.txt", "plugins.xml"]) {
     await copyFile(path.join(skeleton, name), path.join(pkg, name));
   }
-  await writeFile(path.join(pkg, "src", "maneuver_at_waypoint.cpp"), source, "utf8");
+  await writeText(path.join(pkg, "src", "maneuver_at_waypoint.cpp"), source);
   const built = await rosBash(
     [`cd ${sh(ws)}`, "colcon build --packages-select maneuver_at_waypoint --symlink-install"].join("\n"),
     16_000,
@@ -334,23 +522,31 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
   return null;
 }
 
-async function ensureNav(navKey: string, treePath: string, paramsPath: string): Promise<string | null> {
-  if (slot.nav && slot.nav.exitCode === null && slot.navKey === navKey) return null;
-  if (await foreignNavigator()) {
-    return "Nav2 läuft schon ohne diese XML. Beende den anderen Stack und starte noch einmal.";
-  }
-  await stopProcess(slot.nav);
+async function ensureNav(
+  navKey: string,
+  posePath: string,
+  throughPath: string,
+  paramsPath: string,
+  withFollower: boolean,
+): Promise<string | null> {
+  if (liveLabNav(navKey)) return null;
+  await stopLabNav();
   slot.nav = null;
   slot.navKey = "";
   slot.navLog = "";
   slot.navRunLog = "";
+  if (!(await navigatorGone())) {
+    return "Nav2 läuft schon ohne diese XML. Beende den anderen Stack und starte noch einmal.";
+  }
   const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
   const pluginSetup = path.join(pluginWorkspace(), "install", "setup.bash");
   const command = [
     rosPrelude(),
-    `source ${sh(pluginSetup)}`,
-    `exec ros2 launch ${sh(launch)} bt_xml:=${sh(treePath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)}`,
-  ].join("\n");
+    withFollower ? `source ${sh(pluginSetup)}` : "",
+    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const child = startGroup(command);
   slot.nav = child;
   watch(child, "navLog", null);
@@ -387,11 +583,14 @@ function stopStarting(gen: number) {
 
 async function runStudent(
   source: string,
-  plugin: string,
-  tree: string,
+  plugin: string | null,
+  pose: string,
+  through: string,
   controller: string | null,
   follower: string | null,
   planner: string | null,
+  progress: string | null,
+  cityObstacles: boolean,
 ) {
   const gen = ++slot.startGen;
   slot.starting = true;
@@ -401,24 +600,29 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower, planner);
+  const params = await resolveParams(controller, follower, planner, progress, cityObstacles);
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
   }
-  const treePath = path.join(dir, "mission.xml");
+  const posePath = path.join(dir, "pose.xml");
+  const throughPath = path.join(dir, "through.xml");
   const sourcePath = path.join(dir, "waypoint_lesson.py");
-  await writeFile(treePath, tree, "utf8");
-  await writeFile(sourcePath, source, "utf8");
-  const pluginHash = createHash("sha256").update(plugin).digest("hex");
-  const pluginError = await buildPlugin(plugin, pluginHash);
-  if (pluginError) {
-    stopStarting(gen);
-    return { ok: false as const, error: pluginError };
+  await writeText(posePath, pose);
+  await writeText(throughPath, through);
+  await writeText(sourcePath, source);
+  const withFollower = plugin !== null;
+  const pluginHash = plugin ? createHash("sha256").update(plugin).digest("hex") : "none";
+  if (plugin) {
+    const built = await buildPlugin(plugin, pluginHash);
+    if (built) {
+      stopStarting(gen);
+      return { ok: false as const, error: built };
+    }
   }
   const paramsBytes = await readFile(params.file, "utf8");
-  const navKey = `${createHash("sha256").update(tree).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}`;
-  const navError = await ensureNav(navKey, treePath, params.file);
+  const navKey = `${createHash("sha256").update(pose).digest("hex")}:${createHash("sha256").update(through).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}:${withFollower ? "1" : "0"}`;
+  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower);
   if (navError) {
     stopStarting(gen);
     return { ok: false as const, error: navError };
@@ -468,28 +672,40 @@ export async function POST(request: Request) {
   if (!source) {
     return Response.json({ ok: false, error: "Der Knoten ist leer." }, { status: 400 });
   }
-  const plugin = pluginOf(body && typeof body === "object" ? (body as { plugin?: unknown }).plugin : null);
-  if (!plugin) {
-    return Response.json(
-      { ok: false, error: "Das Manöver muss maneuver_at_waypoint::ManeuverAtWaypoint exportieren." },
-      { status: 400 },
-    );
+  const rawPlugin = body && typeof body === "object" && "plugin" in body ? (body as { plugin?: unknown }).plugin : undefined;
+  let plugin: string | null = null;
+  if (rawPlugin !== undefined) {
+    plugin = pluginOf(rawPlugin);
+    if (!plugin) {
+      return Response.json(
+        { ok: false, error: "Das Manöver muss maneuver_at_waypoint::ManeuverAtWaypoint exportieren." },
+        { status: 400 },
+      );
+    }
   }
-  let tree: string | null;
-  if (body && typeof body === "object" && "tree" in body && (body as { tree?: unknown }).tree !== undefined) {
-    tree = treeOf((body as { tree?: unknown }).tree);
-    if (!tree) {
-      return Response.json({ ok: false, error: "Der Behavior Tree ist kein XML." }, { status: 400 });
+  let pose: string | null;
+  if (body && typeof body === "object" && "pose" in body && (body as { pose?: unknown }).pose !== undefined) {
+    pose = treeOf((body as { pose?: unknown }).pose);
+    if (!pose) {
+      return Response.json({ ok: false, error: "mission.xml ist kein XML." }, { status: 400 });
     }
   } else {
-    tree = treeOf(await readFile(missionFile(), "utf8").catch(() => ""));
-    if (!tree) {
+    pose = treeOf(await readFile(missionFile(), "utf8").catch(() => ""));
+    if (!pose) {
       return Response.json({ ok: false, error: "mission.xml fehlt." }, { status: 500 });
     }
   }
-  const chosen = tree;
-  if (!chosen) {
-    return Response.json({ ok: false, error: "mission.xml fehlt." }, { status: 500 });
+  let through: string | null;
+  if (body && typeof body === "object" && "tree" in body && (body as { tree?: unknown }).tree !== undefined) {
+    through = treeOf((body as { tree?: unknown }).tree);
+    if (!through) {
+      return Response.json({ ok: false, error: "Der Behavior Tree ist kein XML." }, { status: 400 });
+    }
+  } else {
+    through = treeOf(await readFile(throughFile(), "utf8").catch(() => ""));
+    if (!through) {
+      return Response.json({ ok: false, error: "through_poses.xml fehlt." }, { status: 500 });
+    }
   }
   let controller: string | null = null;
   if (body && typeof body === "object" && "controller" in body && (body as { controller?: unknown }).controller !== undefined) {
@@ -515,13 +731,24 @@ export async function POST(request: Request) {
   if (body && typeof body === "object" && "planner" in body && (body as { planner?: unknown }).planner !== undefined) {
     const raw = (body as { planner?: unknown }).planner;
     if (typeof raw !== "string") {
-      return Response.json({ ok: false, error: "Die Planner-Settings sind leer." }, { status: 400 });
+      return Response.json({ ok: false, error: "Das Plugin ist leer." }, { status: 400 });
     }
     planner = raw.endsWith("\n") ? raw : `${raw}\n`;
-    const shape = plannerSettingsError(planner);
+    const shape = pluginError(planner);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
-  const result = await enqueue(() => runStudent(source, plugin, chosen, controller, follower, planner));
+  let progress: string | null = null;
+  if (body && typeof body === "object" && "progress" in body && (body as { progress?: unknown }).progress !== undefined) {
+    const raw = (body as { progress?: unknown }).progress;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Progress Checker ist leer." }, { status: 400 });
+    }
+    progress = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = progressError(progress);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
+  const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
+  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, cityObstacles));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

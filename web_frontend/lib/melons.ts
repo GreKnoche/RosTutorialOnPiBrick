@@ -17,16 +17,23 @@ export const MELONS: ReadonlyArray<readonly [number, number]> = [
 /** Same order of magnitude as the waypoint goal tolerance, so a reached point collects. */
 export const MELON_REACH_M = 0.3;
 
-export function freshMelons() {
-  return MELONS.map(() => true);
+export function freshMelons(spots: ReadonlyArray<readonly [number, number]> = MELONS) {
+  return spots.map(() => true);
 }
 
 /** Drop melons the car has reached. Returns the same array when nothing changed. */
-export function takeMelons(alive: boolean[], x: number, y: number) {
+export function takeMelons(
+  alive: boolean[],
+  x: number,
+  y: number,
+  spots: ReadonlyArray<readonly [number, number]> = MELONS,
+) {
   let changed = false;
   const next = alive.map((here, index) => {
     if (!here) return false;
-    const [mx, my] = MELONS[index];
+    const spot = spots[index];
+    if (!spot) return false;
+    const [mx, my] = spot;
     if (Math.hypot(x - mx, y - my) < MELON_REACH_M) {
       changed = true;
       return false;
@@ -36,10 +43,15 @@ export function takeMelons(alive: boolean[], x: number, y: number) {
   return changed ? next : alive;
 }
 
-export function nearestMelon(x: number, y: number, reach = 0.35): readonly [number, number] | null {
+export function nearestMelon(
+  x: number,
+  y: number,
+  reach = 0.35,
+  spots: ReadonlyArray<readonly [number, number]> = MELONS,
+): readonly [number, number] | null {
   let best: readonly [number, number] | null = null;
   let bestD = reach;
-  for (const spot of MELONS) {
+  for (const spot of spots) {
     const dist = Math.hypot(x - spot[0], y - spot[1]);
     if (dist < bestD) {
       best = spot;

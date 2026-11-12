@@ -274,6 +274,7 @@ function NodeButton({
         ref={buttonRef}
         type="button"
         disabled={state === "locked" || passed}
+        autoComplete="off"
         aria-current={state === "current" ? "step" : undefined}
         aria-expanded={state !== "locked" && !passed && !live ? armed : undefined}
         aria-label={

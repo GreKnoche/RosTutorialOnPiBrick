@@ -14,16 +14,26 @@ export type MissionCheckpoint = {
   yaw?: number;
 };
 
+export type SpawnPose = { x: number; y: number; theta: number };
+
+/** The car has passed this line on the mid road, just before the pocket. */
+export type ObstacleTrigger = { x: number; yMin: number; yMax: number };
+
 export type NodeMission = {
   id: string;
   title: string;
   kind: MissionKind | null;
+  spawn: SpawnPose;
+  explain?: string;
+  melons?: ReadonlyArray<readonly [number, number]>;
   obstacles: MissionObstacle[];
   checkpoints: MissionCheckpoint[];
+  laterObstacles?: MissionObstacle[];
+  trigger?: ObstacleTrigger;
 };
 
 /** Lesson id that first draws the node. */
-export type NodeShow = "folgen" | "controller" | "planner" | "baum-1";
+export type NodeShow = "folgen" | "controller" | "planner" | "plugin" | "baum-1";
 
 export type NavNode = {
   id: string;
@@ -35,6 +45,45 @@ export type NavNode = {
 };
 
 const NONE: Pick<NodeMission, "obstacles" | "checkpoints"> = { obstacles: [], checkpoints: [] };
+
+/** Shown above the code graph until a step has its own text. */
+export const EXPLAIN = "Erklärung zu diesem Schritt.";
+
+/** Same pose as the city start, in front of the finish line. */
+const HOME: SpawnPose = { x: 1.576, y: 5.554285714285714, theta: 0 };
+
+/** South side of the square loop, just north of the cross street, facing east. */
+const BLOCK: SpawnPose = { x: 11, y: 5.194285714285714, theta: 0 };
+
+/** One melon on each corner of that loop, clear of the spawn in the middle of the south side. */
+const BLOCK_MELONS: ReadonlyArray<readonly [number, number]> = [
+  [11.89, 5.194285714285714],
+  [11.89, 6.974285714285714],
+  [10.11, 6.974285714285714],
+  [10.11, 5.194285714285714],
+];
+
+/** Six melons. The first sits on the open mid-road stretch. The other five are past the U. */
+const TREE_MELONS: ReadonlyArray<readonly [number, number]> = [
+  [4.15, 5.59],
+  [8.62, 5.64],
+  [8.2, 7.6],
+  [4.05, 7.86],
+  [1.84, 7.52],
+  [8.62, 2.07],
+];
+
+/**
+ * U on the mid road, mouth facing west. Side walls cross the curbs.
+ * Inner gap is about 0.44 m, so the car enters and cannot slip past.
+ */
+const TREE_POCKET: MissionObstacle[] = [
+  { x: 6.675, y: 5.984, w: 0.95, h: 0.42 },
+  { x: 6.675, y: 5.124, w: 0.95, h: 0.42 },
+  { x: 7.1, y: 5.554, w: 0.3, h: 1.28 },
+];
+
+const TREE_TRIGGER: ObstacleTrigger = { x: 5.35, yMin: 5.19, yMax: 5.92 };
 
 /** Controller lap. Straight, then a weave, a pinched corner, a cone row, a stop, and a turn-back. */
 const MID = 5.554;
@@ -82,8 +131,8 @@ export const NAV_NODES: NavNode[] = [
     y: 58,
     show: "folgen",
     missions: [
-      { id: "folgen", title: "Wegpunkten folgen", kind: "melons", ...NONE },
-      { id: "nochmal", title: "Nochmal", kind: "melons", ...NONE },
+      { id: "folgen", title: "Wegpunkten folgen", kind: "melons", spawn: HOME, ...NONE },
+      { id: "nochmal", title: "Nochmal", kind: "melons", spawn: HOME, ...NONE },
     ],
   },
   {
@@ -92,7 +141,7 @@ export const NAV_NODES: NavNode[] = [
     x: 84,
     y: 28,
     show: "folgen",
-    missions: [{ id: "anhalten", title: "Anhalten", kind: null, ...NONE }],
+    missions: [{ id: "anhalten", title: "Anhalten", kind: null, spawn: HOME, ...NONE }],
   },
   {
     id: "controller",
@@ -100,7 +149,15 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 88,
     show: "controller",
-    missions: [{ id: "controller", title: "Controller", kind: "gates", ...CONTROLLER_COURSE }],
+    missions: [{ id: "controller", title: "Controller", kind: "gates", spawn: HOME, ...CONTROLLER_COURSE }],
+  },
+  {
+    id: "planner",
+    name: "planner plugin",
+    x: 22,
+    y: 58,
+    show: "plugin",
+    missions: [{ id: "plugin", title: "planner plugin", kind: null, spawn: BLOCK, ...NONE }],
   },
   {
     id: "planner_plugin",
@@ -108,15 +165,7 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "planner",
-    missions: [],
-  },
-  {
-    id: "planner",
-    name: "planner_server",
-    x: 22,
-    y: 88,
-    show: "planner",
-    missions: [{ id: "planner", title: "Planner", kind: null, ...NONE }],
+    missions: [{ id: "planner", title: "Planner", kind: "melons", spawn: BLOCK, melons: BLOCK_MELONS, ...NONE }],
   },
   {
     id: "mission",
@@ -124,23 +173,36 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 88,
     show: "baum-1",
-    missions: [{ id: "baum-1", title: "Behavior Tree 1", kind: null, ...NONE }],
+    missions: [
+      {
+        id: "baum-1",
+        title: "Behavior Tree 1",
+        kind: "melons",
+        spawn: HOME,
+        explain:
+          "Nach der ersten Strecke steht ein U auf der Straße. Der Progress Checker beendet FollowPath, wenn das Auto stehen bleibt. Im Baum setzt ein RecoveryNode zurück, danach plant dieselbe Pipeline um das U herum.",
+        melons: TREE_MELONS,
+        ...NONE,
+        laterObstacles: TREE_POCKET,
+        trigger: TREE_TRIGGER,
+      },
+    ],
   },
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-const MISSION_ORDER = ["folgen", "controller", "planner", "baum-1", "nochmal", "anhalten"] as const;
+const MISSION_ORDER = ["folgen", "controller", "plugin", "planner", "baum-1", "nochmal", "anhalten"] as const;
 
 const owned = new Map(
   NAV_NODES.flatMap((node) => node.missions.map((mission) => [mission.id, { mission, node }] as const)),
 );
 
-export const PATH_STEPS: { id: string; title: string }[] = [
-  { id: "start", title: "Start" },
+export const PATH_STEPS: { id: string; title: string; explain: string }[] = [
+  { id: "start", title: "Start", explain: EXPLAIN },
   ...MISSION_ORDER.map((id) => {
     const found = owned.get(id);
     if (!found) throw new Error(`missing mission ${id}`);
-    return { id: found.mission.id, title: found.mission.title };
+    return { id: found.mission.id, title: found.mission.title, explain: found.mission.explain ?? EXPLAIN };
   }),
 ];
 
@@ -150,30 +212,25 @@ export function missionAt(done: number): {
   node: string;
   obstacles: MissionObstacle[];
   checkpoints: MissionCheckpoint[];
+  laterObstacles?: MissionObstacle[];
+  trigger?: ObstacleTrigger;
 } | null {
   const step = PATH_STEPS[done];
   if (!step || step.id === "start") return null;
   return missionById(step.id);
 }
 
-/** Latest mission on this node that is already behind the frontier. */
-export function doneMissionOnNode(nodeId: string, done: number): string | null {
-  const node = NAV_NODES.find((item) => item.id === nodeId);
-  if (!node) return null;
-  let found: string | null = null;
-  for (const mission of node.missions) {
-    const index = PATH_STEPS.findIndex((step) => step.id === mission.id);
-    if (index > 0 && index < done) found = mission.id;
-  }
-  return found;
-}
-
 export function missionById(id: string): {
   id: string;
   kind: MissionKind | null;
   node: string;
+  spawn: SpawnPose;
+  explain: string;
+  melons?: ReadonlyArray<readonly [number, number]>;
   obstacles: MissionObstacle[];
   checkpoints: MissionCheckpoint[];
+  laterObstacles?: MissionObstacle[];
+  trigger?: ObstacleTrigger;
 } | null {
   const found = owned.get(id);
   if (!found) return null;
@@ -181,65 +238,15 @@ export function missionById(id: string): {
     id: found.mission.id,
     kind: found.mission.kind,
     node: found.node.id,
+    spawn: found.mission.spawn,
+    explain: found.mission.explain ?? EXPLAIN,
+    melons: found.mission.melons,
     obstacles: found.mission.obstacles,
     checkpoints: found.mission.checkpoints,
+    laterObstacles: found.mission.laterObstacles,
+    trigger: found.mission.trigger,
   };
 }
 
-/** A node is on the graph once its opening lesson is the current station or already passed. */
-export function nodeOpen(done: number, show: NodeShow): boolean {
-  const index = PATH_STEPS.findIndex((step) => step.id === show);
-  return index >= 0 && done >= index;
-}
-
-/** From the controller lesson on, one path is driven and the maneuver is out. */
-export function usesThroughPath(id: string | null | undefined): boolean {
-  if (!id) return false;
-  const here = PATH_STEPS.findIndex((step) => step.id === id);
-  const gate = PATH_STEPS.findIndex((step) => step.id === "controller");
-  return gate >= 0 && here >= gate;
-}
-
-/** Which graph a path station draws. Later stations add nodes; nothing loads before Start. */
-export type StationGraph = {
-  id: string;
-  focus: string;
-  nodes: string[];
-  through: boolean;
-  controller: boolean;
-  planner: boolean;
-  tree: boolean;
-};
-
-export const STATION_GRAPH: Record<string, StationGraph> = Object.fromEntries(
-  PATH_STEPS.flatMap((step) => {
-    if (step.id === "start") return [];
-    const at = PATH_STEPS.findIndex((item) => item.id === step.id);
-    const through = usesThroughPath(step.id);
-    const controller = nodeOpen(at, "controller");
-    const planner = nodeOpen(at, "planner");
-    const tree = nodeOpen(at, "baum-1");
-    const nodes = NAV_NODES.filter((node) => {
-      if (through && (node.id === "maneuver" || node.id === "waypoint_follower")) return false;
-      if (node.show === "controller") return controller;
-      if (node.show === "planner") return planner;
-      if (node.show === "baum-1") return tree;
-      return true;
-    }).map((node) => node.id);
-    const graph: StationGraph = {
-      id: step.id,
-      focus: missionById(step.id)?.node ?? "",
-      nodes,
-      through,
-      controller,
-      planner,
-      tree,
-    };
-    return [[step.id, graph]];
-  }),
-);
-
-export function stationGraph(id: string | null | undefined): StationGraph | null {
-  if (!id) return null;
-  return STATION_GRAPH[id] ?? null;
-}
+export { stationGraph } from "@/components/nav2lessons";
+export type { Nav2Station } from "@/components/nav2lessons";

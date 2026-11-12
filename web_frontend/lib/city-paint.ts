@@ -392,6 +392,7 @@ export function draw(
   gates: boolean,
   courseGates: Gate[] | null = null,
   ghost: Pose | null = null,
+  melonSpots: ReadonlyArray<readonly [number, number]> = MELONS,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -406,7 +407,7 @@ export function draw(
   if (gates && city) drawGates(ctx, to, ppm, courseGates ?? city.gates, lap);
 
   if (melons) {
-    MELONS.forEach(([x, y], index) => {
+    melonSpots.forEach(([x, y], index) => {
       if (!melons[index]) return;
       const screen = to(x, y);
       drawMelon(ctx, screen.x, screen.y, ppm);

@@ -15,6 +15,7 @@ from city import (
     IMAGE_W,
     RANGE_MAX_M,
     ROAD,
+    ROAD_W,
     SCAN_COUNT,
     SKY,
     foot_radius,
@@ -253,6 +254,13 @@ def test_the_finish_line_crosses_the_street_and_the_car_waits_in_front() -> None
     assert CITY.start_theta == 0.0
     nose_x = CITY.start_x + BODY_LENGTH_M / 2.0
     assert nose_x < min(px for px, _py in points) + 0.02
+    block = CITY.house("block")
+    assert math.isclose(block.w, block.h)
+    middle_x = block.x + block.w / 2.0
+    middle_y = block.y + block.h / 2.0
+    assert not CITY.on_asphalt(middle_x, middle_y)
+    assert CITY.on_asphalt(middle_x, block.y - ROAD_W / 2.0 - 0.08)
+    assert block.x > 10.0
 
 
 def test_city_route_returns_the_same_map() -> None:
@@ -529,3 +537,26 @@ def test_a_mission_spawns_its_cones_and_checkpoints() -> None:
         assert [gate.id for gate in plant.lap.gates] == [gate.id for gate in CITY.gates]
     finally:
         CITY.set_clutter(False)
+
+
+def test_samples_fill_a_rectangle() -> None:
+    from city_geom import sample_rects
+
+    points = sample_rects([(1.0, 2.0, 1.1, 2.1)], 0.05)
+    assert (1.0, 2.0) in points
+    assert any(abs(x - 1.05) < 1e-9 and abs(y - 2.05) < 1e-9 for x, y in points)
+    assert all(1.0 - 1e-9 <= x <= 1.1 + 1e-9 and 2.0 - 1e-9 <= y <= 2.1 + 1e-9 for x, y in points)
+
+
+def test_a_spawned_block_is_in_the_obstacle_samples() -> None:
+    from city import City
+
+    city = City()
+
+    def near(points: list[tuple[float, float]]) -> bool:
+        return any(abs(x - 7.1) <= 0.02 and abs(y - 5.554) <= 0.02 for x, y in points)
+
+    city.set_obstacles([(7.1, 5.554, 0.3, 1.28)])
+    assert near(city.obstacle_samples())
+    city.set_obstacles([])
+    assert not near(city.obstacle_samples())

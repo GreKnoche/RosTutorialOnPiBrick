@@ -35,4 +35,6 @@ brickpi.sh
 .ideas/
 .scripts/
 **.next/
+web_frontend/.next-root-cache/
 web_frontend/.student/
+web_frontend/.student-cache/

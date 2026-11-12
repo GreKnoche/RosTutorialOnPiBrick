@@ -196,6 +196,118 @@ export function followPathError(section: string): string | null {
   return null;
 }
 
+const CHECKER = "nav2_controller::SimpleProgressChecker";
+
+const CHECKER_NOTES: Record<string, string> = {
+  plugin: "Dieser Checker beendet FollowPath, wenn das Auto stehen bleibt.",
+  required_movement_radius: "So weit, m, muss sich das Auto in der Zeit bewegen.",
+  movement_time_allowance: "Sekunden. Länger als eine Drehung auf der Stelle, kürzer als das Stehen im U.",
+};
+
+function annotateProgress(text: string): string {
+  const out: string[] = [];
+  for (const line of text.replace(/\n$/, "").split("\n")) {
+    const key = line.match(/^\s*([A-Za-z0-9_]+):/)?.[1];
+    const note = key ? CHECKER_NOTES[key] : undefined;
+    if (note) out.push(`${line.match(/^ */)?.[0] ?? ""}# ${note}`);
+    out.push(line);
+  }
+  return `${out.join("\n")}\n`;
+}
+
+function progressBounds(lines: string[]): Bounds | null {
+  const start = lines.findIndex((line) => /^(\s*)progress_checker:[ \t]*$/.test(line));
+  if (start < 0) return null;
+  const indent = lines[start].match(/^ */)?.[0].length ?? 0;
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (!lines[index].trim()) continue;
+    const spaces = lines[index].match(/^ */)?.[0].length ?? 0;
+    if (spaces <= indent) {
+      end = index;
+      break;
+    }
+  }
+  return { start, end, indent };
+}
+
+function extractProgress(text: string): string | null {
+  const lines = text.split("\n");
+  const bounds = progressBounds(lines);
+  if (!bounds) return null;
+  const body = lines.slice(bounds.start, bounds.end);
+  while (body.length > 0 && !body[body.length - 1].trim()) body.pop();
+  return body
+    .map((line) => {
+      if (!line.trim()) return "";
+      const spaces = line.match(/^ */)?.[0].length ?? 0;
+      return line.slice(Math.min(spaces, bounds.indent));
+    })
+    .join("\n");
+}
+
+function numbered(section: string, key: string): boolean {
+  const match = section.match(new RegExp(`^\\s*${key}:\\s*([0-9]*\\.?[0-9]+)\\s*$`, "m"));
+  if (!match) return false;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0;
+}
+
+/** progress_checker, dedented, with a trailing newline. */
+export function progressSection(params: string): string | null {
+  const text = extractProgress(params);
+  if (!text) return null;
+  return annotateProgress(`${text.replace(/\n*$/, "")}\n`);
+}
+
+export function progressError(section: string): string | null {
+  if (!section.trim() || section.includes("\0") || section.length > 100_000) {
+    return "Progress Checker ist leer.";
+  }
+  if (section.includes("\t")) return "Progress Checker darf keine Tabulatoren enthalten.";
+  const keys = section.split(/\r?\n/).filter((line) => /^[A-Za-z0-9_]+:/.test(line));
+  if (keys.length !== 1 || keys[0].trim() !== "progress_checker:") {
+    return "Sichtbar ist nur progress_checker.";
+  }
+  if (!section.includes(CHECKER)) {
+    return "progress_checker muss SimpleProgressChecker bleiben.";
+  }
+  if (!numbered(section, "required_movement_radius") || !numbered(section, "movement_time_allowance")) {
+    return "Radius und Zeitfenster brauchen eine Zahl größer als 0.";
+  }
+  for (const line of section.split(/\r?\n/)) {
+    if (!line.trim() || line.trim() === "progress_checker:" || line.trim().startsWith("#")) continue;
+    if (!/^\s+\S/.test(line)) return "Die Parameter von progress_checker müssen eingerückt sein.";
+  }
+  return null;
+}
+
+/** Keep a pasted block. A whole params file keeps only progress_checker. */
+export function absorbProgress(incoming: string): string {
+  if (!incoming.trim()) return incoming;
+  let text = tidy(incoming);
+  if (text.split("\n").some((line) => FOREIGN_ROOT.test(line)) || /^\s*FollowPath:\s*$/m.test(text)) {
+    text = extractProgress(text) ?? text;
+  }
+  return withNewline(text);
+}
+
+/** Splice progress_checker into the lab params. FollowPath and the rest stay. */
+export function mergeProgress(params: string, section: string): string | null {
+  if (progressError(section)) return null;
+  const lines = params.split(/\r?\n/);
+  const bounds = progressBounds(lines);
+  if (!bounds) return null;
+  const body = withoutComments(section)
+    .trimEnd()
+    .split(/\r?\n/)
+    .map((line) => (line.trim() ? `${" ".repeat(bounds.indent)}${line}` : ""));
+  const head = [...lines.slice(0, bounds.start), ...body];
+  const tail = lines.slice(bounds.end);
+  if (tail.length > 0 && tail[0].trim() && body[body.length - 1] !== "") head.push("");
+  return `${[...head, ...tail].join("\n").replace(/\n*$/, "")}\n`;
+}
+
 /** Splice a FollowPath block into the lab params. Goal checker, progress checker and the rest stay. */
 export function mergeFollowPath(params: string, section: string): string | null {
   if (followPathError(section)) return null;

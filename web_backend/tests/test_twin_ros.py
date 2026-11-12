@@ -235,3 +235,21 @@ def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch)
             twin.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+
+
+def test_obstacle_cloud_is_an_odom_pointcloud() -> None:
+    import struct
+
+    from builtin_interfaces.msg import Time
+
+    from twin_ros import obstacle_cloud
+
+    msg = obstacle_cloud([(1.25, 2.5)], Time(sec=3, nanosec=0))
+    assert msg.header.frame_id == "odom"
+    assert msg.header.stamp.sec == 3
+    assert msg.width == 1
+    assert msg.point_step == 12
+    x, y, z = struct.unpack("<fff", bytes(msg.data))
+    assert math.isclose(x, 1.25)
+    assert math.isclose(y, 2.5)
+    assert math.isclose(z, 0.5)

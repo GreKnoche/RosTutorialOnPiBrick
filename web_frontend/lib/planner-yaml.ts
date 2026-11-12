@@ -1,17 +1,12 @@
-/** Server keys live on planner_server. Everything else in the editor is a GridBased parameter. The class stays out. */
-const SERVER_KEYS = ["expected_planner_frequency", "costmap_update_timeout"] as const;
+/** The plugin class the lesson edits. GridBased stays the name the behavior tree calls. */
 
-const SERVER = new Set<string>(SERVER_KEYS);
-
-const NOTES: Record<string, string> = {
-  expected_planner_frequency: "Pläne pro Sekunde, die der Server erwartet. 5.0 heißt: länger als 0,2 s ergibt eine Warnung.",
-  costmap_update_timeout: "Sekunden, die auf eine frische Costmap gewartet wird.",
-  tolerance: "Meter, die das Ziel zur Seite rücken darf, wenn die Zielzelle belegt ist.",
-  use_astar: "false: Dijkstra vom Ziel über die Costmap. true: A* mit Luftlinie.",
-  allow_unknown: "true: unbekannte Zellen sind befahrbar.",
-};
-
-type Pair = { key: string; value: string };
+const CLASSES = [
+  "nav2_navfn_planner::NavfnPlanner",
+  "nav2_smac_planner::SmacPlanner2D",
+  "nav2_theta_star_planner::ThetaStarPlanner",
+  "nav2_smac_planner::SmacPlannerHybrid",
+  "nav2_smac_planner::SmacPlannerLattice",
+] as const;
 
 function tidy(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\t/g, "  ");
@@ -31,7 +26,8 @@ function keyLine(line: string): { indent: number; key: string; value: string } |
   return { indent: match[1].length, key: match[2], value: match[3].trim() };
 }
 
-function childEnd(lines: string[], start: number, indent: number): number {
+function childEnd(lines: string[], start: number): number {
+  const indent = indentOf(lines[start]);
   for (let index = start + 1; index < lines.length; index += 1) {
     if (!lines[index].trim()) continue;
     if (indentOf(lines[index]) <= indent) return index;
@@ -41,7 +37,7 @@ function childEnd(lines: string[], start: number, indent: number): number {
 
 function lineOfChild(lines: string[], parent: number, key: string): number {
   const want = indentOf(lines[parent]) + 2;
-  const end = childEnd(lines, parent, indentOf(lines[parent]));
+  const end = childEnd(lines, parent);
   for (let index = parent + 1; index < end; index += 1) {
     const parsed = keyLine(lines[index]);
     if (parsed && parsed.indent === want && parsed.key === key) return index;
@@ -49,105 +45,25 @@ function lineOfChild(lines: string[], parent: number, key: string): number {
   return -1;
 }
 
-function gridPairs(lines: string[], grid: number): Pair[] {
-  const want = indentOf(lines[grid]) + 2;
-  const end = childEnd(lines, grid, indentOf(lines[grid]));
-  const pairs: Pair[] = [];
-  for (let index = grid + 1; index < end; index += 1) {
-    const parsed = keyLine(lines[index]);
-    if (!parsed || parsed.indent !== want || parsed.key === "plugin" || !parsed.value) continue;
-    pairs.push({ key: parsed.key, value: parsed.value });
-  }
-  return pairs;
+function unquote(value: string): string {
+  return value.replace(/^["']|["']$/g, "");
 }
 
-function settingsFromParams(text: string): Pair[] | null {
-  const lines = text.split("\n");
-  const server = lines.findIndex((line) => /^planner_server:\s*$/.test(line));
-  if (server < 0) return null;
-  const ros = lineOfChild(lines, server, "ros__parameters");
-  if (ros < 0) return null;
-  const grid = lineOfChild(lines, ros, "GridBased");
-  if (grid < 0) return null;
-  const want = indentOf(lines[ros]) + 2;
-  const end = childEnd(lines, ros, indentOf(lines[ros]));
-  const serverPairs: Pair[] = [];
-  for (let index = ros + 1; index < end; index += 1) {
-    const parsed = keyLine(lines[index]);
-    if (!parsed || parsed.indent !== want || !SERVER.has(parsed.key) || !parsed.value) continue;
-    serverPairs.push({ key: parsed.key, value: parsed.value });
-  }
-  return orderPairs([...serverPairs, ...gridPairs(lines, grid)]);
+function classOf(value: string): (typeof CLASSES)[number] | null {
+  const bare = unquote(value);
+  return CLASSES.find((name) => name === bare) ?? null;
 }
 
-function gridOnly(text: string): Pair[] | null {
-  const lines = text.split("\n");
-  const grid = lines.findIndex((line) => /^\s*GridBased:\s*$/.test(line));
-  if (grid < 0) return null;
-  const pairs = gridPairs(lines, grid);
-  return pairs.length > 0 ? pairs : null;
+function render(list: string, plugin: string): string {
+  return `# Eine Klasse. Der Name GridBased bleibt, den ruft der Baum auf.
+planner_plugins: ${list}
+GridBased:
+  plugin: "${plugin}"
+`;
 }
 
-function flatPairs(text: string): Pair[] | null {
-  const pairs: Pair[] = [];
-  const seen = new Set<string>();
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const parsed = keyLine(line);
-    if (!parsed || parsed.indent !== 0 || !parsed.value) return null;
-    if (seen.has(parsed.key)) return null;
-    seen.add(parsed.key);
-    pairs.push({ key: parsed.key, value: parsed.value });
-  }
-  return pairs.length > 0 ? pairs : null;
-}
-
-function pairsOf(text: string): Pair[] | null {
-  if (/^planner_server:\s*$/m.test(text)) {
-    const pairs = settingsFromParams(text);
-    return pairs && pairs.length > 0 ? pairs : null;
-  }
-  if (text.split("\n").some((line) => /^\s*GridBased:\s*$/.test(line))) return gridOnly(text);
-  return flatPairs(text);
-}
-
-function orderPairs(pairs: Pair[]): Pair[] {
-  const byKey = new Map(pairs.map((pair) => [pair.key, pair]));
-  const ordered: Pair[] = [];
-  for (const key of SERVER_KEYS) {
-    const pair = byKey.get(key);
-    if (!pair) continue;
-    ordered.push(pair);
-    byKey.delete(key);
-  }
-  for (const pair of pairs) {
-    if (!byKey.has(pair.key)) continue;
-    ordered.push(pair);
-    byKey.delete(pair.key);
-  }
-  return ordered;
-}
-
-function render(pairs: Pair[]): string {
-  const lines: string[] = [];
-  for (const pair of pairs) {
-    const note = NOTES[pair.key];
-    if (note) lines.push(`# ${note}`);
-    lines.push(`${pair.key}: ${pair.value}`);
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-/** Flat settings. The plugin class and planner_plugins stay out. */
-export function plannerSettingsSection(params: string): string | null {
-  const pairs = settingsFromParams(tidy(params));
-  if (!pairs || pairs.length === 0) return null;
-  return render(pairs);
-}
-
-/** The name in the list and the class behind it. */
-export function plannerPluginSection(params: string): string | null {
+/** The two lines that choose the class, taken from nav2_params.yaml. */
+export function pluginSection(params: string): string | null {
   const lines = tidy(params).split("\n");
   const server = lines.findIndex((line) => /^planner_server:\s*$/.test(line));
   if (server < 0) return null;
@@ -161,121 +77,78 @@ export function plannerPluginSection(params: string): string | null {
   const plugins = keyLine(lines[list]);
   const klass = keyLine(lines[plugin]);
   if (!plugins?.value || !klass?.value) return null;
-  return `planner_plugins: ${plugins.value}\nGridBased:\n  plugin: ${klass.value}\n`;
+  const name = classOf(klass.value);
+  return render(plugins.value, name ?? unquote(klass.value));
 }
 
-export function absorbPlannerSettings(_current: string, incoming: string): string {
+function readBlock(text: string): { list: string; plugin: string } | null {
+  const lines = tidy(text).split("\n");
+  const server = lines.findIndex((line) => /^planner_server:\s*$/.test(line));
+  const root = server >= 0 ? lineOfChild(lines, server, "ros__parameters") : -1;
+  const parent = root >= 0 ? root : -1;
+  const listAt =
+    parent >= 0
+      ? lineOfChild(lines, parent, "planner_plugins")
+      : lines.findIndex((line) => /^planner_plugins\s*:/.test(line));
+  const gridAt =
+    parent >= 0 ? lineOfChild(lines, parent, "GridBased") : lines.findIndex((line) => /^GridBased:\s*$/.test(line));
+  if (listAt < 0 || gridAt < 0) return null;
+  const pluginAt = lineOfChild(lines, gridAt, "plugin");
+  if (pluginAt < 0) return null;
+  const list = keyLine(lines[listAt]);
+  const plugin = keyLine(lines[pluginAt]);
+  if (!list?.value || !plugin?.value) return null;
+  return { list: list.value, plugin: unquote(plugin.value) };
+}
+
+/** Keep a pasted block. A whole params file keeps only the plugin lines. */
+export function absorbPlugin(current: string, incoming: string): string {
   if (!incoming.trim()) return incoming;
   const text = tidy(incoming);
-  const pairs = pairsOf(text);
-  if (!pairs) return withNewline(text);
-  const rendered = render(orderPairs(pairs));
-  if (plannerSettingsError(rendered)) return withNewline(text);
-  return rendered;
+  const block = readBlock(text);
+  if (block && classOf(block.plugin)) return render(block.list, block.plugin);
+  if (!pluginError(withNewline(text))) return withNewline(text);
+  const loose = text.match(/plugin:\s*["']?([A-Za-z0-9_:]+)["']?/);
+  const known = loose ? classOf(loose[1]) : null;
+  if (known) {
+    const list = readBlock(current)?.list ?? '["GridBased"]';
+    return render(list, known);
+  }
+  return withNewline(text);
 }
 
-export function plannerSettingsError(section: string): string | null {
+export function pluginError(section: string): string | null {
   if (!section.trim() || section.includes("\0") || section.length > 100_000) {
-    return "Die Planner-Settings sind leer.";
+    return "Das Plugin ist leer.";
   }
-  if (section.includes("\t")) return "Die Planner-Settings dürfen keine Tabulatoren enthalten.";
-  const keys: string[] = [];
-  for (const line of section.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const parsed = keyLine(line);
-    if (!parsed || parsed.indent !== 0) return "Jede Einstellung ist eine Zeile key: value.";
-    if (parsed.key === "plugin" || parsed.key === "planner_plugins" || parsed.key === "GridBased") {
-      return "Die Klasse steht im Knoten planner_plugins.";
-    }
-    if (!parsed.value) return `Der Schlüssel ${parsed.key} braucht einen Wert.`;
-    if (keys.includes(parsed.key)) return `Der Schlüssel ${parsed.key} steht doppelt.`;
-    keys.push(parsed.key);
+  if (section.includes("\t")) return "Das Plugin darf keine Tabulatoren enthalten.";
+  const block = readBlock(section);
+  if (!block) return "Sichtbar sind planner_plugins und GridBased.plugin.";
+  if (unquote(block.list) !== '["GridBased"]' && block.list.replace(/\s/g, "") !== '["GridBased"]') {
+    return "planner_plugins bleibt [\"GridBased\"].";
   }
-  if (keys.length === 0) return "Die Planner-Settings sind leer.";
+  if (!classOf(block.plugin)) {
+    return "Die Klasse ist NavfnPlanner, SmacPlanner2D, ThetaStarPlanner, SmacPlannerHybrid oder SmacPlannerLattice.";
+  }
   return null;
 }
 
-function applyChildren(
-  lines: string[],
-  parent: number,
-  decide: (key: string) => "keep" | "drop" | string,
-  extras: Pair[],
-  extrasBefore: string | null,
-): string[] {
-  const indent = indentOf(lines[parent]) + 2;
-  const end = childEnd(lines, parent, indentOf(lines[parent]));
-  const body: string[] = [];
-  const seen = new Set<string>();
-  const pending = extras.filter((pair) => pair.value);
-  const pushExtras = () => {
-    for (const extra of pending) {
-      if (seen.has(extra.key)) continue;
-      seen.add(extra.key);
-      body.push(`${" ".repeat(indent)}${extra.key}: ${extra.value}`);
-    }
-    pending.length = 0;
-  };
-  for (let index = parent + 1; index < end; index += 1) {
-    const parsed = keyLine(lines[index]);
-    if (!parsed || parsed.indent !== indent) {
-      body.push(lines[index]);
-      continue;
-    }
-    if (extrasBefore && parsed.key === extrasBefore) pushExtras();
-    seen.add(parsed.key);
-    const action = decide(parsed.key);
-    if (action === "keep") body.push(lines[index]);
-    else if (action !== "drop") body.push(`${" ".repeat(indent)}${parsed.key}: ${action}`);
-  }
-  let tail = 0;
-  while (tail < body.length && !body[body.length - 1 - tail]?.trim()) tail += 1;
-  const extraLines: string[] = [];
-  for (const extra of pending) {
-    if (seen.has(extra.key)) continue;
-    extraLines.push(`${" ".repeat(indent)}${extra.key}: ${extra.value}`);
-  }
-  const head = body.slice(0, body.length - tail);
-  const rest = body.slice(body.length - tail);
-  return [...lines.slice(0, parent + 1), ...head, ...extraLines, ...rest, ...lines.slice(end)];
-}
-
-/** Write the flat settings back. planner_plugins and the plugin class stay. */
-export function mergePlannerSettings(params: string, section: string): string | null {
-  if (plannerSettingsError(section)) return null;
-  const pairs = flatPairs(section.replace(/^\s*#.*$/gm, ""));
-  if (!pairs) return null;
-  let lines = tidy(params).split("\n");
+/** Replace the class. The rest of planner_server stays. */
+export function mergePlugin(params: string, section: string): string | null {
+  if (pluginError(section)) return null;
+  const block = readBlock(section);
+  if (!block) return null;
+  const lines = tidy(params).split("\n");
   const server = lines.findIndex((line) => /^planner_server:\s*$/.test(line));
   if (server < 0) return null;
   const ros = lineOfChild(lines, server, "ros__parameters");
   if (ros < 0) return null;
+  const list = lineOfChild(lines, ros, "planner_plugins");
   const grid = lineOfChild(lines, ros, "GridBased");
-  if (grid < 0) return null;
-  const wanted = new Map(pairs.map((pair) => [pair.key, pair.value]));
-  lines = applyChildren(
-    lines,
-    grid,
-    (key) => {
-      if (key === "plugin") return "keep";
-      if (!wanted.has(key)) return "drop";
-      return wanted.get(key) ?? "drop";
-    },
-    pairs.filter((pair) => !SERVER.has(pair.key)),
-    null,
-  );
-  const rosNow = lineOfChild(lines, server, "ros__parameters");
-  if (rosNow < 0) return null;
-  lines = applyChildren(
-    lines,
-    rosNow,
-    (key) => {
-      if (!SERVER.has(key)) return "keep";
-      if (!wanted.has(key)) return "drop";
-      return wanted.get(key) ?? "drop";
-    },
-    pairs.filter((pair) => SERVER.has(pair.key)),
-    "GridBased",
-  );
+  if (list < 0 || grid < 0) return null;
+  const plugin = lineOfChild(lines, grid, "plugin");
+  if (plugin < 0) return null;
+  lines[list] = `${" ".repeat(indentOf(lines[list]))}planner_plugins: ${block.list}`;
+  lines[plugin] = `${" ".repeat(indentOf(lines[plugin]))}plugin: "${block.plugin}"`;
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
 }

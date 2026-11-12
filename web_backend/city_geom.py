@@ -14,6 +14,27 @@ RANGE_MIN_M = 0.05
 RANGE_MAX_M = 4.0
 
 
+def sample_rects(
+    rects: list[tuple[float, float, float, float]],
+    step: float = 0.04,
+) -> list[tuple[float, float]]:
+    """Grid points that fill each rectangle, including the far edges."""
+    if step <= 0.0:
+        return []
+    points: list[tuple[float, float]] = []
+    for x0, y0, x1, y1 in rects:
+        if x1 < x0 or y1 < y0:
+            continue
+        x = x0
+        while x <= x1 + 1e-9:
+            y = y0
+            while y <= y1 + 1e-9:
+                points.append((x, y))
+                y += step
+            x += step
+    return points
+
+
 def foot_radius() -> float:
     """Half the body diagonal, so a corner does not sit inside a wall."""
     return 0.5 * math.hypot(BODY_LENGTH_M, BODY_WIDTH_M)

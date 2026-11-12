@@ -1,4 +1,7 @@
-"""Nav2 bringup for the student node. The behavior tree is bt_xml."""
+"""Nav2 bringup for the student node.
+
+pose_xml is navigate_to_pose (follow_waypoints). through_xml is navigate_through_poses.
+"""
 
 from __future__ import annotations
 
@@ -36,7 +39,7 @@ def _params_source() -> str:
     )
 
 
-def _through_bt() -> str:
+def _tree(name: str) -> str:
     return os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
@@ -46,7 +49,7 @@ def _through_bt() -> str:
             "src",
             "brick_nav",
             "behavior_trees",
-            "through_poses.xml",
+            name,
         )
     )
 
@@ -63,9 +66,13 @@ def _widen(src: str, dest: str) -> None:
 
 
 def _setup(context, *_args, **_kwargs):
-    bt_xml = context.perform_substitution(LaunchConfiguration("bt_xml")).strip()
+    pose_xml = context.perform_substitution(LaunchConfiguration("pose_xml")).strip() or _tree("mission.xml")
+    through_xml = context.perform_substitution(LaunchConfiguration("through_xml")).strip() or _tree(
+        "through_poses.xml"
+    )
     cache = context.perform_substitution(LaunchConfiguration("cache_dir")).strip()
     given = context.perform_substitution(LaunchConfiguration("params_file")).strip()
+    with_follower = context.perform_substitution(LaunchConfiguration("with_follower")).strip().lower() != "false"
     params = os.path.join(cache, "nav2_params.yaml")
     _widen(given or _params_source(), params)
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
@@ -73,10 +80,10 @@ def _setup(context, *_args, **_kwargs):
     names = [
         "controller_server",
         "planner_server",
+        "behavior_server",
         "bt_navigator",
-        "waypoint_follower",
     ]
-    return [
+    nodes = [
         Node(
             package="nav2_controller",
             executable="controller_server",
@@ -101,20 +108,34 @@ def _setup(context, *_args, **_kwargs):
             parameters=[
                 *common,
                 {
-                    "default_nav_to_pose_bt_xml": bt_xml,
-                    "default_nav_through_poses_bt_xml": _through_bt(),
+                    "default_nav_to_pose_bt_xml": pose_xml,
+                    "default_nav_through_poses_bt_xml": through_xml,
                 },
             ],
             remappings=remappings,
         ),
         Node(
-            package="nav2_waypoint_follower",
-            executable="waypoint_follower",
-            name="waypoint_follower",
+            package="nav2_behaviors",
+            executable="behavior_server",
+            name="behavior_server",
             output="screen",
             parameters=common,
             remappings=remappings,
         ),
+    ]
+    if with_follower:
+        names.append("waypoint_follower")
+        nodes.append(
+            Node(
+                package="nav2_waypoint_follower",
+                executable="waypoint_follower",
+                name="waypoint_follower",
+                output="screen",
+                parameters=common,
+                remappings=remappings,
+            )
+        )
+    nodes.append(
         Node(
             package="nav2_lifecycle_manager",
             executable="lifecycle_manager",
@@ -127,16 +148,19 @@ def _setup(context, *_args, **_kwargs):
                     "node_names": names,
                 }
             ],
-        ),
-    ]
+        )
+    )
+    return nodes
 
 
 def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
-            DeclareLaunchArgument("bt_xml"),
+            DeclareLaunchArgument("pose_xml", default_value=""),
+            DeclareLaunchArgument("through_xml", default_value=""),
             DeclareLaunchArgument("cache_dir"),
             DeclareLaunchArgument("params_file", default_value=""),
+            DeclareLaunchArgument("with_follower", default_value="true"),
             OpaqueFunction(function=_setup),
         ]
     )

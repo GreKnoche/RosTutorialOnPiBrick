@@ -256,6 +256,20 @@ def _finish_line(
     return squares, spawn
 
 
+def _square_loop(cx: float, cy: float, block: float, gap: float = 0.08) -> tuple[list[list[tuple[float, float]]], House]:
+    """Square road around a square block. Each side runs past the corner by half a road."""
+    half_block = block / 2.0
+    half_road = ROAD_W / 2.0
+    reach = half_block + gap + half_road
+    extra = half_road
+    south = _straight(cx - reach - extra, cy - reach, cx + reach + extra, cy - reach)
+    east = _straight(cx + reach, cy - reach - extra, cx + reach, cy + reach + extra)
+    north = _straight(cx + reach + extra, cy + reach, cx - reach - extra, cy + reach)
+    west = _straight(cx - reach, cy + reach + extra, cx - reach, cy - reach - extra)
+    house = House("block", cx - half_block, cy - half_block, block, block, (88, 90, 94))
+    return [south, east, north, west], house
+
+
 def _ribbon_polygon(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     left = _offset_side(points, 1.0)
     right = _offset_side(points, -1.0)
@@ -447,6 +461,9 @@ def build_city_map() -> CityMap:
         _straight(ustem_x, mid_y, ustem_x, right_u_y),
         _bend(right_u_x, right_u_y, u_r, math.pi, math.tau),
     ]
+    main_ribbons = ribbons
+    side, block = _square_loop(11.0, mid_y + 0.53, 0.9)
+    ribbons = [*main_ribbons, *side]
     roads = [_ribbon_polygon(_extended(ribbon, 0.22)) for ribbon in ribbons]
     gap = ROAD_W / 2.0 + 0.14
     outer = ROAD_W / 2.0 + 0.18
@@ -468,6 +485,7 @@ def build_city_map() -> CityMap:
         House("kehre-west", ustem_x - outer - 0.62, right_u_y + 0.08, 0.56, 0.46, (196, 112, 72)),
         House("kehre-ost", right_x + outer, right_u_y - 0.62, 0.54, 0.48, (72, 140, 120)),
         House("kehre-sued", right_u_x - 1.2, right_u_y - u_r - outer - 0.46, 0.58, 0.4, (150, 96, 150)),
+        block,
     )
     edges: list[Segment] = []
     lanes: list[Segment] = []
@@ -548,7 +566,7 @@ def build_city_map() -> CityMap:
         shore=shore_box,
         cones=spots,
         places=places,
-        graph=_graph(ribbons, stem_x, mid_y),
+        graph=_graph(main_ribbons, stem_x, mid_y),
         arch=arch,
         dock=dock,
         gates=gates,

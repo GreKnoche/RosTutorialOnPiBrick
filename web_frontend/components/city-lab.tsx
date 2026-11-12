@@ -5,7 +5,7 @@ import { LocateFixed, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { parseCity, type CityMap, type LapState, type Rect } from "@/lib/city-map";
 import { draw } from "@/lib/city-paint";
-import type { MissionCheckpoint, MissionObstacle } from "@/lib/nav2-lessons";
+import type { MissionCheckpoint, MissionObstacle, ObstacleTrigger } from "@/lib/nav2-lessons";
 import {
   emptyMemory,
   parseProbe,
@@ -26,7 +26,14 @@ import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostP
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
-type MapPin = { left: number; top: number; x: number; y: number };
+type MapPin = { left: number; top: number; x: number; y: number; theta: number };
+
+type Course = {
+  obstacles: MissionObstacle[];
+  checkpoints: MissionCheckpoint[];
+  later?: MissionObstacle[];
+  trigger?: ObstacleTrigger;
+};
 
 type GhostTake = {
   on: boolean;
@@ -98,6 +105,7 @@ function FlagBox({
       type="button"
       aria-pressed={on}
       disabled={disabled}
+      autoComplete="off"
       title={title}
       onClick={onToggle}
       className={`rounded-md border px-2.5 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -116,8 +124,12 @@ function clipNumber(value: number) {
   return trimmed.includes(".") ? trimmed : `${trimmed}.0`;
 }
 
-function pointClip(x: number, y: number) {
-  return `(${clipNumber(x)}, ${clipNumber(y)}, 0.0)`;
+function wrapAngle(angle: number) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function pointClip(x: number, y: number, theta: number) {
+  return `(${clipNumber(x)}, ${clipNumber(y)}, ${clipNumber(wrapAngle(theta))})`;
 }
 
 function copyPoint(text: string) {
@@ -147,8 +159,12 @@ export function CityLab({
   melons = false,
   gates = false,
   course = null,
+  needBackup = false,
   missionKey = "",
   round = 0,
+  spawn = null,
+  spawnBoot = 0,
+  melonSpots = MELONS,
   onMelonsCleared,
   onGatesCleared,
   onPlay,
@@ -159,9 +175,13 @@ export function CityLab({
   notice?: ReactNode;
   melons?: boolean;
   gates?: boolean;
-  course?: { obstacles: MissionObstacle[]; checkpoints: MissionCheckpoint[] } | null;
+  course?: Course | null;
+  needBackup?: boolean;
   missionKey?: string;
   round?: number;
+  spawn?: { x: number; y: number; theta: number } | null;
+  spawnBoot?: number;
+  melonSpots?: ReadonlyArray<readonly [number, number]>;
   onMelonsCleared?: () => void;
   onGatesCleared?: () => void;
   onPlay?: () => void;
@@ -205,10 +225,18 @@ export function CityLab({
   kapitelRef.current = kapitel;
   const melonsOnRef = useRef(melons);
   melonsOnRef.current = melons;
+  const spotsRef = useRef(melonSpots);
+  spotsRef.current = melonSpots;
+  const spawnRef = useRef(spawn);
+  spawnRef.current = spawn;
   const gatesOnRef = useRef(gates);
   gatesOnRef.current = gates;
   const courseRef = useRef(course);
   courseRef.current = course;
+  const needBackupRef = useRef(needBackup);
+  needBackupRef.current = needBackup;
+  const trapRef = useRef(false);
+  const backedRef = useRef(false);
   const clearedRef = useRef(onMelonsCleared);
   clearedRef.current = onMelonsCleared;
   const gatesClearedRef = useRef(onGatesCleared);
@@ -242,9 +270,9 @@ export function CityLab({
 
   useLayoutEffect(() => {
     if (!melons) return;
-    melonsRef.current = freshMelons();
-    setMelonsLeft(MELONS.length);
-  }, [melons, missionKey]);
+    melonsRef.current = freshMelons(melonSpots);
+    setMelonsLeft(melonSpots.length);
+  }, [melons, melonSpots, missionKey]);
   const keepGhost = (take: GhostTake) => {
     take.settled = true;
     take.on = false;
@@ -492,20 +520,41 @@ export function CityLab({
           gatesOnRef.current,
           courseRef.current?.checkpoints ?? null,
           ghost,
+          spotsRef.current,
         );
+      }
+      const runningCourse = courseRef.current;
+      const here = poseRef.current;
+      if (runningCourse?.later?.length && runningCourse.trigger && !trapRef.current) {
+        const line = runningCourse.trigger;
+        if (here.x > line.x && here.y >= line.yMin && here.y <= line.yMax) {
+          trapRef.current = true;
+          linkRef.current?.send({
+            type: "mission",
+            client: sessionRef.current,
+            obstacles: runningCourse.later,
+            checkpoints: runningCourse.checkpoints,
+          });
+        }
+      }
+      if (needBackupRef.current && motionRef.current.linear < -0.03 && !backedRef.current) {
+        backedRef.current = true;
+        if (melonsOnRef.current && melonsRef.current.length > 0 && melonsRef.current.every((alive) => !alive)) {
+          clearedRef.current?.();
+        }
       }
       if (!kapitelRef.current && melonsOnRef.current) {
         const pose = poseRef.current;
         if (holdMelons.current) {
-          const start = cityRef.current?.start;
-          if (!start || Math.hypot(pose.x - start.x, pose.y - start.y) < 0.25) holdMelons.current = false;
+          const home = spawnRef.current ?? cityRef.current?.start;
+          if (!home || Math.hypot(pose.x - home.x, pose.y - home.y) < 0.25) holdMelons.current = false;
         }
-        const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y);
+        const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y, spotsRef.current);
         if (next !== melonsRef.current) {
           melonsRef.current = next;
           const left = next.filter(Boolean).length;
           setMelonsLeft(left);
-          if (left === 0) clearedRef.current?.();
+          if (left === 0 && (!needBackupRef.current || backedRef.current)) clearedRef.current?.();
         }
       }
       const gatesOn = gatesOnRef.current;
@@ -601,6 +650,8 @@ export function CityLab({
   const courseKey = JSON.stringify(course ?? null);
   const courseWasOn = useRef(false);
   useEffect(() => {
+    trapRef.current = false;
+    backedRef.current = false;
     if (!rosUp) return;
     if (!courseRef.current && !courseWasOn.current) return;
     courseWasOn.current = courseRef.current !== null;
@@ -611,10 +662,25 @@ export function CityLab({
       obstacles: running?.obstacles ?? [],
       checkpoints: running?.checkpoints ?? null,
     });
-  }, [courseKey, rosUp]);
+  }, [courseKey, rosUp, round]);
 
   const roundSeen = useRef(round);
   const holdMelons = useRef(false);
+  const placeAt = (home: { x: number; y: number; theta: number }) => {
+    poseRef.current = { x: home.x, y: home.y, theta: home.theta };
+    havePose.current = true;
+    const origin = cityRef.current?.start;
+    if (origin && Math.hypot(home.x - origin.x, home.y - origin.y) > 0.5) {
+      lookRef.current = { x: home.x, y: home.y };
+    }
+    linkRef.current?.send({
+      type: "reset",
+      client: sessionRef.current,
+      x: home.x,
+      y: home.y,
+      theta: home.theta,
+    });
+  };
   useEffect(() => {
     if (roundSeen.current === round) return;
     roundSeen.current = round;
@@ -632,18 +698,25 @@ export function CityLab({
     }
     if (melonsOnRef.current) {
       holdMelons.current = true;
-      melonsRef.current = freshMelons();
-      setMelonsLeft(MELONS.length);
+      melonsRef.current = freshMelons(spotsRef.current);
+      setMelonsLeft(spotsRef.current.length);
     }
     const start = cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 };
-    linkRef.current?.send({
-      type: "reset",
-      client: sessionRef.current,
-      x: start.x,
-      y: start.y,
-      theta: start.theta,
-    });
+    const home = spawnRef.current ?? start;
+    placeAt(home);
   }, [round]);
+
+  const spawnSeen = useRef("");
+  useEffect(() => {
+    if (!rosUp || !spawn) {
+      spawnSeen.current = "";
+      return;
+    }
+    const key = `${spawn.x}:${spawn.y}:${spawn.theta}:${spawnBoot}`;
+    if (spawnSeen.current === key) return;
+    spawnSeen.current = key;
+    placeAt(spawn);
+  }, [spawnBoot, rosUp, spawn]);
 
   const sendFlags = (nextDrift: boolean, nextCamera: boolean) => {
     cameraRef.current = nextCamera;
@@ -657,8 +730,19 @@ export function CityLab({
 
   const reset = () => {
     memoryRef.current = emptyMemory();
-    melonsRef.current = freshMelons();
-    setMelonsLeft(MELONS.length);
+    trapRef.current = false;
+    backedRef.current = false;
+    melonsRef.current = freshMelons(spotsRef.current);
+    setMelonsLeft(spotsRef.current.length);
+    const running = courseRef.current;
+    if (running) {
+      linkRef.current?.send({
+        type: "mission",
+        client: sessionRef.current,
+        obstacles: running.obstacles,
+        checkpoints: running.checkpoints,
+      });
+    }
     const origin = probeRef.current?.start;
     const start = origin
       ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
@@ -719,17 +803,18 @@ export function CityLab({
     let x = view.x + (sx - rect.width / 2) / ppm;
     let y = view.y - (sy - rect.height / 2) / ppm;
     if (!kapitel && melonsOnRef.current) {
-      const melon = nearestMelon(x, y);
+      const melon = nearestMelon(x, y, 0.35, spotsRef.current);
       if (melon) {
         x = melon[0];
         y = melon[1];
       }
     }
-    const labelW = 148;
+    const theta = poseRef.current.theta;
+    const labelW = 196;
     const left = sx + 12 + labelW > rect.width ? Math.max(4, sx - labelW - 8) : sx + 12;
     const top = sy < 22 ? sy + 12 : sy - 18;
-    setMapPin({ left, top, x, y });
-    copyPoint(pointClip(x, y));
+    setMapPin({ left, top, x, y, theta });
+    copyPoint(pointClip(x, y, theta));
     if (pinTimer.current !== null) window.clearTimeout(pinTimer.current);
     pinTimer.current = window.setTimeout(() => {
       pinTimer.current = null;
@@ -846,7 +931,7 @@ export function CityLab({
         ) : null}
         {!kapitel && melons ? (
           <p className="absolute top-3 left-8 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
-            {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${MELONS.length - melonsLeft}/${MELONS.length}`}
+            {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
           </p>
         ) : null}
         <p className="pointer-events-none absolute top-2 right-2 z-10 rounded bg-neutral-700/80 px-2 py-0.5 text-[0.7rem] text-neutral-300">
@@ -858,7 +943,7 @@ export function CityLab({
             className="pointer-events-none absolute z-10 font-mono text-xs whitespace-nowrap text-[#d6f6ff]"
             style={{ left: mapPin.left, top: mapPin.top, textShadow: "0 1px 2px rgba(17,19,24,0.9)" }}
           >
-            {formatDe(mapPin.x, 2)} m, {formatDe(mapPin.y, 2)} m
+            {formatDe(mapPin.x, 2)} m, {formatDe(mapPin.y, 2)} m, {formatDe(wrapAngle(mapPin.theta), 2)}
           </span>
         ) : null}
         <div className="absolute bottom-3 left-3 flex items-center gap-1">
@@ -915,7 +1000,7 @@ export function CityLab({
               Kamerabild
             </FlagBox>
           </div>
-          <Button type="button" onClick={reset} disabled={!rosUp}>
+          <Button type="button" autoComplete="off" onClick={reset} disabled={!rosUp}>
             Zurücksetzen
           </Button>
         </div>
@@ -924,6 +1009,7 @@ export function CityLab({
             <button
               type="button"
               aria-label="Code abspielen"
+              autoComplete="off"
               onClick={() => {
                 if (gates && takeGhostRef.current) {
                   ghostGen.current += 1;

@@ -32,6 +32,7 @@ from city_geom import (
     foot_radius,
     push_circle,
     ray_rect,
+    sample_rects,
 )
 from city_map import (
     FINISH_A,
@@ -201,6 +202,10 @@ class City:
 
     def collision_rects(self) -> list[tuple[float, float, float, float]]:
         return self.live.collision_rects()
+
+    def obstacle_samples(self) -> list[tuple[float, float]]:
+        """Houses and the live clutter, filled so a 5 cm costmap cell is hit."""
+        return sample_rects(self.collision_rects())
 
     def resolve(self, pose: object, radius: float) -> None:
         x = float(getattr(pose, "x"))

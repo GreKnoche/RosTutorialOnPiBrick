@@ -277,6 +277,19 @@ function Highlighted({ source, language }: { source: string; language: CodeLangu
   );
 }
 
+export function ResetCodeButton({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+    >
+      Reset to default
+    </button>
+  );
+}
+
 export function CodeEditor({
   value,
   onChange,

@@ -1,4 +1,3 @@
-import { PATH_STEPS } from "@/lib/nav2-lessons";
 import { writeCompleted } from "@/lib/progress";
 
 const NAV2_PROGRESS_KEY = "learn2ros.nav2.progress";
@@ -8,6 +7,7 @@ const NAV2_TEXT_KEYS = {
   maneuver: "learn2ros.nav2.maneuver",
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",
+  progress: "learn2ros.nav2.progress",
   follower: "learn2ros.nav2.follower",
   planner: "learn2ros.nav2.planner",
 } as const;
@@ -169,21 +169,9 @@ function storeBook(book: LessonBook) {
   emitDrafts();
 }
 
-/** Saved text for this station, else the nearest earlier station, else the old shared draft. */
-function resolveText(book: LessonBook, missionId: string, field: Nav2TextField): string | null {
-  const index = PATH_STEPS.findIndex((step) => step.id === missionId);
-  for (let i = index; i >= 1; i -= 1) {
-    const lesson = book[PATH_STEPS[i].id];
-    if (!lesson) continue;
-    const text = lesson[field];
-    if (typeof text === "string") return text;
-    if (lesson.seeded) return null;
-  }
-  return readNav2Text(field);
-}
-
 export function readLessonText(missionId: string, field: Nav2TextField): string | null {
-  return resolveText(readBook(), missionId, field);
+  const text = readBook()[missionId]?.[field];
+  return typeof text === "string" ? text : null;
 }
 
 export function writeLessonText(missionId: string, field: Nav2TextField, source: string | null) {
@@ -199,28 +187,24 @@ export function writeLessonText(missionId: string, field: Nav2TextField, source:
     lesson[field] = text;
   }
   const next = { ...book, [missionId]: lesson };
-  if (!lesson.seeded && TEXT_FIELDS.every((item) => lesson[item] === undefined)) delete next[missionId];
+  if (TEXT_FIELDS.every((item) => lesson[item] === undefined)) delete next[missionId];
   storeBook(next);
 }
 
-/** Snapshot earlier code into each station up to the current one. folgen stays the root. */
-export function seedLessonsThrough(done: number) {
+/** Write this station's own start text into any field it does not have yet. */
+export function fillStationDefaults(missionId: string, defaults: Partial<Record<Nav2TextField, string>>) {
   const book = readBook();
-  const next: LessonBook = { ...book };
+  const lesson: LessonRecord = { ...(book[missionId] ?? {}) };
   let changed = false;
-  for (let index = 2; index <= done && index < PATH_STEPS.length; index += 1) {
-    const id = PATH_STEPS[index].id;
-    if (next[id]?.seeded) continue;
-    const previous = PATH_STEPS[index - 1].id;
-    const lesson: LessonRecord = { seeded: true };
-    for (const field of TEXT_FIELDS) {
-      const text = resolveText(next, previous, field);
-      if (text !== null) lesson[field] = text;
-    }
-    next[id] = lesson;
+  for (const field of TEXT_FIELDS) {
+    if (lesson[field] !== undefined) continue;
+    const clean = usableText(defaults[field] ?? null);
+    if (clean === null) continue;
+    lesson[field] = clean;
     changed = true;
   }
-  if (changed) storeBook(next);
+  if (!changed) return;
+  storeBook({ ...book, [missionId]: lesson });
 }
 
 function nodeKey(track: string, id: string, level: string) {
@@ -258,9 +242,11 @@ export function writeNodeDraft(track: string, id: string, level: string, source:
 
 export function resetBrowserStore() {
   removeRaw(NAV2_PROGRESS_KEY);
+  removeRaw(LESSONS_KEY);
   for (const key of Object.values(NAV2_TEXT_KEYS)) removeRaw(key);
   removeRaw(NODES_KEY);
   progressCache = null;
+  bookCache = null;
   writeCompleted([]);
   emitDrafts();
 }

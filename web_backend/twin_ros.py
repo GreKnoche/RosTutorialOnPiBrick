@@ -8,6 +8,7 @@ The camera frame is the expensive one: it stays off until that page asks.
 from __future__ import annotations
 
 import math
+import struct
 from collections import deque
 
 from brick_core.chassis import Chassis, load_chassis
@@ -18,7 +19,7 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import Image, Imu, JointState, LaserScan
+from sensor_msgs.msg import Image, Imu, JointState, LaserScan, PointCloud2, PointField
 from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
 
@@ -34,6 +35,29 @@ from city import (
     SCAN_MIN,
 )
 from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message
+
+
+def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointCloud2:
+    """Known blocks in the odom frame. z sits inside the costmap height window."""
+    msg = PointCloud2()
+    msg.header.stamp = stamp  # type: ignore[assignment]
+    msg.header.frame_id = "odom"
+    msg.height = 1
+    msg.width = len(points)
+    msg.fields = [
+        PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
+    ]
+    msg.is_bigendian = False
+    msg.point_step = 12
+    msg.row_step = msg.point_step * msg.width
+    msg.is_dense = True
+    payload = bytearray()
+    for x, y in points:
+        payload.extend(struct.pack("<fff", float(x), float(y), 0.5))
+    msg.data = payload
+    return msg
 
 
 class CanvasTwinNode(Node):
@@ -56,6 +80,9 @@ class CanvasTwinNode(Node):
         self._joint_pub = self.create_publisher(JointState, "joint_states", 10)
         self._cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
         self._scan_pub = self.create_publisher(LaserScan, "scan", 10)
+        self._cloud_pub = self.create_publisher(PointCloud2, "city_obstacles", 10)
+        self._cloud_tick = 0
+        self._cloud_key: tuple[tuple[float, float, float, float], ...] | None = None
         self._image_pub = self.create_publisher(Image, "camera/image_raw", 10)
         self._imu_pub = self.create_publisher(Imu, "imu", 10)
         self._tf = TransformBroadcaster(self)
@@ -125,6 +152,8 @@ class CanvasTwinNode(Node):
             self._publish_sensors()
         else:
             self._sensor_tick = 0
+            self._cloud_tick = 0
+            self._cloud_key = None
             self.hub.clear_city()
         self.hub.store(self.plant.sample())
         if result is not None and result.done is not None:
@@ -246,6 +275,7 @@ class CanvasTwinNode(Node):
         scan.range_max = RANGE_MAX_M
         scan.ranges = [float(item) for item in ranges]
         self._scan_pub.publish(scan)
+        self._publish_obstacles(now)
 
         imu = Imu()
         imu.header.stamp = now
@@ -291,3 +321,14 @@ class CanvasTwinNode(Node):
             },
             keep_image=False,
         )
+
+    def _publish_obstacles(self, stamp: object) -> None:
+        city = self.plant.city
+        if city is None:
+            return
+        self._cloud_tick += 1
+        key = tuple(city.collision_rects())
+        if key == self._cloud_key and self._cloud_tick % 10 != 0:
+            return
+        self._cloud_key = key
+        self._cloud_pub.publish(obstacle_cloud(city.obstacle_samples(), stamp))

@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CityLab } from "@/components/city-lab";
 import { MissionPath } from "@/components/mission-path";
 import { NavGraph } from "@/components/nav-graph";
-import { readNav2Progress, seedLessonsThrough, serverNav2Progress, subscribeDrafts, writeNav2Progress } from "@/lib/browser-draft";
-import { PATH_STEPS, doneMissionOnNode, missionAt, missionById, stationGraph, usesThroughPath } from "@/lib/nav2-lessons";
+import { fillStationDefaults, readNav2Progress, serverNav2Progress, subscribeDrafts, writeNav2Progress } from "@/lib/browser-draft";
+import { PATH_STEPS, missionAt, missionById, stationGraph } from "@/lib/nav2-lessons";
 
 export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
@@ -15,6 +15,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [round, setRound] = useState(0);
   const [driveBusy, setDriveBusy] = useState(false);
+  const [spawnBoot, setSpawnBoot] = useState(0);
   const driveRef = useRef<() => void>(() => {});
   const started = progress.started;
   const frontier = missionAt(done);
@@ -23,15 +24,20 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const stationId = runningId ?? picked ?? (finishedId && finishedId !== "start" ? finishedId : null);
   const station = stationId ? missionById(stationId) : null;
   const graph = stationGraph(stationId);
-  const loadedAt = PATH_STEPS.findIndex((step) => step.id === graph?.id);
   const kind = station?.kind ?? null;
   const course =
-    station && (station.obstacles.length > 0 || station.checkpoints.length > 0)
-      ? { obstacles: station.obstacles, checkpoints: station.checkpoints }
+    station && (station.obstacles.length > 0 || station.checkpoints.length > 0 || (station.laterObstacles?.length ?? 0) > 0)
+      ? {
+          obstacles: station.obstacles,
+          checkpoints: station.checkpoints,
+          later: station.laterObstacles,
+          trigger: station.trigger,
+        }
       : null;
   useEffect(() => {
-    if (loadedAt >= 1) seedLessonsThrough(loadedAt);
-  }, [loadedAt]);
+    if (!graph) return;
+    fillStationDefaults(graph.id, graph.defaults);
+  }, [graph]);
   const finishRun = (advance: boolean) => {
     if (stationId) setPicked(stationId);
     setHint(false);
@@ -66,6 +72,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           setReplay(id === frontier?.id ? null : id);
           writeNav2Progress({ started: true, done });
           setHint(true);
+          setSpawnBoot((value) => value + 1);
           retry();
         }}
         onComplete={() => finishRun(replay === null)}
@@ -87,8 +94,12 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           missionKey={stationId ?? ""}
           round={round}
           melons={kind === "melons"}
+          melonSpots={station?.melons}
           gates={kind === "gates"}
           course={course}
+          needBackup={station?.id === "baum-1"}
+          spawn={station?.spawn ?? null}
+          spawnBoot={spawnBoot}
           onMelonsCleared={() => {
             if (kind === "melons") finishRun(started && replay === null && station?.id === frontier?.id);
           }}
@@ -108,8 +119,15 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                 onClick={() => setHint(false)}
                 className="absolute top-1/2 right-3 z-20 w-64 max-h-[calc(100%-5.5rem)] -translate-y-1/2 overflow-y-auto rounded-2xl bg-[#1c1404]/92 px-4 py-3 text-left text-sm text-[#f4efe4] shadow-lg"
               >
-                {station?.kind === "melons" ? (
-                  usesThroughPath(station.id) ? (
+                {station?.id === "baum-1" ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Sammle die sechs Melonen.</li>
+                    <li>Nach der ersten Strecke steht ein U auf der Straße.</li>
+                    <li>Im Baum: RecoveryNode, zweites Kind BackUp, danach dieselbe Pipeline noch einmal.</li>
+                    <li>Das Zeitfenster im Progress Checker ist länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.</li>
+                  </ul>
+                ) : station?.kind === "melons" ? (
+                  graph?.client === "through" ? (
                     <ul className="list-disc space-y-1 pl-4">
                       <li>Sammle alle Melonen ein.</li>
                       <li>Rechtsklick auf die Karte kopiert die Koordinaten ins Clipboard.</li>
@@ -137,21 +155,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           }
         />
         {graph ? (
-          <NavGraph
-            graph={graph}
-            playRef={driveRef}
-            onPlayBusy={setDriveBusy}
-            onPick={(id) => {
-              if (id === station?.node) return;
-              const mission = doneMissionOnNode(id, done);
-              if (!mission || mission === stationId) return;
-              setPicked(mission);
-              setReplay(null);
-              setHint(false);
-              if (started) writeNav2Progress({ started: false, done });
-              setRound((value) => value + 1);
-            }}
-          />
+          <NavGraph graph={graph} playRef={driveRef} onPlayBusy={setDriveBusy} />
         ) : null}
       </div>
     </div>
