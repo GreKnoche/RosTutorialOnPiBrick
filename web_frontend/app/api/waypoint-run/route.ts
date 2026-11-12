@@ -6,7 +6,7 @@ import path from "node:path";
 import { withCityObstacles } from "@/lib/city-costmap";
 import { followPathError, mergeFollowPath, mergeProgress, progressError } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
-import { mergePlugin, pluginError } from "@/lib/planner-yaml";
+import { mergePlugin, mergeSmac, pluginError, smacError } from "@/lib/planner-yaml";
 
 export const runtime = "nodejs";
 
@@ -162,9 +162,10 @@ async function resolveParams(
   planner: string | null,
   progress: string | null,
   cityObstacles: boolean,
+  smac: string | null,
 ): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null && follower === null && planner === null && progress === null && !cityObstacles) {
+  if (controller === null && follower === null && planner === null && progress === null && smac === null && !cityObstacles) {
     return { file: stock, error: null };
   }
   let merged = await readFile(stock, "utf8").catch(() => "");
@@ -173,6 +174,13 @@ async function resolveParams(
     if (shape) return { file: stock, error: shape };
     const next = mergePlugin(merged, planner);
     if (!next) return { file: stock, error: "planner_plugins fehlt in nav2_params.yaml." };
+    merged = next;
+  }
+  if (smac !== null) {
+    const shape = smacError(smac);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeSmac(merged, smac);
+    if (!next) return { file: stock, error: "GridBased fehlt in nav2_params.yaml." };
     merged = next;
   }
   if (controller !== null) {
@@ -591,6 +599,7 @@ async function runStudent(
   planner: string | null,
   progress: string | null,
   cityObstacles: boolean,
+  smac: string | null,
 ) {
   const gen = ++slot.startGen;
   slot.starting = true;
@@ -600,7 +609,7 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower, planner, progress, cityObstacles);
+  const params = await resolveParams(controller, follower, planner, progress, cityObstacles, smac);
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
@@ -737,6 +746,16 @@ export async function POST(request: Request) {
     const shape = pluginError(planner);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
+  let smac: string | null = null;
+  if (body && typeof body === "object" && "smac" in body && (body as { smac?: unknown }).smac !== undefined) {
+    const raw = (body as { smac?: unknown }).smac;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Die Smac-Konfiguration ist leer." }, { status: 400 });
+    }
+    smac = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = smacError(smac);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
   let progress: string | null = null;
   if (body && typeof body === "object" && "progress" in body && (body as { progress?: unknown }).progress !== undefined) {
     const raw = (body as { progress?: unknown }).progress;
@@ -748,7 +767,7 @@ export async function POST(request: Request) {
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
   const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
-  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, cityObstacles));
+  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, cityObstacles, smac));
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

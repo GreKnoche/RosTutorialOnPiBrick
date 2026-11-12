@@ -24,7 +24,6 @@ export type NodeMission = {
   title: string;
   kind: MissionKind | null;
   spawn: SpawnPose;
-  explain?: string;
   melons?: ReadonlyArray<readonly [number, number]>;
   obstacles: MissionObstacle[];
   checkpoints: MissionCheckpoint[];
@@ -46,21 +45,21 @@ export type NavNode = {
 
 const NONE: Pick<NodeMission, "obstacles" | "checkpoints"> = { obstacles: [], checkpoints: [] };
 
-/** Shown above the code graph until a step has its own text. */
-export const EXPLAIN = "Erklärung zu diesem Schritt.";
-
 /** Same pose as the city start, in front of the finish line. */
 const HOME: SpawnPose = { x: 1.576, y: 5.554285714285714, theta: 0 };
 
-/** South side of the square loop, just north of the cross street, facing east. */
-const BLOCK: SpawnPose = { x: 11, y: 5.194285714285714, theta: 0 };
+/** South road, west of the melon, facing east. The melon sits on the old spawn. */
+const PLUGIN_SPAWN: SpawnPose = { x: 10.5, y: 5.194285714285714, theta: 0 };
 
-/** One melon on each corner of that loop, clear of the spawn in the middle of the south side. */
-const BLOCK_MELONS: ReadonlyArray<readonly [number, number]> = [
-  [11.89, 5.194285714285714],
-  [11.89, 6.974285714285714],
-  [10.11, 6.974285714285714],
-  [10.11, 5.194285714285714],
+/**
+ * One melon in the middle of each side. The straight chord crosses the block,
+ * so the planners have to turn the corner instead of sharing one line.
+ */
+const PLUGIN_MELONS: ReadonlyArray<readonly [number, number]> = [
+  [11, 5.194285714285714],
+  [11.89, 6.084285714285714],
+  [11, 6.974285714285714],
+  [10.11, 6.084285714285714],
 ];
 
 /** Six melons. The first sits on the open mid-road stretch. The other five are past the U. */
@@ -88,6 +87,16 @@ const TREE_TRIGGER: ObstacleTrigger = { x: 5.35, yMin: 5.19, yMax: 5.92 };
 /** Controller lap. Straight, then a weave, a pinched corner, a cone row, a stop, and a turn-back. */
 const MID = 5.554;
 const HALF = 0.36;
+
+/** Eastbound stretch of the mid road, from the start line to the cross-street gate. */
+const MAIN_STRETCH: Pick<NodeMission, "obstacles" | "checkpoints"> = {
+  obstacles: [],
+  checkpoints: [
+    { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
+    { id: "mitte", x0: 4.8, y0: MID - HALF, x1: 4.8, y1: MID + HALF },
+    { id: "quer", x0: 7.16, y0: MID - HALF, x1: 7.16, y1: MID + HALF },
+  ],
+};
 const ROAD_EAST = 8.677;
 const HAIRPIN_X = 7.301;
 const HAIRPIN_Y = 1.53;
@@ -157,15 +166,17 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "plugin",
-    missions: [{ id: "plugin", title: "planner plugin", kind: null, spawn: BLOCK, ...NONE }],
+    missions: [
+      { id: "plugin", title: "planner plugin", kind: "melons", spawn: PLUGIN_SPAWN, melons: PLUGIN_MELONS, ...NONE },
+    ],
   },
   {
     id: "planner_plugin",
-    name: "planner_plugins",
+    name: "Smac Hybrid",
     x: 22,
     y: 58,
     show: "planner",
-    missions: [{ id: "planner", title: "Planner", kind: "melons", spawn: BLOCK, melons: BLOCK_MELONS, ...NONE }],
+    missions: [{ id: "planner", title: "Smac Hybrid", kind: "gates", spawn: HOME, ...MAIN_STRETCH }],
   },
   {
     id: "mission",
@@ -179,8 +190,6 @@ export const NAV_NODES: NavNode[] = [
         title: "Behavior Tree 1",
         kind: "melons",
         spawn: HOME,
-        explain:
-          "Nach der ersten Strecke steht ein U auf der Straße. Der Progress Checker beendet FollowPath, wenn das Auto stehen bleibt. Im Baum setzt ein RecoveryNode zurück, danach plant dieselbe Pipeline um das U herum.",
         melons: TREE_MELONS,
         ...NONE,
         laterObstacles: TREE_POCKET,
@@ -197,12 +206,12 @@ const owned = new Map(
   NAV_NODES.flatMap((node) => node.missions.map((mission) => [mission.id, { mission, node }] as const)),
 );
 
-export const PATH_STEPS: { id: string; title: string; explain: string }[] = [
-  { id: "start", title: "Start", explain: EXPLAIN },
+export const PATH_STEPS: { id: string; title: string }[] = [
+  { id: "start", title: "Start" },
   ...MISSION_ORDER.map((id) => {
     const found = owned.get(id);
     if (!found) throw new Error(`missing mission ${id}`);
-    return { id: found.mission.id, title: found.mission.title, explain: found.mission.explain ?? EXPLAIN };
+    return { id: found.mission.id, title: found.mission.title };
   }),
 ];
 
@@ -225,7 +234,6 @@ export function missionById(id: string): {
   kind: MissionKind | null;
   node: string;
   spawn: SpawnPose;
-  explain: string;
   melons?: ReadonlyArray<readonly [number, number]>;
   obstacles: MissionObstacle[];
   checkpoints: MissionCheckpoint[];
@@ -239,7 +247,6 @@ export function missionById(id: string): {
     kind: found.mission.kind,
     node: found.node.id,
     spawn: found.mission.spawn,
-    explain: found.mission.explain ?? EXPLAIN,
     melons: found.mission.melons,
     obstacles: found.mission.obstacles,
     checkpoints: found.mission.checkpoints,

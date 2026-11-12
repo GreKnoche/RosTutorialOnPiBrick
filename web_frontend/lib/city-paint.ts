@@ -448,10 +448,4 @@ export function draw(
     width: (glyph) => Math.max(0.5, glyph * 0.012),
     outline: false,
   });
-
-  ctx.fillStyle = "rgba(255,247,237,0.8)";
-  ctx.font = `${Math.max(12, ppm * 0.04)}px ui-sans-serif, system-ui`;
-  ctx.textAlign = "center";
-  ctx.fillText("N", width / 2, Math.max(18, ppm * 0.05));
-  ctx.textAlign = "start";
 }

@@ -8,6 +8,8 @@ const controller: Nav2Station = {
   tree: "through",
   showProgress: false,
   cityObstacles: false,
+  explain:
+    "FollowPath macht aus dem Pfad /cmd_vel. Tempo, Lookahead und die Drehung vor der Fahrt stehen hier. Mehrere Zeilen auf einmal einfügen geht, auch ohne Einrückung. Neue Parameter bleiben erhalten.",
   nodes: [
     { id: "waypoint_lesson", x: 22, y: 50 },
     { id: "controller", x: 78, y: 50 },

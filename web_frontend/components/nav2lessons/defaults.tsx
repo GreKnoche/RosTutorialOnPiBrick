@@ -71,6 +71,36 @@ export const FOLLOW_PATH = take(followPathSection(PARAMS), "FollowPath");
 export const PROGRESS = take(progressSection(PARAMS), "progress_checker");
 export const FOLLOWER = take(followerSection(PARAMS), "waypoint_follower");
 export const NAVFN = take(pluginSection(PARAMS), "GridBased");
+export const HYBRID = NAVFN.replace(
+  'plugin: "nav2_navfn_planner::NavfnPlanner"',
+  'plugin: "nav2_smac_planner::SmacPlannerHybrid"',
+);
+
+export const SMAC = `plugin: "nav2_smac_planner::SmacPlannerHybrid"
+tolerance: 0.5
+downsample_costmap: false
+downsampling_factor: 1
+allow_unknown: true
+max_iterations: 1000000
+max_on_approach_iterations: 1000
+max_planning_time: 3.5
+# DUBIN fährt nur vorwärts. REEDS_SHEPP darf rückwärts.
+motion_model_for_search: "DUBIN"
+angle_quantization_bins: 64
+analytic_expansion_ratio: 3.5
+analytic_expansion_max_length: 3.0
+analytic_expansion_max_cost: 200.0
+# Meter. Radstand geteilt durch tan vom maximalen Lenkwinkel.
+minimum_turning_radius: 0.40
+reverse_penalty: 2.1
+change_penalty: 0.0
+non_straight_penalty: 1.20
+cost_penalty: 2.0
+retrospective_penalty: 0.025
+lookup_table_size: 20.0
+cache_obstacle_heuristic: false
+smooth_path: true
+`;
 export const WIGGLE = MANEUVER_PLUGIN_SOURCE;
 
 export const HALT = MANEUVER_PLUGIN_SOURCE.replace(
@@ -119,7 +149,8 @@ from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß: 0 Ost, 1.57 Nord, 3.14 West, -1.57 Süd.
+# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
+# Ost math.pi * 0, Nord math.pi / 2, West math.pi, Süd -math.pi / 2.
 POINTS = [
     # (1.4, 5.59, 0.0),
 ]
@@ -195,7 +226,8 @@ from nav2_msgs.action import NavigateThroughPoses
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß: 0 Ost, 1.57 Nord, 3.14 West, -1.57 Süd.
+# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
+# Ost math.pi * 0, Nord math.pi / 2, West math.pi, Süd -math.pi / 2.
 POINTS = [
     # (1.4, 5.59, 0.0),
 ]

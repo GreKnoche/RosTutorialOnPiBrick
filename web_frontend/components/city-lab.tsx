@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { LocateFixed, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { parseCity, type CityMap, type LapState, type Rect } from "@/lib/city-map";
@@ -24,9 +24,51 @@ import {
 import { formatDe } from "@/lib/format";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
+import { noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
 import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
+
+function clockLabel(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function MapClock({ runKey, running }: { runKey: number; running: boolean }) {
+  const origin = useRef(0);
+  const [stamp, setStamp] = useState(0);
+  const [ms, setMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (runKey === 0) return;
+    origin.current = performance.now();
+    setStamp(runKey);
+    setMs(0);
+  }, [runKey]);
+
+  useEffect(() => {
+    if (!running || stamp !== runKey || runKey === 0) return;
+    const id = window.setInterval(() => {
+      setMs(performance.now() - origin.current);
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [running, runKey, stamp]);
+
+  if (ms === null || stamp !== runKey) return null;
+  const label = clockLabel(ms);
+  return (
+    <p
+      role="timer"
+      aria-label={`Zeit ${label}`}
+      className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 font-mono text-xs tabular-nums tracking-wide text-[#fff7ed]/75"
+      style={{ textShadow: "0 1px 2px rgba(17, 19, 24, 0.7)" }}
+    >
+      {label}
+    </p>
+  );
+}
 
 type Course = {
   obstacles: MissionObstacle[];
@@ -165,11 +207,14 @@ export function CityLab({
   spawn = null,
   spawnBoot = 0,
   melonSpots = MELONS,
+  melonNote = null,
   onMelonsCleared,
   onGatesCleared,
   onPlay,
   playBusy = false,
   playReady = false,
+  runKey = 0,
+  timing = false,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
@@ -182,11 +227,14 @@ export function CityLab({
   spawn?: { x: number; y: number; theta: number } | null;
   spawnBoot?: number;
   melonSpots?: ReadonlyArray<readonly [number, number]>;
+  melonNote?: string | null;
   onMelonsCleared?: () => void;
   onGatesCleared?: () => void;
   onPlay?: () => void;
   playBusy?: boolean;
   playReady?: boolean;
+  runKey?: number;
+  timing?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -203,7 +251,7 @@ export function CityLab({
   const generation = useRef(0);
   const [rosUp, setRosUp] = useState(false);
   const [phase, setPhase] = useState<TwinPhase>("connecting");
-  const [nodeLog, setNodeLog] = useState("");
+  const nodeLog = useSyncExternalStore(subscribeRunTerminal, readRunTerminal, serverRunTerminal);
   const [booting, setBooting] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const [mapUp, setMapUp] = useState(false);
@@ -732,8 +780,16 @@ export function CityLab({
     memoryRef.current = emptyMemory();
     trapRef.current = false;
     backedRef.current = false;
+    if (melonsOnRef.current) holdMelons.current = true;
     melonsRef.current = freshMelons(spotsRef.current);
     setMelonsLeft(spotsRef.current.length);
+    const origin = probeRef.current?.start;
+    const home =
+      spawnRef.current ??
+      (origin
+        ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
+        : (cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 }));
+    placeAt(home);
     const running = courseRef.current;
     if (running) {
       linkRef.current?.send({
@@ -743,17 +799,6 @@ export function CityLab({
         checkpoints: running.checkpoints,
       });
     }
-    const origin = probeRef.current?.start;
-    const start = origin
-      ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
-      : (cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 });
-    linkRef.current?.send({
-      type: "reset",
-      client: sessionRef.current,
-      x: start.x,
-      y: start.y,
-      theta: start.theta,
-    });
   };
 
   const cssPpm = () => {
@@ -848,8 +893,8 @@ export function CityLab({
         const body = (await response.json()) as { log?: string; starting?: boolean; running?: boolean };
         if (cancel) return;
         const log = typeof body.log === "string" ? body.log : "";
-        setNodeLog(log);
-        setBooting(body.starting === true && log.trim() === "");
+        noteRunPhase(body.starting === true, body.running === true, log);
+        setBooting(body.starting === true && log.trim() === "" && !readRunTerminal().trim());
         const active = playBusy || body.running === true || body.starting === true;
         if (body.running === true || body.starting === true) seenRunRef.current = true;
         if (!active) {
@@ -866,7 +911,7 @@ export function CityLab({
         timer = window.setTimeout(() => void tick(), 1000);
       } catch {
         if (cancel) return;
-        setNodeLog("");
+        if (playBusy) setRunTerminal("Der Knoten ist nicht erreichbar.");
         setBooting(false);
         if (playBusy) timer = window.setTimeout(() => void tick(), 1000);
       }
@@ -906,6 +951,7 @@ export function CityLab({
           onPointerCancel={onPanEnd}
           onContextMenu={onMapMenu}
         />
+        <MapClock runKey={runKey} running={timing} />
         <span
           role="status"
           title={phase === "up" ? "Verbunden" : phase === "connecting" ? "Verbinde" : "Nicht verbunden"}
@@ -930,9 +976,16 @@ export function CityLab({
           </p>
         ) : null}
         {!kapitel && melons ? (
-          <p className="absolute top-3 left-8 rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
-            {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
-          </p>
+          <div className="absolute top-3 left-8 z-10 flex max-w-[18rem] flex-col gap-1">
+            <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
+              {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
+            </p>
+            {melonNote ? (
+              <p className="max-w-full rounded-xl bg-[#1c1404]/80 px-3 py-1 text-xs leading-4 font-semibold text-[#f4efe4]">
+                {melonNote}
+              </p>
+            ) : null}
+          </div>
         ) : null}
         <p className="pointer-events-none absolute top-2 right-2 z-10 rounded bg-neutral-700/80 px-2 py-0.5 text-[0.7rem] text-neutral-300">
           Sichtfenster {formatDe(CITY_VIEW_W / zoom, 1)} m mal {formatDe(CITY_VIEW_H / zoom, 1)} m
@@ -1011,6 +1064,7 @@ export function CityLab({
               aria-label="Code abspielen"
               autoComplete="off"
               onClick={() => {
+                reset();
                 if (gates && takeGhostRef.current) {
                   ghostGen.current += 1;
                   seenRunRef.current = false;
@@ -1047,9 +1101,9 @@ export function CityLab({
               aria-busy={booting}
               className="box-content h-8 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
             >
-              {booting ? "" : nodeLog}
+              {booting && !nodeLog.trim() ? "" : nodeLog}
             </pre>
-            {booting ? <TwinOrbit /> : null}
+            {booting && !nodeLog.trim() ? <TwinOrbit /> : null}
           </div>
         </div>
         {ghostNote ? <p className="text-sm leading-6 text-muted-foreground">{ghostNote}</p> : null}

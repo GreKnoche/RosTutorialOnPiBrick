@@ -11,6 +11,7 @@ _PROMPTS = {
     "start": "Überfahre die Startlinie.",
     "schikane": "Schikane, erste Lücke, oben-unten.",
     "schikane-2": "Schikane, zweite Lücke, oben-unten.",
+    "mitte": "Weiter auf der Hauptstrecke.",
     "quer": "Checkpoint auf der Querstraße, oben-unten.",
     "ecke": "Enge Ecke.",
     "reihe": "Kegelreihe, links-rechts.",

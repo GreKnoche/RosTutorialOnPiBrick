@@ -8,6 +8,7 @@ const anhalten: Nav2Station = {
   tree: "pose",
   showProgress: false,
   cityObstacles: false,
+  explain: "Erklärung zu diesem Schritt.",
   nodes: [
     { id: "waypoint_lesson", x: 16, y: 50 },
     { id: "waypoint_follower", x: 50, y: 50 },

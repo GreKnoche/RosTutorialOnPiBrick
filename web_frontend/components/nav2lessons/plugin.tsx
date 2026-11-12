@@ -7,7 +7,9 @@ const plugin: Nav2Station = {
   client: "through",
   tree: "through",
   showProgress: false,
-  cityObstacles: false,
+  cityObstacles: true,
+  explain:
+    "Tausch die Klasse hinter GridBased. Der Name bleibt, den ruft der Baum auf. Die vier Melonen zählen einmal pro Planner.",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 50 },
     { id: "planner", x: 50, y: 50 },

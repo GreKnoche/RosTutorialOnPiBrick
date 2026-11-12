@@ -1,4 +1,4 @@
-import { FOLLOW_PATH, NAVFN, PROGRESS, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import { FOLLOW_PATH, HYBRID, PROGRESS, SMAC, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
 import type { Nav2Station } from "./types";
 
 const planner: Nav2Station = {
@@ -8,6 +8,8 @@ const planner: Nav2Station = {
   tree: "through",
   showProgress: false,
   cityObstacles: false,
+  explain:
+    "Das ist die Konfiguration von Smac Hybrid. Bewegungsmodell und Mindestradius stehen hier. Der Block ersetzt GridBased.",
   nodes: [
     { id: "waypoint_lesson", x: 10, y: 62 },
     { id: "planner", x: 46, y: 62 },
@@ -19,11 +21,12 @@ const planner: Nav2Station = {
     { from: "planner", to: "controller", label: "follow_path" },
     { from: "planner", to: "planner_plugin", label: "plugin" },
   ],
-  fields: ["through", "controller", "planner", "progress", "mission"],
+  fields: ["through", "controller", "planner", "smac", "progress", "mission"],
   defaults: {
     through: THROUGH_SOURCE,
     controller: FOLLOW_PATH,
-    planner: NAVFN,
+    planner: HYBRID,
+    smac: SMAC,
     progress: PROGRESS,
     mission: THROUGH_XML,
   },

@@ -12,6 +12,8 @@ export type GraphNodeId =
 export type Nav2Station = {
   id: string;
   focus: GraphNodeId;
+  /** Shown for this road step, whichever code node is open. */
+  explain: string;
   nodes: { id: GraphNodeId; x: number; y: number }[];
   edges: { from: GraphNodeId; to: GraphNodeId; label: string }[];
   client: "waypoints" | "through";

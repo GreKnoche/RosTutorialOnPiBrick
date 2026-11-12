@@ -6,20 +6,8 @@ import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import type { Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
 import { absorbFollowPath, absorbProgress, followPathError, progressError } from "@/lib/controller-yaml";
-import { absorbPlugin, pluginError } from "@/lib/planner-yaml";
-import { NAV_NODES, missionById } from "@/lib/nav2-lessons";
-
-const COMPARISON = `# (x, y), Raster
-NavfnPlanner: "nav2_navfn_planner::NavfnPlanner"
-# (x, y), acht Nachbarn
-SmacPlanner2D: "nav2_smac_planner::SmacPlanner2D"
-# (x, y), Sichtlinie
-ThetaStarPlanner: "nav2_theta_star_planner::ThetaStarPlanner"
-# (x, y, theta), Mindestradius
-SmacPlannerHybrid: "nav2_smac_planner::SmacPlannerHybrid"
-# (x, y, theta), Manöverdatei
-SmacPlannerLattice: "nav2_smac_planner::SmacPlannerLattice"
-`;
+import { absorbPlugin, pluginError, smacError } from "@/lib/planner-yaml";
+import { NAV_NODES } from "@/lib/nav2-lessons";
 
 const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
 
@@ -77,6 +65,7 @@ export function NavGraph({
   const controllerDraft = useField(missionId, "controller");
   const followerDraft = useField(missionId, "follower");
   const plannerDraft = useField(missionId, "planner");
+  const smacDraft = useField(missionId, "smac");
   const progressDraft = useField(missionId, "progress");
   const ownDrive = useRef<() => void>(() => {});
   const driveRef = playRef ?? ownDrive;
@@ -85,6 +74,7 @@ export function NavGraph({
   const controllerDefault = graph.defaults.controller ?? "";
   const followerDefault = graph.defaults.follower ?? "";
   const plannerDefault = graph.defaults.planner ?? "";
+  const smacDefault = graph.defaults.smac ?? "";
   const progressDefault = graph.defaults.progress ?? "";
   const xml = missionDraft ?? missionDefault;
   const maneuver = maneuverDraft ?? maneuverDefault;
@@ -93,6 +83,8 @@ export function NavGraph({
   const followerYaml = followerDraft ?? followerDefault;
   const plannerYaml = absorbPlugin(plannerDefault, plannerDraft ?? plannerDefault);
   const plannerProblem = plannerYaml.trim() ? pluginError(plannerYaml) : null;
+  const smacYaml = smacDraft ?? smacDefault;
+  const smacProblem = smacYaml.trim() ? smacError(smacYaml) : null;
   const progressYaml = absorbProgress(progressDraft ?? progressDefault);
   const progressProblem = progressYaml.trim() ? progressError(progressYaml) : null;
   const showProgress = graph.showProgress && placed.some((node) => node.id === "controller");
@@ -116,11 +108,10 @@ export function NavGraph({
     ];
   });
 
-  const explain = missionById(graph.id)?.explain ?? "Erklärung zu diesem Schritt.";
-
   return (
     <section className="mt-6 flex flex-col gap-4">
-      <p className="text-sm leading-6 text-muted-foreground">{explain}</p>
+      <h2 className="text-base font-semibold">Erklärung</h2>
+      <p className="text-sm leading-6 text-muted-foreground">{graph.explain}</p>
       <h2 className="text-base font-semibold">Code Graph</h2>
       <div className="overflow-x-auto">
         <div className="relative w-full" style={{ height: graphHeight }} role="group" aria-label="Verbundene Knoten">
@@ -183,9 +174,6 @@ export function NavGraph({
             language="yaml"
             height="h-[16rem]"
           />
-          <p className="text-sm leading-6 text-muted-foreground">
-            Nach jedem erreichten Punkt ruft dieser Knoten maneuver() im Plugin auf.
-          </p>
         </div>
       ) : null}
       {current?.id === "controller" ? (
@@ -208,10 +196,6 @@ export function NavGraph({
             height="h-[28rem]"
           />
           {controllerProblem ? <p className="text-sm leading-6">{controllerProblem}</p> : null}
-          <p className="text-sm leading-6 text-muted-foreground">
-            FollowPath macht aus dem Pfad /cmd_vel. Tempo, Lookahead und die Drehung vor der Fahrt stehen hier.
-            Mehrere Zeilen auf einmal einfügen geht, auch ohne Einrückung. Neue Parameter bleiben erhalten.
-          </p>
           {showProgress ? (
             <>
               <div className="flex items-center justify-between gap-3">
@@ -241,26 +225,21 @@ export function NavGraph({
       ) : null}
       {current?.id === "planner_plugin" ? (
         <div className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold">planner_plugins</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">Smac Hybrid</h3>
+            <ResetCodeButton
+              disabled={!smacDefault || smacYaml === smacDefault}
+              onClick={() => writeLessonText(missionId, "smac", null)}
+            />
+          </div>
           <CodeEditor
-            value={COMPARISON}
-            label="Planner im Vergleich"
+            value={smacYaml}
+            onChange={(value) => writeLessonText(missionId, "smac", value === smacDefault ? null : value)}
+            label="Smac Hybrid"
             language="yaml"
-            height="h-[8rem]"
-            readOnly
+            height="h-[28rem]"
           />
-          <p className="text-sm leading-6 text-muted-foreground">
-            Ein Pfadaufruf nutzt genau eine Klasse. NavFn, SmacPlanner2D und Theta* suchen in Zellen <span className="font-mono">(x, y)</span>. Der EV3 dreht auf der Stelle, deshalb bleibt so ein Pfad fahrbar. Smac Hybrid und Smac Lattice suchen in <span className="font-mono">(x, y, θ)</span> und brauchen einen Mindestradius.
-          </p>
-          <ul className="list-disc space-y-1 pl-4 text-sm leading-6 text-muted-foreground">
-            <li>Auf einer geraden Rasterzeile fallen NavFn, Smac2D und Theta* zusammen.</li>
-            <li>Eine schräge Diagonale zeigt den Unterschied. NavFn bleibt am Raster, Smac2D setzt eine Treppe, Theta* zieht eine Gerade.</li>
-            <li>Um einen Block legt Theta* eine scharfe Ecke. Smac2D hält Abstand in den billigen Zellen.</li>
-            <li>Eine Parklücke mit vorgeschriebener Blickrichtung zeigt Hybrid und Lattice. Die Zellplaner ignorieren die Nase am Ziel.</li>
-          </ul>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Die Klasse steht im Knoten davor.
-          </p>
+          {smacProblem ? <p className="text-sm leading-6">{smacProblem}</p> : null}
         </div>
       ) : null}
       {current?.id === "planner" ? (
@@ -283,9 +262,6 @@ export function NavGraph({
             height="h-[12rem]"
           />
           {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
-          <p className="text-sm leading-6 text-muted-foreground">
-            Tausch die Klasse hinter GridBased. Der Name bleibt, den ruft der Baum auf.
-          </p>
         </div>
       ) : null}
       {current?.id === "mission" ? (
@@ -301,9 +277,6 @@ export function NavGraph({
             language="xml"
             height="h-[20rem]"
           />
-          <p className="text-sm leading-6 text-muted-foreground">
-            Dieser Baum fährt navigate_through_poses. Ein Pfad, dann FollowPath, ohne einen Timer, der neu plant.
-          </p>
         </div>
       ) : null}
       {current?.id === "maneuver" ? (

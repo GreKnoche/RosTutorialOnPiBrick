@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useEffect, useSyncExternalStore, type RefObject } from "react";
 import type { Nav2Station } from "@/components/nav2lessons";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
+import { holdRunTerminal, setRunTerminal } from "@/lib/run-terminal";
 
 function useField(missionId: string, field: Nav2TextField) {
   const read = useCallback(() => readLessonText(missionId, field), [missionId, field]);
@@ -33,44 +34,20 @@ export function WaypointNode({
   const controller = useField(missionId, "controller");
   const follower = useField(missionId, "follower");
   const planner = useField(missionId, "planner");
+  const smac = useField(missionId, "smac");
   const progress = useField(missionId, "progress");
   const base = station.defaults[field] ?? "";
-  const source = (throughClient ? through : waypoint) ?? base;
-  const [noteClient, setNoteClient] = useState(throughClient);
-  const [note, setNote] = useState("Rechtsklick kopiert einen Punkt. theta ist die Blickrichtung.");
-  const [watching, setWatching] = useState(false);
-  if (noteClient !== throughClient) {
-    setNoteClient(throughClient);
-    setNote("Rechtsklick kopiert (x, y, theta). 0 Ost, 1.57 Nord, 3.14 West, -1.57 Süd.");
-  }
+  const stored = (throughClient ? through : waypoint) ?? base;
+  const source = stored.replace(
+    "# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß: 0 Ost, 1.57 Nord, 3.14 West, -1.57 Süd.",
+    `# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
+# Ost math.pi * 0, Nord math.pi / 2, West math.pi, Süd -math.pi / 2.`,
+  );
   const has = useCallback((name: Nav2TextField) => station.fields.includes(name), [station.fields]);
-
-  useEffect(() => {
-    if (!watching) return;
-    let cancel = false;
-    const tick = async () => {
-      try {
-        const response = await fetch("/api/waypoint-run");
-        const body = (await response.json()) as { running?: boolean; log?: string };
-        if (cancel) return;
-        if (body.log) setNote(body.log);
-        if (!body.running) setWatching(false);
-      } catch {
-        if (!cancel) setNote("Der Knoten ist nicht erreichbar.");
-      }
-    };
-    const timer = setInterval(() => void tick(), 1000);
-    void tick();
-    return () => {
-      cancel = true;
-      clearInterval(timer);
-    };
-  }, [watching]);
 
   const drive = useCallback(async () => {
     onBusy?.(true);
-    setWatching(false);
-    setNote(has("maneuver") ? "Baue maneuver_at_waypoint und starte Nav2." : "Starte Nav2.");
+    holdRunTerminal(has("maneuver") ? "Baue maneuver_at_waypoint und starte Nav2." : "Starte Nav2.");
     const body: Record<string, unknown> = { source };
     if (has("maneuver")) body.plugin = kept(maneuver, station.defaults.maneuver);
     if (station.tree === "through") body.tree = kept(mission, station.defaults.mission);
@@ -80,6 +57,7 @@ export function WaypointNode({
     if (station.cityObstacles) body.cityObstacles = true;
     if (has("follower")) body.follower = kept(follower, station.defaults.follower);
     if (has("planner")) body.planner = kept(planner, station.defaults.planner);
+    if (has("smac")) body.smac = kept(smac, station.defaults.smac);
     try {
       const response = await fetch("/api/waypoint-run", {
         method: "POST",
@@ -88,17 +66,16 @@ export function WaypointNode({
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string; running?: boolean; log?: string };
       if (!response.ok || !payload.ok) {
-        setNote(payload.error || "Der Knoten ist nicht gestartet.");
+        setRunTerminal(payload.error || "Der Knoten ist nicht gestartet.");
         return;
       }
-      if (payload.log) setNote(payload.log);
-      setWatching(payload.running !== false);
+      if (payload.log) setRunTerminal(payload.log);
     } catch {
-      setNote("Der Knoten ist nicht gestartet.");
+      setRunTerminal("Der Knoten ist nicht gestartet.");
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, has, maneuver, mission, onBusy, planner, progress, source, station]);
+  }, [controller, follower, has, maneuver, mission, onBusy, planner, progress, smac, source, station]);
 
   useEffect(() => {
     driveRef.current = () => {
@@ -119,7 +96,6 @@ export function WaypointNode({
         language="python"
         height="h-[36rem]"
       />
-      <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-sm text-muted-foreground">{note}</pre>
     </section>
   );
 }

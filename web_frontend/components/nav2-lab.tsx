@@ -4,11 +4,28 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CityLab } from "@/components/city-lab";
 import { MissionPath } from "@/components/mission-path";
 import { NavGraph } from "@/components/nav-graph";
-import { fillStationDefaults, readNav2Progress, serverNav2Progress, subscribeDrafts, writeNav2Progress } from "@/lib/browser-draft";
+import {
+  fillStationDefaults,
+  readLessonText,
+  readNav2Progress,
+  readPluginPlanners,
+  serverNav2Progress,
+  serverPluginPlanners,
+  subscribeDrafts,
+  writeNav2Progress,
+  writePluginPlanners,
+} from "@/lib/browser-draft";
 import { PATH_STEPS, missionAt, missionById, stationGraph } from "@/lib/nav2-lessons";
+import { PLANNER_CLASSES, absorbPlugin, plannerClass, plannerShort } from "@/lib/planner-yaml";
+
+function openPlanners(done: readonly string[]): string {
+  const open = PLANNER_CLASSES.filter((name) => !done.includes(name)).map((name) => plannerShort(name));
+  return open.length === 0 ? "Alle Planner" : `Offen: ${open.join(", ")}`;
+}
 
 export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
+  const pluginDone = useSyncExternalStore(subscribeDrafts, readPluginPlanners, serverPluginPlanners);
   const done = progress.done;
   const [hint, setHint] = useState(false);
   const [replay, setReplay] = useState<string | null>(null);
@@ -16,6 +33,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const [round, setRound] = useState(0);
   const [driveBusy, setDriveBusy] = useState(false);
   const [spawnBoot, setSpawnBoot] = useState(0);
+  const [runKey, setRunKey] = useState(0);
   const driveRef = useRef<() => void>(() => {});
   const started = progress.started;
   const frontier = missionAt(done);
@@ -71,6 +89,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           setPicked(id);
           setReplay(id === frontier?.id ? null : id);
           writeNav2Progress({ started: true, done });
+          setRunKey((value) => value + 1);
           setHint(true);
           setSpawnBoot((value) => value + 1);
           retry();
@@ -85,6 +104,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
             if (index <= 0 || index >= next) return null;
             return current;
           });
+          const pluginAt = PATH_STEPS.findIndex((step) => step.id === "plugin");
+          if (pluginAt >= 0 && next <= pluginAt) writePluginPlanners([]);
           writeNav2Progress({ started: false, done: next });
         }}
       />
@@ -95,13 +116,39 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           round={round}
           melons={kind === "melons"}
           melonSpots={station?.melons}
+          melonNote={
+            station?.id !== "plugin"
+              ? null
+              : PATH_STEPS.findIndex((step) => step.id === "plugin") < done
+                ? "Alle Planner"
+                : openPlanners(pluginDone)
+          }
           gates={kind === "gates"}
           course={course}
           needBackup={station?.id === "baum-1"}
           spawn={station?.spawn ?? null}
           spawnBoot={spawnBoot}
           onMelonsCleared={() => {
-            if (kind === "melons") finishRun(started && replay === null && station?.id === frontier?.id);
+            if (kind !== "melons" || !station) return;
+            const advance = started && replay === null && station.id === frontier?.id;
+            if (station.id !== "plugin") {
+              finishRun(advance);
+              return;
+            }
+            const fallback = graph?.defaults.planner ?? "";
+            const yaml = absorbPlugin(fallback, readLessonText("plugin", "planner") ?? fallback);
+            const name = plannerClass(yaml);
+            const have = new Set(readPluginPlanners());
+            if (name) have.add(name);
+            const names = PLANNER_CLASSES.filter((item) => have.has(item));
+            if (names.length === PLANNER_CLASSES.length) {
+              writePluginPlanners([]);
+              finishRun(advance);
+              return;
+            }
+            writePluginPlanners(names);
+            setRound((value) => value + 1);
+            setHint(true);
           }}
           onGatesCleared={() => {
             if (kind === "gates") finishRun(started && replay === null && station?.id === frontier?.id);
@@ -112,6 +159,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           }}
           playBusy={driveBusy}
           playReady={graph !== null}
+          runKey={runKey}
+          timing={started}
           notice={
             started && hint && station?.kind ? (
               <button
@@ -119,7 +168,28 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                 onClick={() => setHint(false)}
                 className="absolute top-1/2 right-3 z-20 w-64 max-h-[calc(100%-5.5rem)] -translate-y-1/2 overflow-y-auto rounded-2xl bg-[#1c1404]/92 px-4 py-3 text-left text-sm text-[#f4efe4] shadow-lg"
               >
-                {station?.id === "baum-1" ? (
+                {station?.id === "plugin" ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Sammle die vier Melonen. Die Gerade dazwischen läuft durch den Block.</li>
+                    <li>NavFn, Smac2D und Theta* legen die Ecke verschieden.</li>
+                    <li>theta ist die Nase. Die Zellplaner ignorieren sie, Hybrid und Lattice halten sie.</li>
+                    <li>Süd 0, Ost math.pi / 2, Nord math.pi, West -math.pi / 2.</li>
+                    <li>Tausche die Klasse und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
+                    {PLANNER_CLASSES.map((name) => (
+                      <li key={name}>
+                        {plannerShort(name)}
+                        {pluginDone.includes(name) ? " geschafft" : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : station?.id === "planner" ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Fahre die Hauptstrecke nach Osten.</li>
+                    <li>Überfahre Start, Mitte und die Querlinie.</li>
+                    <li>Smac Hybrid sucht in (x, y, θ) und hält den Mindestradius.</li>
+                    <li>Gras macht die Strecke ungültig.</li>
+                  </ul>
+                ) : station?.id === "baum-1" ? (
                   <ul className="list-disc space-y-1 pl-4">
                     <li>Sammle die sechs Melonen.</li>
                     <li>Nach der ersten Strecke steht ein U auf der Straße.</li>

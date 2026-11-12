@@ -157,6 +157,16 @@ export function MissionPath({
           const state = index < done ? "done" : index === current ? "current" : "locked";
           const passed = item.id === "start";
           const side = index % 2 === 0 ? "left" : "right";
+          const open = () => {
+            if (state === "locked" || passed) return;
+            if (state === "done") {
+              onStart?.(item.id);
+              return;
+            }
+            if (active) return;
+            setOpenId(item.id);
+            onSelect?.(item.id);
+          };
           return (
             <li key={item.id} className="relative z-10 grid grid-cols-[3rem_1.5rem_2.5rem_1.5rem_3rem]">
               <div className="flex flex-col items-end">
@@ -171,11 +181,7 @@ export function MissionPath({
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
-                    onClick={() => {
-                      if (active || state === "locked" || passed) return;
-                      setOpenId(item.id);
-                      onSelect?.(item.id);
-                    }}
+                    onClick={open}
                     onStart={() => onStart?.(item.id)}
                   />
                 ) : null}
@@ -195,11 +201,7 @@ export function MissionPath({
                     buttonRef={(el) => {
                       nodeRefs.current[index] = el;
                     }}
-                    onClick={() => {
-                      if (active || state === "locked" || passed) return;
-                      setOpenId(item.id);
-                      onSelect?.(item.id);
-                    }}
+                    onClick={open}
                     onStart={() => onStart?.(item.id)}
                   />
                 ) : null}
@@ -278,13 +280,15 @@ function NodeButton({
         aria-current={state === "current" ? "step" : undefined}
         aria-expanded={state !== "locked" && !passed && !live ? armed : undefined}
         aria-label={
-          held && !live
-            ? `${item.title}, ausgewählt`
-            : passed || (state === "done" && !live)
-              ? `${item.title}, geschafft`
-              : state === "locked"
-                ? `${item.title}, zu`
-                : item.title
+          passed
+            ? `${item.title}, geschafft`
+            : state === "done" && !live
+              ? `${item.title}, nochmal starten`
+              : held && !live
+                ? `${item.title}, ausgewählt`
+                : state === "locked"
+                  ? `${item.title}, zu`
+                  : item.title
         }
         onClick={onClick}
         className={`relative z-10 flex size-12 items-center justify-center rounded-full ${

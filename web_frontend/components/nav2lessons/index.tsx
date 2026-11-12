@@ -18,6 +18,7 @@ for (const station of STATIONS) {
       throw new Error(`${station.id} hat keinen Starttext für ${field}`);
     }
   }
+  if (!station.explain.trim()) throw new Error(`${station.id} hat keine Erklärung`);
 }
 
 export function stationGraph(id: string | null | undefined): Nav2Station | null {

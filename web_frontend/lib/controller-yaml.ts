@@ -1,40 +1,5 @@
 const PLUGIN = "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController";
 
-/** Shown in the browser only. mergeFollowPath drops these lines before writing params. */
-const NOTES: Record<string, string> = {
-  plugin: "Dieser Regler fährt den Bogen zum Punkt auf dem Pfad.",
-  desired_linear_vel: "Wunschtempo geradeaus, m/s. Gazebo schneidet bei 0,35 ab.",
-  lookahead_dist: "Abstand zum Punkt auf dem Pfad, m. Größer glättet, kleiner lenkt enger.",
-  min_lookahead_dist: "Kürzester Abstand zum Punkt auf dem Pfad, m.",
-  max_lookahead_dist: "Weitester Abstand zum Punkt auf dem Pfad, m.",
-  lookahead_time: "Sekunden voraus. Abstand = Tempo mal diese Zeit, dann zwischen min und max.",
-  use_velocity_scaled_lookahead_dist: "true: der Vorauspunkt wächst mit dem Tempo.",
-  min_approach_linear_velocity: "Langsamstes Tempo in der Nähe des Ziels, m/s.",
-  approach_velocity_scaling_dist: "Ab dieser Entfernung zum Pfadende, m, wird auf das langsame Tempo heruntergeregelt.",
-  use_regulated_linear_velocity_scaling: "true: in engen Kurven bremsen.",
-  regulated_linear_scaling_min_radius: "Unter diesem Kurvenradius, m, setzt die Kurvenbremse ein.",
-  regulated_linear_scaling_min_speed: "Die Kurvenbremse geht nicht unter dieses Tempo, m/s.",
-  use_cost_regulated_linear_velocity_scaling: "true: auch bremsen, wenn die Costmap neben dem Roboter teuer ist.",
-  use_collision_detection: "true: den Bogen gegen die Costmap prüfen.",
-  use_rotate_to_heading: "true: bei großem Winkel erst auf der Stelle drehen, dann losfahren.",
-  rotate_to_heading_min_angle: "Ab diesem Winkel, rad, wird auf der Stelle gedreht. 0,4 rad sind etwa 23°.",
-  rotate_to_heading_angular_vel: "Drehtempo dabei, rad/s.",
-  max_angular_accel: "Wie schnell die Drehgeschwindigkeit zunehmen darf, rad/s².",
-  max_robot_pose_search_dist: "Suche nach dem nächsten Pfadpunkt nur in diesem Abstand, m.",
-  allow_reversing: "false: nicht rückwärts fahren.",
-};
-
-function annotate(text: string): string {
-  const out = ["# Punkt auf dem Pfad voraus, dann ein Bogen dorthin."];
-  for (const line of text.replace(/\n$/, "").split("\n")) {
-    const key = line.match(/^\s*([A-Za-z0-9_]+):/)?.[1];
-    const note = key ? NOTES[key] : undefined;
-    if (note) out.push(`${line.match(/^ */)?.[0] ?? ""}# ${note}`);
-    out.push(line);
-  }
-  return `${out.join("\n")}\n`;
-}
-
 function withoutComments(section: string): string {
   return section
     .split(/\r?\n/)
@@ -77,7 +42,7 @@ export function followPathSection(params: string): string | null {
       return line.slice(Math.min(spaces, bounds.indent));
     })
     .join("\n");
-  return annotate(`${text.replace(/\n*$/, "")}\n`);
+  return `${text.replace(/\n*$/, "")}\n`;
 }
 
 const FOREIGN_ROOT = /^(controller_server|planner_server|bt_navigator|waypoint_follower|local_costmap|global_costmap)\s*:/;
@@ -164,10 +129,17 @@ function rebuild(text: string, current: string): string | null {
   return lines.join("\n");
 }
 
+function dropHashLines(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
+}
+
 /** Keep a pasted block. Bare key: value lines land under FollowPath; a whole params file keeps only that section. */
 export function absorbFollowPath(current: string, incoming: string): string {
   if (!incoming.trim()) return incoming;
-  let text = tidy(incoming);
+  let text = dropHashLines(tidy(incoming));
   if (text.split("\n").some((line) => FOREIGN_ROOT.test(line))) {
     text = extractFollowPath(text) ?? text;
   }

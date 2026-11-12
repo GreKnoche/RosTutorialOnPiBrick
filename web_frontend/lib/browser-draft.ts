@@ -10,8 +10,11 @@ const NAV2_TEXT_KEYS = {
   progress: "learn2ros.nav2.progress",
   follower: "learn2ros.nav2.follower",
   planner: "learn2ros.nav2.planner",
+  smac: "learn2ros.nav2.smac",
 } as const;
 const LESSONS_KEY = "learn2ros.nav2.lessons";
+const PLUGIN_PLANNERS_KEY = "learn2ros.nav2.plugin-planners";
+const EMPTY_PLANNERS: readonly string[] = [];
 const NODES_KEY = "learn2ros.nodes";
 const MAX_TEXT = 100_000;
 
@@ -88,6 +91,41 @@ export function serverNav2Progress(): Nav2Progress {
 
 export function serverText(): string | null {
   return null;
+}
+
+let pluginCache: { raw: string | null; value: readonly string[] } | null = null;
+
+function parsePluginPlanners(raw: string | null): readonly string[] {
+  if (!raw) return EMPTY_PLANNERS;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return EMPTY_PLANNERS;
+    const names = parsed.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length < 80);
+    return names.length === 0 ? EMPTY_PLANNERS : names;
+  } catch {
+    return EMPTY_PLANNERS;
+  }
+}
+
+/** Planner classes that already collected the plugin melons. */
+export function readPluginPlanners(): readonly string[] {
+  const raw = readRaw(PLUGIN_PLANNERS_KEY);
+  if (pluginCache && pluginCache.raw === raw) return pluginCache.value;
+  const value = parsePluginPlanners(raw);
+  pluginCache = { raw, value };
+  return value;
+}
+
+export function writePluginPlanners(names: readonly string[]) {
+  const value = [...names];
+  const raw = JSON.stringify(value);
+  writeRaw(PLUGIN_PLANNERS_KEY, raw);
+  pluginCache = { raw, value };
+  emitDrafts();
+}
+
+export function serverPluginPlanners(): readonly string[] {
+  return EMPTY_PLANNERS;
 }
 
 export function readNav2Progress(): Nav2Progress {
@@ -245,8 +283,10 @@ export function resetBrowserStore() {
   removeRaw(LESSONS_KEY);
   for (const key of Object.values(NAV2_TEXT_KEYS)) removeRaw(key);
   removeRaw(NODES_KEY);
+  removeRaw(PLUGIN_PLANNERS_KEY);
   progressCache = null;
   bookCache = null;
+  pluginCache = null;
   writeCompleted([]);
   emitDrafts();
 }
