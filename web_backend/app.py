@@ -106,6 +106,8 @@ async def twin_socket(websocket: WebSocket) -> None:
                     session["tick"] = int(session["tick"]) + 1
                     if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
                         payload["image"] = view["image"]
+                    if session["tick"] % 20 == 0 and isinstance(view.get("costmap"), dict):
+                        payload["costmap"] = view["costmap"]
             await websocket.send_json(payload)
             await _send_done(websocket, listen)
             await asyncio.sleep(0.05)

@@ -130,13 +130,6 @@ smooth_path: true
 `;
 export const WIGGLE = MANEUVER_PLUGIN_SOURCE;
 
-export const HALT = MANEUVER_PLUGIN_SOURCE.replace(
-  `    drive(0.12, 0.8, 400);
-    drive(0.12, -0.8, 400);
-    // Etwa eine volle Drehung auf der Stelle: drive(0.0, 1.0, 6280);`,
-  `    drive(0.0, 0.0, 1000);`,
-);
-
 export const POSE_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <!-- Nav2 lädt diesen Baum für navigate_to_pose. -->

@@ -155,10 +155,7 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 58,
     show: "folgen",
-    missions: [
-      { id: "folgen", title: "Wegpunkten folgen", kind: "melons", spawn: HOME, ...NONE },
-      { id: "nochmal", title: "Nochmal", kind: "melons", spawn: HOME, ...NONE },
-    ],
+    missions: [{ id: "folgen", title: "Wegpunkten folgen", kind: "melons", spawn: HOME, ...NONE }],
   },
   {
     id: "maneuver",
@@ -166,7 +163,7 @@ export const NAV_NODES: NavNode[] = [
     x: 84,
     y: 28,
     show: "folgen",
-    missions: [{ id: "anhalten", title: "Anhalten", kind: null, spawn: HOME, ...NONE }],
+    missions: [],
   },
   {
     id: "controller",
@@ -240,7 +237,7 @@ export const NAV_NODES: NavNode[] = [
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-export const MISSION_ORDER = ["folgen", "controller", "plugin", "costmap", "planner", "baum-1", "nochmal", "anhalten"] as const;
+export const MISSION_ORDER = ["folgen", "controller", "plugin", "costmap", "planner", "baum-1"] as const;
 
 export type MissionId = (typeof MISSION_ORDER)[number];
 

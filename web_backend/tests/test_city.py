@@ -22,7 +22,7 @@ from city import (
     push_circle,
     ray_rect,
 )
-from twin import TICK_HZ, CanvasPlant, TwinHub, apply_message
+from twin import TICK_HZ, CanvasPlant, TwinHub, apply_message, pack_costmap
 
 
 def _pixel(bmp: bytes, x: int, y: int) -> tuple[int, int, int]:
@@ -169,6 +169,25 @@ def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -
     assert math.isclose(plant.odom.pose.y, 0.0)
     hub.clear_city()
     assert hub.city_view() == {}
+
+
+def test_costmap_keeps_origin_and_drops_free_cells() -> None:
+    packet = pack_costmap(3, 2, 0.05, 1.5, 4.0, [0, -1, 40, 0, 100, 0])
+    assert packet is not None
+    assert packet["resolution"] == 0.05
+    assert packet["originX"] == 1.5
+    assert packet["originY"] == 4.0
+    assert packet["width"] == 3
+    assert packet["height"] == 2
+    assert packet["cells"] == [[2, 0, 40], [1, 1, 100]]
+    hub = TwinHub()
+    hub.store_costmap(packet)
+    assert hub.city_view()["costmap"] == packet
+    hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)
+    assert hub.city_view()["costmap"] == packet
+    hub.clear_city()
+    assert "costmap" not in hub.city_view()
+    assert pack_costmap(0, 2, 0.05, 0.0, 0.0, [1]) is None
 
 
 def test_the_camera_shows_sky_road_and_a_house() -> None:

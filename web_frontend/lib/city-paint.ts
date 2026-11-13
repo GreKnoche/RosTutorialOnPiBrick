@@ -3,6 +3,7 @@ import type { CityProbe } from "@/lib/city-probe";
 import { SCAN_MIN, SCAN_STEP, cityScreen } from "@/lib/city-view";
 import { MELONS } from "@/lib/melons";
 import { TRACK_CAR } from "@/lib/track-car";
+import type { CostmapGrid } from "@/lib/twin-socket";
 import type { CityMap, Gate, LapState, Rect, Shore } from "@/lib/city-map";
 
 const BODY_L = 0.128;
@@ -12,6 +13,45 @@ const MIN_BODY_L = 26;
 const MIN_BODY_W = 17;
 
 const TUFT_CELL = 0.34;
+
+function costFill(cost: number): string | null {
+  if (cost <= 0) return null;
+  if (cost >= 99) return "rgba(17,17,16,0.88)";
+  const alpha = 0.25 + 0.55 * Math.min(1, cost / 98);
+  return `rgba(251,146,60,${alpha.toFixed(3)})`;
+}
+
+const costmapCache: { key: string; canvas: HTMLCanvasElement | null } = { key: "", canvas: null };
+
+function costmapRaster(grid: CostmapGrid) {
+  const last = grid.cells[grid.cells.length - 1];
+  const key = `${grid.originX}:${grid.originY}:${grid.resolution}:${grid.width}:${grid.height}:${grid.cells.length}:${last ? last.join(",") : ""}`;
+  if (costmapCache.key === key && costmapCache.canvas) return costmapCache.canvas;
+  const raster = document.createElement("canvas");
+  raster.width = Math.max(1, grid.width);
+  raster.height = Math.max(1, grid.height);
+  const pen = raster.getContext("2d");
+  if (!pen) return null;
+  for (const [col, row, cost] of grid.cells) {
+    const fill = costFill(cost);
+    if (!fill || col < 0 || row < 0 || col >= grid.width || row >= grid.height) continue;
+    pen.fillStyle = fill;
+    pen.fillRect(col, grid.height - 1 - row, 1, 1);
+  }
+  costmapCache.key = key;
+  costmapCache.canvas = raster;
+  return raster;
+}
+
+function paintCostmap(ctx: CanvasRenderingContext2D, to: (x: number, y: number) => Screen, grid: CostmapGrid) {
+  const raster = costmapRaster(grid);
+  if (!raster) return;
+  const { resolution, originX, originY, width, height } = grid;
+  const topLeft = to(originX, originY + height * resolution);
+  const bottomRight = to(originX + width * resolution, originY);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(raster, topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+}
 
 function tileKind(ix: number, iy: number) {
   return (Math.imul(ix, 374761393) + Math.imul(iy, 668265263)) & 1023;
@@ -393,6 +433,7 @@ export function draw(
   courseGates: Gate[] | null = null,
   ghost: Pose | null = null,
   melonSpots: ReadonlyArray<readonly [number, number]> = MELONS,
+  costmap: CostmapGrid | null = null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -404,6 +445,7 @@ export function draw(
   const layer = cachedWorld(width, height, zoom, view, city, clutter, probe, runner);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(layer, 0, 0);
+  if (costmap) paintCostmap(ctx, to, costmap);
   if (gates && city) drawGates(ctx, to, ppm, courseGates ?? city.gates, lap);
 
   if (melons) {

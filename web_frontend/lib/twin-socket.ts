@@ -2,6 +2,15 @@ export const ROBOT_API = process.env.NEXT_PUBLIC_ROBOT_API ?? "http://127.0.0.1:
 
 export type TwinGoal = { x: number; y: number; theta: number };
 
+export type CostmapGrid = {
+  resolution: number;
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+  cells: Array<[number, number, number]>;
+};
+
 export type TwinState = {
   x: number;
   y: number;
@@ -23,6 +32,7 @@ export type TwinState = {
   dock?: boolean;
   runner?: { x: number; y: number; w: number; h: number; theta: number } | null;
   lap?: { text: string; done: boolean; grass: boolean; next: string } | null;
+  costmap?: CostmapGrid;
 };
 
 export type TwinDone = {
@@ -89,6 +99,7 @@ function asState(data: Record<string, unknown>): TwinState | null {
     dock: data.dock === true,
     runner: asRunner(data.runner),
     lap: asLap(data.lap),
+    costmap: asCostmap(data.costmap),
   };
 }
 
@@ -128,6 +139,39 @@ function asRunner(value: unknown): { x: number; y: number; w: number; h: number;
     w: box.w,
     h: box.h,
     theta: typeof box.theta === "number" ? box.theta : 0,
+  };
+}
+
+function asCostmap(value: unknown): CostmapGrid | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const grid = value as Record<string, unknown>;
+  if (
+    typeof grid.resolution !== "number" ||
+    typeof grid.originX !== "number" ||
+    typeof grid.originY !== "number" ||
+    typeof grid.width !== "number" ||
+    typeof grid.height !== "number" ||
+    !Array.isArray(grid.cells)
+  ) {
+    return undefined;
+  }
+  const cells: Array<[number, number, number]> = [];
+  for (const item of grid.cells) {
+    if (!Array.isArray(item) || item.length < 3) continue;
+    const col = item[0];
+    const row = item[1];
+    const cost = item[2];
+    if (typeof col !== "number" || typeof row !== "number" || typeof cost !== "number") continue;
+    if (cost <= 0) continue;
+    cells.push([col, row, cost]);
+  }
+  return {
+    resolution: grid.resolution,
+    originX: grid.originX,
+    originY: grid.originY,
+    width: grid.width,
+    height: grid.height,
+    cells,
   };
 }
 

@@ -25,7 +25,7 @@ import { formatDe } from "@/lib/format";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
-import { ROBOT_API, openTwin, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
+import { ROBOT_API, openTwin, type CostmapGrid, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
 
@@ -195,6 +195,12 @@ function copyPointFallback(text: string) {
   area.remove();
 }
 
+function costmapKey(grid: CostmapGrid | null) {
+  if (!grid) return "";
+  const last = grid.cells[grid.cells.length - 1];
+  return `${grid.originX.toFixed(2)}:${grid.originY.toFixed(2)}:${grid.resolution}:${grid.cells.length}:${last ? last.join(",") : ""}`;
+}
+
 export function CityLab({
   kapitel = null,
   notice = null,
@@ -246,6 +252,9 @@ export function CityLab({
   const [lap, setLap] = useState<LapState | null>(null);
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
+  const costmapRef = useRef<CostmapGrid | null>(null);
+  const missionRef = useRef(missionKey);
+  missionRef.current = missionKey;
   const linkRef = useRef<TwinLink | null>(null);
   const havePose = useRef(false);
   const clientId = useRef(useId());
@@ -265,6 +274,9 @@ export function CityLab({
   const [minBody, setMinBody] = useState(true);
   const minBodyRef = useRef(true);
   minBodyRef.current = minBody;
+  const [showCostmap, setShowCostmap] = useState(false);
+  const showCostmapRef = useRef(false);
+  showCostmapRef.current = showCostmap;
   const cameraRef = useRef(false);
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
@@ -473,6 +485,7 @@ export function CityLab({
         sampleGhostRef.current(sample);
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
+        if (sample.costmap) costmapRef.current = sample.costmap;
         runnerRef.current = sample.runner
           ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
           : null;
@@ -550,6 +563,7 @@ export function CityLab({
         lapRef.current?.next ?? "",
         lapRef.current?.done ? "1" : "0",
         lapRef.current?.grass ? "1" : "0",
+        missionRef.current === "costmap" && showCostmapRef.current ? costmapKey(costmapRef.current) : "",
       ].join("|");
       if (raysRef.current && rangesRef.current) {
         signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
@@ -575,6 +589,7 @@ export function CityLab({
           courseRef.current?.checkpoints ?? null,
           ghostPose,
           spotsRef.current,
+          missionRef.current === "costmap" && showCostmapRef.current ? costmapRef.current : null,
         );
       }
       const runningCourse = courseRef.current;
@@ -1046,6 +1061,15 @@ export function CityLab({
             >
               Vergrößert
             </FlagBox>
+            {missionKey === "costmap" ? (
+              <FlagBox
+                on={showCostmap}
+                title="Legt die globale Costmap von Nav2 über die ganze Karte. Das Auto bleibt davor."
+                onToggle={() => setShowCostmap((current) => !current)}
+              >
+                Costmap
+              </FlagBox>
+            ) : null}
             <FlagBox
               on={camera}
               disabled={!rosUp}

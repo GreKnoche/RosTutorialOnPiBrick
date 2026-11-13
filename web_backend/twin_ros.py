@@ -14,7 +14,7 @@ from collections import deque
 from brick_core.chassis import Chassis, load_chassis
 from brick_core.geometry import yaw_from_quaternion, yaw_to_quaternion
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -34,7 +34,7 @@ from city import (
     SCAN_INCREMENT,
     SCAN_MIN,
 )
-from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message
+from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message, pack_costmap
 
 
 def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointCloud2:
@@ -76,6 +76,12 @@ class CanvasTwinNode(Node):
 
         self.create_subscription(Twist, "cmd_vel", self._on_cmd, 10)
         self.create_subscription(PoseStamped, "goal_pose", self._on_goal, 10)
+        costmap_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(OccupancyGrid, "global_costmap/costmap", self._on_costmap, costmap_qos)
         self._odom_pub = self.create_publisher(Odometry, "odom", 10)
         self._joint_pub = self.create_publisher(JointState, "joint_states", 10)
         self._cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
@@ -321,6 +327,19 @@ class CanvasTwinNode(Node):
             },
             keep_image=False,
         )
+
+    def _on_costmap(self, msg: OccupancyGrid) -> None:
+        info = msg.info
+        packet = pack_costmap(
+            int(info.width),
+            int(info.height),
+            float(info.resolution),
+            float(info.origin.position.x),
+            float(info.origin.position.y),
+            msg.data,
+        )
+        if packet is not None:
+            self.hub.store_costmap(packet)
 
     def _publish_obstacles(self, stamp: object) -> None:
         city = self.plant.city

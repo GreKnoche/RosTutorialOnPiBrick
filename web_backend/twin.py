@@ -405,6 +405,45 @@ class CanvasPlant:
         return Pose2D(pose.x, pose.y, pose.theta)
 
 
+def pack_costmap(
+    width: int,
+    height: int,
+    resolution: float,
+    origin_x: float,
+    origin_y: float,
+    data: object,
+) -> dict[str, object] | None:
+    """Occupied cells of a Nav2 OccupancyGrid. Free and unknown cells stay out."""
+    if width <= 0 or height <= 0 or resolution <= 0:
+        return None
+    if not math.isfinite(resolution) or not math.isfinite(origin_x) or not math.isfinite(origin_y):
+        return None
+    try:
+        raw = list(data)  # type: ignore[arg-type]
+    except TypeError:
+        return None
+    limit = width * height
+    cells: list[list[int]] = []
+    for index, item in enumerate(raw):
+        if index >= limit:
+            break
+        try:
+            cost = int(item)
+        except (TypeError, ValueError):
+            continue
+        if cost <= 0:
+            continue
+        cells.append([index % width, index // width, cost])
+    return {
+        "resolution": float(resolution),
+        "originX": float(origin_x),
+        "originY": float(origin_y),
+        "width": int(width),
+        "height": int(height),
+        "cells": cells,
+    }
+
+
 def sample_dict(sample: TwinSample) -> dict[str, object]:
     goal = None
     if sample.goal_x is not None and sample.goal_y is not None and sample.goal_theta is not None:
@@ -558,6 +597,15 @@ class TwinHub:
                 view["image"] = image
             if props:
                 view.update(props)
+            self._city_view = view
+
+    def store_costmap(self, packet: dict[str, object] | None) -> None:
+        with self._lock:
+            view = dict(self._city_view)
+            if packet is None:
+                view.pop("costmap", None)
+            else:
+                view["costmap"] = packet
             self._city_view = view
 
     def clear_city(self) -> None:
