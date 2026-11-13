@@ -66,6 +66,14 @@ export const LOCAL_CITY = cityCostmap(LOCAL_COSTMAP);
 /** Global costmap with houses from /city_obstacles. */
 export const GLOBAL_CITY = cityCostmap(GLOBAL_COSTMAP);
 
+/** Costmap lesson only. Coarser cells, a larger robot, and a wide shallow inflation. */
+export const COSTMAP_MISSION = cityCostmap(
+  GLOBAL_COSTMAP.replace("resolution: 0.05", "resolution: 0.15")
+    .replace("robot_radius: 0.09", "robot_radius: 0.1")
+    .replace("cost_scaling_factor: 2.5", "cost_scaling_factor: 0.5")
+    .replace("inflation_radius: 0.12", "inflation_radius: 0.6"),
+);
+
 if (!LOCAL_CITY.includes("nav2_costmap_2d::ObstacleLayer") || !GLOBAL_CITY.includes("nav2_costmap_2d::ObstacleLayer")) {
   throw new Error("Costmap-Vorlage hat keine Hindernisschicht.");
 }
@@ -136,4 +144,15 @@ export function mergeCostmap(params: string, section: string, root: CostmapRoot)
   const body = tidy(section).replace(/\n*$/, "").split("\n");
   lines.splice(start, end - start, ...body);
   return `${lines.join("\n").replace(/\n*$/, "")}\n`;
+}
+
+if (
+  costmapError(COSTMAP_MISSION, "global_costmap") ||
+  !COSTMAP_MISSION.includes("resolution: 0.15") ||
+  !COSTMAP_MISSION.includes("robot_radius: 0.1") ||
+  !COSTMAP_MISSION.includes("cost_scaling_factor: 0.5") ||
+  !COSTMAP_MISSION.includes("inflation_radius: 0.6") ||
+  GLOBAL_CITY.includes("resolution: 0.15")
+) {
+  throw new Error("Costmap-Mission hat nicht die eigene Vorlage.");
 }

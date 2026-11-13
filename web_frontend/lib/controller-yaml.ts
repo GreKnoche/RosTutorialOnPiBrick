@@ -273,10 +273,10 @@ export function mergeProgress(params: string, section: string): string | null {
 const GOAL = "nav2_controller::SimpleGoalChecker";
 
 const GOAL_NOTES: Record<string, string> = {
-  plugin: "SimpleGoalChecker prüft Ort und Blickrichtung der letzten Pfadpose.",
-  stateful: "true merkt sich den Ort beim ersten Treffer. false prüft Ort und Blickrichtung zusammen.",
+  plugin: "SimpleGoalChecker prüft den Ort. Die Blickrichtung nur, wenn yaw_goal_tolerance klein ist.",
+  stateful: "true merkt sich den Ort beim ersten Treffer. Danach zählt der Ort nicht mehr.",
   xy_goal_tolerance: "Meter. So nah muss das Auto am Zielort sein.",
-  yaw_goal_tolerance: "Bogenmaß. So nah muss die Blickrichtung am Ziel liegen.",
+  yaw_goal_tolerance: "Bogenmaß. Über 3.14 gilt jede Blickrichtung.",
 };
 
 function annotateGoal(text: string): string {

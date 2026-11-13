@@ -103,10 +103,12 @@ async def twin_socket(websocket: WebSocket) -> None:
                     payload["runner"] = view.get("runner")
                     if isinstance(view.get("lap"), dict):
                         payload["lap"] = view["lap"]
+                    if isinstance(view.get("bumps"), int):
+                        payload["bumps"] = view["bumps"]
                     session["tick"] = int(session["tick"]) + 1
                     if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
                         payload["image"] = view["image"]
-                    if session["tick"] % 20 == 0 and isinstance(view.get("costmap"), dict):
+                    if session["tick"] % 20 == 0 and "costmap" in view:
                         payload["costmap"] = view["costmap"]
             await websocket.send_json(payload)
             await _send_done(websocket, listen)

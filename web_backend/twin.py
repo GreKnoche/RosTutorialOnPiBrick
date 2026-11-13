@@ -18,6 +18,7 @@ from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
 
 from city import CITY, Gate, foot_radius
+from city_geom import overlapping
 
 TICK_HZ = 20.0
 
@@ -119,6 +120,9 @@ class CanvasPlant:
         self._drift_rng = random.Random()
         self.applied = Twist2D()
         self.linear_accel = 0.0
+        self.bumps = 0
+        self.count_walls = False
+        self._wall_hits: set[int] = set()
         self.odom.update(0.0, 0.0, 0.0)
 
     def set_chassis(self, wheel_radius_m: float, wheel_separation_m: float) -> None:
@@ -146,6 +150,8 @@ class CanvasPlant:
         self._hold = Twist2D()
         self._queue = []
         self._left = 0.0
+        self.bumps = 0
+        self._wall_hits = set()
         if self.lap is not None and self.city is not None:
             home = abs(float(x) - self.city.start_x) < 0.05 and abs(float(y) - self.city.start_y) < 0.05
             self.lap.reset(float(x), float(y), home)
@@ -154,6 +160,7 @@ class CanvasPlant:
         from lap import Lap
 
         self.city_holder = client if isinstance(client, str) else None
+        self.count_walls = False
         self.city = CITY
         self.lap = Lap(CITY.gates, CITY.on_asphalt)
         self.drift = False
@@ -170,6 +177,7 @@ class CanvasPlant:
         self.drift = False
         self.camera = False
         self.probe = None
+        self.count_walls = False
         self.city.set_scene("leer")
         self.city = None
         self.lap = None
@@ -186,7 +194,7 @@ class CanvasPlant:
         if camera is not None:
             self.camera = bool(camera)
 
-    def set_course(self, obstacles: object, checkpoints: object) -> None:
+    def set_course(self, obstacles: object, checkpoints: object, walls: bool = False) -> None:
         if self.city is None:
             return
         points: list[tuple[float, ...]] = []
@@ -198,6 +206,9 @@ class CanvasPlant:
                 w, h = _finite(item.get("w")), _finite(item.get("h"))
                 points.append((x, y, w, h) if w > 0.0 and h > 0.0 else (x, y))
         self.city.set_obstacles(points)
+        self.count_walls = walls
+        self.bumps = 0
+        self._wall_hits = set()
         gates = CITY.gates
         if isinstance(checkpoints, list):
             parsed: list[Gate] = []
@@ -387,6 +398,7 @@ class CanvasPlant:
             self.applied = Twist2D(self.command.linear, self.command.angular)
             self.linear_accel = 0.0
             return
+        self._note_walls()
         self.city.resolve(self.odom.pose, foot_radius())
         after = self.odom.pose
         if self.lap is not None:
@@ -399,6 +411,16 @@ class CanvasPlant:
         angular = dtheta / dt
         self.linear_accel = (linear - self.applied.linear) / dt
         self.applied = Twist2D(linear, angular)
+
+    def _note_walls(self) -> None:
+        """Count a spawned block once, from the moment the body cuts it until it leaves."""
+        if self.city is None or not self.count_walls:
+            self._wall_hits = set()
+            return
+        rects = [house.bounds for house in self.city.clutter]
+        hits = overlapping(self.odom.pose.x, self.odom.pose.y, foot_radius(), rects)
+        self.bumps += len(hits - self._wall_hits)
+        self._wall_hits = hits
 
     def _pose(self) -> Pose2D:
         pose = self.odom.pose
@@ -513,7 +535,7 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
         return ApplyResult()
     if kind == "mission":
         if plant.city is not None and client_id == plant.city_holder:
-            plant.set_course(payload.get("obstacles"), payload.get("checkpoints"))
+            plant.set_course(payload.get("obstacles"), payload.get("checkpoints"), bool(payload.get("walls")))
         return ApplyResult()
     if kind == "probe":
         if plant.city is not None and client_id == plant.city_holder:
@@ -600,12 +622,10 @@ class TwinHub:
             self._city_view = view
 
     def store_costmap(self, packet: dict[str, object] | None) -> None:
+        """Keep the latest grid. None tells the page the previous picture is stale."""
         with self._lock:
             view = dict(self._city_view)
-            if packet is None:
-                view.pop("costmap", None)
-            else:
-                view["costmap"] = packet
+            view["costmap"] = packet
             self._city_view = view
 
     def clear_city(self) -> None:

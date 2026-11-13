@@ -32,7 +32,8 @@ export type TwinState = {
   dock?: boolean;
   runner?: { x: number; y: number; w: number; h: number; theta: number } | null;
   lap?: { text: string; done: boolean; grass: boolean; next: string } | null;
-  costmap?: CostmapGrid;
+  bumps?: number;
+  costmap?: CostmapGrid | null;
 };
 
 export type TwinDone = {
@@ -99,7 +100,8 @@ function asState(data: Record<string, unknown>): TwinState | null {
     dock: data.dock === true,
     runner: asRunner(data.runner),
     lap: asLap(data.lap),
-    costmap: asCostmap(data.costmap),
+    bumps: typeof data.bumps === "number" ? data.bumps : undefined,
+    costmap: "costmap" in data ? (asCostmap(data.costmap) ?? null) : undefined,
   };
 }
 

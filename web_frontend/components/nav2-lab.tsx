@@ -108,6 +108,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
         <CityLab
           kapitel={kapitel}
           missionKey={stationId ?? ""}
+          costmapToggle={stationId === "costmap" || done.costmap}
+          walls={stationId === "costmap"}
           round={round}
           melons={kind === "melons"}
           melonSpots={station?.melons}
@@ -196,6 +198,13 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                     <li>Nach der ersten Strecke steht ein U auf der Straße.</li>
                     <li>Im Baum: RecoveryNode, zweites Kind BackUp, danach dieselbe Pipeline noch einmal.</li>
                     <li>Das Zeitfenster im Progress Checker ist länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.</li>
+                  </ul>
+                ) : station?.id === "costmap" ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Sammle die Melone, ohne eine Wand zu berühren.</li>
+                    <li>Der Zähler muss auf 0 stehen. Sonst zählt der Versuch nicht.</li>
+                    <li>Rechtsklick auf die Karte kopiert die Koordinaten ins Clipboard.</li>
+                    <li>Die Liste wird ein Pfad. An den Zwischenpunkten gibt es kein Manöver.</li>
                   </ul>
                 ) : station?.kind === "melons" ? (
                   graph?.client === "through" ? (

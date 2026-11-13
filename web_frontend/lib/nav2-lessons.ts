@@ -1,4 +1,8 @@
-/** Nav2 lessons belong to the graph node that owns them. The road walks MISSION_ORDER. */
+/** Nav2 lessons belong to the graph node that owns them. The road walks MISSION_ORDER.
+ *
+ * Each lesson below is one mission object. Its `obstacles` spawn when the lesson
+ * starts. `laterObstacles` spawn only after the car crosses `trigger`.
+ */
 
 export type MissionKind = "melons" | "gates";
 
@@ -44,79 +48,34 @@ export type NavNode = {
   missions: NodeMission[];
 };
 
-const NONE: Pick<NodeMission, "obstacles" | "checkpoints"> = { obstacles: [], checkpoints: [] };
-
 /** Same pose as the city start, in front of the finish line. */
 const HOME: SpawnPose = { x: 1.576, y: 5.554285714285714, theta: 0 };
 
-/** South road, west of the melon, facing east. The melon sits on the old spawn. */
-const PLUGIN_SPAWN: SpawnPose = { x: 10.5, y: 5.194285714285714, theta: 0 };
-
-/**
- * One melon in the middle of each side. The straight chord crosses the block,
- * so the planners have to turn the corner instead of sharing one line.
- */
-const PLUGIN_MELONS: ReadonlyArray<readonly [number, number]> = [
-  [11, 5.194285714285714],
-  [11.89, 6.084285714285714],
-  [11, 6.974285714285714],
-  [10.11, 6.084285714285714],
-];
-
-/** Six melons. The first sits on the open mid-road stretch. The other five are past the U. */
-const TREE_MELONS: ReadonlyArray<readonly [number, number]> = [
-  [4.15, 5.59],
-  [8.62, 5.64],
-  [8.2, 7.6],
-  [4.05, 7.86],
-  [1.84, 7.52],
-  [8.62, 2.07],
-];
-
-/**
- * U on the mid road, mouth facing west. Side walls cross the curbs.
- * Inner gap is about 0.44 m, so the car enters and cannot slip past.
- */
-const TREE_POCKET: MissionObstacle[] = [
-  { x: 6.675, y: 5.984, w: 0.95, h: 0.42 },
-  { x: 6.675, y: 5.124, w: 0.95, h: 0.42 },
-  { x: 7.1, y: 5.554, w: 0.3, h: 1.28 },
-];
-
-const TREE_TRIGGER: ObstacleTrigger = { x: 5.35, yMin: 5.19, yMax: 5.92 };
-
-/** Controller lap. Straight, then a weave, a pinched corner, a cone row, a stop, and a turn-back. */
+/** Mid-road center, half a street, and the east-street center. Controller and planner share these. */
 const MID = 5.554;
 const HALF = 0.36;
 const ROAD_EAST = 8.677;
 
-/**
- * Right turn off the mid road into the east street, then a dead end.
- * The inner box clears a 0.40 m arc and cuts a 0.80 m arc. The wall closes
- * the street; a U-turn of radius 0.40 needs 0.80 m and the street is 0.72 m.
- */
-const POCKET_GOAL_Y = 4.22;
-const POCKET_COURSE: Pick<NodeMission, "obstacles" | "checkpoints"> = {
-  obstacles: [
-    { x: 8.357, y: 5.234, w: 0.2, h: 0.2 },
-    { x: ROAD_EAST, y: 3.9, w: 0.9, h: 0.16 },
-  ],
-  checkpoints: [
-    { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
-    {
-      id: "tasche",
-      x0: ROAD_EAST - HALF,
-      y0: POCKET_GOAL_Y,
-      x1: ROAD_EAST + HALF,
-      y1: POCKET_GOAL_Y,
-      halt: true,
-      yaw: Math.PI / 2,
-    },
-  ],
+/** folgen: no obstacles. */
+const FOLGEN: NodeMission = {
+  id: "folgen",
+  title: "Wegpunkten folgen",
+  kind: "melons",
+  spawn: HOME,
+  obstacles: [],
+  checkpoints: [],
 };
+
+/**
+ * controller: spawned at the start.
+ * Straight, then a weave, a pinched corner, a cone row, a stop, and a turn-back.
+ */
 const HAIRPIN_X = 7.301;
-const HAIRPIN_Y = 1.53;
-const CONTROLLER_COURSE: Pick<NodeMission, "obstacles" | "checkpoints"> = {
+const CONTROLLER: NodeMission = {
+  id: "controller",
+  title: "Controller",
+  kind: "gates",
+  spawn: HOME,
   obstacles: [
     { x: 4.9, y: MID + 0.16 },
     { x: 5.7, y: MID - 0.16 },
@@ -135,9 +94,121 @@ const CONTROLLER_COURSE: Pick<NodeMission, "obstacles" | "checkpoints"> = {
     { id: "reihe", x0: ROAD_EAST - HALF, y0: 4.2, x1: ROAD_EAST - 0.02, y1: 4.2 },
     { id: "kehre", x0: HAIRPIN_X, y0: 1.17, x1: HAIRPIN_X, y1: 1.89 },
     { id: "stamm", x0: 5.566, y0: 4.23, x1: 6.286, y1: 4.23 },
-    { id: "oese", x0: 3.79, y0: 5.89, x1: 3.79, y1: 5.59},
+    { id: "oese", x0: 3.79, y0: 5.89, x1: 3.79, y1: 5.59 },
     { id: "ziel", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
   ],
+};
+
+/**
+ * plugin: no obstacles.
+ * One melon in the middle of each side. The straight chord crosses the block,
+ * so the planners have to turn the corner instead of sharing one line.
+ */
+/** South road, west of the melon, facing east. The melon sits on the old spawn. */
+const PLUGIN_SPAWN: SpawnPose = { x: 10.5, y: 5.194285714285714, theta: 0 };
+const PLUGIN: NodeMission = {
+  id: "plugin",
+  title: "planner plugin",
+  kind: "melons",
+  spawn: PLUGIN_SPAWN,
+  melons: [
+    [11, 5.194285714285714],
+    [11.89, 6.084285714285714],
+    [11, 6.974285714285714],
+    [10.11, 6.084285714285714],
+  ],
+  obstacles: [],
+  checkpoints: [],
+};
+
+/**
+ * costmap: stub on the open mid road, ahead of the start.
+ * A cone and a long block. Houses still arrive through /city_obstacles.
+ * Replace this layout.
+ */
+const COST_BOX_SIDE = 0.65;
+const DIFF_MID = 0.2
+const COSTMAP: NodeMission = {
+  id: "costmap",
+  title: "Costmap",
+  kind: "melons",
+  spawn: HOME,
+  obstacles: [
+    //Long box open east side
+    { x: MID-1-(0.73/2), y: 6.13, w: 9.0-0.73, h: 0.28 },
+    { x: MID-1, y: 4.9, w: 9.0, h: 0.28 },
+    { x: 0.0, y: (4.9+6.13)/2, w: 0.28, h: 1.5 },
+    //Obstacle boxes
+    { x: 3.6, y: MID-DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE},
+    { x: 4.6, y: MID+DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
+    { x: 5.6, y: MID-DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
+    { x: 6.6, y: MID+DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
+    { x: 7.6, y: MID-DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
+    { x: 9.3, y: 5.53, w: 1.0, h:1.0 },
+    
+  ],
+  melons: [[8.63, 6.59]],
+  checkpoints: [],
+};
+
+/**
+ * planner: spawned at the start.
+ * Right turn off the mid road into the east street, then a dead end.
+ * The inner box clears a 0.40 m arc and cuts a 0.80 m arc. The wall closes
+ * the street; a U-turn of radius 0.40 needs 0.80 m and the street is 0.72 m.
+ */
+const POCKET_GOAL_Y = 4.22;
+const PLANNER: NodeMission = {
+  id: "planner",
+  title: "Smac Hybrid",
+  kind: "gates",
+  spawn: HOME,
+  ghost: false,
+  obstacles: [
+    { x: 8.357, y: 5.234, w: 0.2, h: 0.2 },
+    { x: ROAD_EAST, y: 3.9, w: 0.9, h: 0.16 },
+  ],
+  checkpoints: [
+    { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
+    {
+      id: "tasche",
+      x0: ROAD_EAST - HALF,
+      y0: POCKET_GOAL_Y,
+      x1: ROAD_EAST + HALF,
+      y1: POCKET_GOAL_Y,
+      halt: true,
+      yaw: Math.PI / 2,
+    },
+  ],
+};
+
+/**
+ * baum-1: nothing at the start. The U spawns once the car has passed the line
+ * on the mid road. Mouth faces west, side walls cross the curbs. Inner gap is
+ * about 0.44 m, so the car enters and cannot slip past.
+ * The first melon sits on the open mid-road stretch. The other five are past the U.
+ */
+const BAUM_1: NodeMission = {
+  id: "baum-1",
+  title: "Behavior Tree 1",
+  kind: "melons",
+  spawn: HOME,
+  melons: [
+    [4.15, 5.59],
+    [8.62, 5.64],
+    [8.2, 7.6],
+    [4.05, 7.86],
+    [1.84, 7.52],
+    [8.62, 2.07],
+  ],
+  obstacles: [],
+  checkpoints: [],
+  laterObstacles: [
+    { x: 6.675, y: 5.984, w: 0.95, h: 0.42 },
+    { x: 6.675, y: 5.124, w: 0.95, h: 0.42 },
+    { x: 7.1, y: 5.554, w: 0.3, h: 1.28 },
+  ],
+  trigger: { x: 5.35, yMin: 5.19, yMax: 5.92 },
 };
 
 export const NAV_NODES: NavNode[] = [
@@ -155,7 +226,7 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 58,
     show: "folgen",
-    missions: [{ id: "folgen", title: "Wegpunkten folgen", kind: "melons", spawn: HOME, ...NONE }],
+    missions: [FOLGEN],
   },
   {
     id: "maneuver",
@@ -171,7 +242,7 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 88,
     show: "controller",
-    missions: [{ id: "controller", title: "Controller", kind: "gates", spawn: HOME, ...CONTROLLER_COURSE }],
+    missions: [CONTROLLER],
   },
   {
     id: "planner",
@@ -179,9 +250,7 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "plugin",
-    missions: [
-      { id: "plugin", title: "planner plugin", kind: "melons", spawn: PLUGIN_SPAWN, melons: PLUGIN_MELONS, ...NONE },
-    ],
+    missions: [PLUGIN],
   },
   {
     id: "local_costmap",
@@ -197,7 +266,7 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 40,
     show: "costmap",
-    missions: [{ id: "costmap", title: "Costmap", kind: null, spawn: HOME, ...NONE }],
+    missions: [COSTMAP],
   },
   {
     id: "planner_plugin",
@@ -205,7 +274,7 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "planner",
-    missions: [{ id: "planner", title: "Smac Hybrid", kind: "gates", spawn: HOME, ghost: false, ...POCKET_COURSE }],
+    missions: [PLANNER],
   },
   {
     id: "goal",
@@ -221,18 +290,7 @@ export const NAV_NODES: NavNode[] = [
     x: 50,
     y: 88,
     show: "baum-1",
-    missions: [
-      {
-        id: "baum-1",
-        title: "Behavior Tree 1",
-        kind: "melons",
-        spawn: HOME,
-        melons: TREE_MELONS,
-        ...NONE,
-        laterObstacles: TREE_POCKET,
-        trigger: TREE_TRIGGER,
-      },
-    ],
+    missions: [BAUM_1],
   },
 ];
 

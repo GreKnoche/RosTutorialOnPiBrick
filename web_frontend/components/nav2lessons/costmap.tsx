@@ -1,4 +1,5 @@
-import { FOLLOW_PATH, GLOBAL_CITY, GOAL, LOCAL_CITY, NAVFN, PROGRESS, SHOW_LOCAL_COSTMAP, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import { COSTMAP_MISSION } from "@/lib/costmap-yaml";
+import { FOLLOW_PATH, GOAL, LOCAL_CITY, NAVFN, PROGRESS, SHOW_LOCAL_COSTMAP, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
 import type { Nav2Station } from "./types";
 
 const costmap: Nav2Station = {
@@ -8,9 +9,7 @@ const costmap: Nav2Station = {
   tree: "through",
   showProgress: false,
   cityObstacles: true,
-  explain: SHOW_LOCAL_COSTMAP
-    ? "Die globale Costmap plant den Pfad, die lokale fährt ihn. Häuser kommen über /city_obstacles in die Hindernisschicht. Die Inflation legt den Abstand um diese Zellen."
-    : "Die globale Costmap plant den Pfad. Häuser kommen über /city_obstacles in die Hindernisschicht. Die Inflation legt den Abstand um diese Zellen.",
+  explain: "Hier bearbeiten wir die Konfiguration der \"global Costmap\". Costmaps werden von den Plannern verwendet um auf diesen die Wegpunkte auszurechnen, die Costmaps liefern dazu die Hindernisse bzw. Einschränkungen. Die Mission ist zu bestehen in dem nur Einstellungen in der global_costmap vorgenommen werden. Zur Not können Einstellungen auch im Controller erfolgen. Toggle die Costmap am Button unter der Karte an und aus, vor dem ersten Start kann es etwas fehlerhaft sein",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 50 },
     { id: "global_costmap", x: 42, y: 22 },
@@ -33,7 +32,7 @@ const costmap: Nav2Station = {
     goal: GOAL,
     mission: THROUGH_XML,
     localCostmap: LOCAL_CITY,
-    globalCostmap: GLOBAL_CITY,
+    globalCostmap: COSTMAP_MISSION,
   },
 };
 

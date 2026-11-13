@@ -26,6 +26,7 @@ type Slot = {
   studentGen: number;
   starting: boolean;
   startGen: number;
+  stops: number;
 };
 
 const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??= {
@@ -40,9 +41,11 @@ const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??=
   studentGen: 0,
   starting: false,
   startGen: 0,
+  stops: 0,
 });
 slot.starting ??= false;
 slot.startGen ??= 0;
+slot.stops ??= 0;
 slot.navRunLog ??= "";
 slot.navRun ??= false;
 
@@ -481,26 +484,30 @@ function probeHit(out: string, mark: string): boolean {
   return out.split("\n").some((line) => line.trim() === mark);
 }
 
-async function navReady(child: ChildProcess): Promise<boolean> {
+async function navReady(child: ChildProcess, gen: number): Promise<boolean> {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) return false;
+    if (slot.startGen !== gen || child.exitCode !== null) return false;
     const info = await rosBash(graphProbe("active"));
+    if (slot.startGen !== gen || child.exitCode !== null) return false;
     if (probeHit(info.out, "NAV_READY")) return true;
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
   return false;
 }
 
-async function navigatorGone(): Promise<boolean> {
+async function navigatorGone(gen: number): Promise<"gone" | "up" | "aborted"> {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
+    if (slot.startGen !== gen) return "aborted";
     const listed = await rosBash(graphProbe("navigator"));
-    if (!probeHit(listed.out, "NAV_UP")) return true;
+    if (slot.startGen !== gen) return "aborted";
+    if (!probeHit(listed.out, "NAV_UP")) return "gone";
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
+  if (slot.startGen !== gen) return "aborted";
   const listed = await rosBash(graphProbe("navigator"));
-  return !probeHit(listed.out, "NAV_UP");
+  return probeHit(listed.out, "NAV_UP") ? "up" : "gone";
 }
 
 function liveLabNav(navKey: string): boolean {
@@ -569,14 +576,19 @@ async function ensureNav(
   throughPath: string,
   paramsPath: string,
   withFollower: boolean,
+  gen: number,
 ): Promise<string | null> {
+  if (slot.startGen !== gen) return "Nav2 gestoppt.";
   if (liveLabNav(navKey)) return null;
   await stopLabNav();
   slot.nav = null;
   slot.navKey = "";
   slot.navLog = "";
   slot.navRunLog = "";
-  if (!(await navigatorGone())) {
+  if (slot.startGen !== gen) return "Nav2 gestoppt.";
+  const gone = await navigatorGone(gen);
+  if (gone === "aborted" || slot.startGen !== gen) return "Nav2 gestoppt.";
+  if (gone === "up") {
     return "Nav2 läuft schon ohne diese XML. Beende den anderen Stack und starte noch einmal.";
   }
   const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
@@ -597,11 +609,17 @@ async function ensureNav(
       slot.navKey = "";
     }
   });
-  if (!(await navReady(child))) {
+  if (!(await navReady(child, gen))) {
     const log = slot.navLog.trim();
     await stopProcess(child);
     if (slot.nav === child) slot.nav = null;
+    if (slot.startGen !== gen) return "Nav2 gestoppt.";
     return log || "Nav2 ist nicht hochgekommen.";
+  }
+  if (slot.startGen !== gen) {
+    await stopProcess(child);
+    if (slot.nav === child) slot.nav = null;
+    return "Nav2 gestoppt.";
   }
   slot.navKey = navKey;
   return null;
@@ -636,16 +654,27 @@ async function runStudent(
   smac: string | null,
   localCostmap: string | null,
   globalCostmap: string | null,
+  stopMark: number,
 ) {
+  if (slot.stops !== stopMark) {
+    return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+  }
   const gen = ++slot.startGen;
   slot.starting = true;
   await stopStudent();
-  if (slot.startGen !== gen) return { ok: false as const, error: "Der Start wurde ersetzt." };
+  if (slot.startGen !== gen || slot.stops !== stopMark) {
+    stopStarting(gen);
+    return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+  }
   slot.studentLog = "";
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
   const params = await resolveParams(controller, follower, planner, progress, goal, cityObstacles, smac, localCostmap, globalCostmap);
+  if (slot.startGen !== gen || slot.stops !== stopMark) {
+    stopStarting(gen);
+    return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+  }
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
@@ -660,6 +689,10 @@ async function runStudent(
   const pluginHash = plugin ? createHash("sha256").update(plugin).digest("hex") : "none";
   if (plugin) {
     const built = await buildPlugin(plugin, pluginHash);
+    if (slot.startGen !== gen || slot.stops !== stopMark) {
+      stopStarting(gen);
+      return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+    }
     if (built) {
       stopStarting(gen);
       return { ok: false as const, error: built };
@@ -667,7 +700,11 @@ async function runStudent(
   }
   const paramsBytes = await readFile(params.file, "utf8");
   const navKey = `${createHash("sha256").update(pose).digest("hex")}:${createHash("sha256").update(through).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}:${withFollower ? "1" : "0"}`;
-  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower);
+  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower, gen);
+  if (slot.startGen !== gen || slot.stops !== stopMark) {
+    stopStarting(gen);
+    return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+  }
   if (navError) {
     stopStarting(gen);
     return { ok: false as const, error: navError };
@@ -684,6 +721,10 @@ async function runStudent(
     stopStarting(gen);
   });
   const early = await exitWithin(child, 1500);
+  if (slot.startGen !== gen || slot.stops !== stopMark) {
+    stopStarting(gen);
+    return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+  }
   if (early !== null && early !== 0) {
     if (slot.student === child) slot.student = null;
     endNavRun();
@@ -703,6 +744,55 @@ function navErrors(): string {
     .trim();
 }
 
+async function zeroTwist() {
+  await rosBash(
+    [
+      "python3 - <<'PY'",
+      "import random",
+      "import time",
+      "import rclpy",
+      "from geometry_msgs.msg import Twist",
+      "rclpy.init()",
+      "node = rclpy.create_node('nav_stop_%d' % random.randrange(1_000_000_000))",
+      "pub = node.create_publisher(Twist, 'cmd_vel', 10)",
+      "deadline = time.time() + 1.2",
+      "while time.time() < deadline:",
+      "    pub.publish(Twist())",
+      "    rclpy.spin_once(node, timeout_sec=0.05)",
+      "node.destroy_node()",
+      "rclpy.shutdown()",
+      "PY",
+    ].join("\n"),
+  );
+}
+
+async function haltMission() {
+  slot.stops += 1;
+  slot.startGen += 1;
+  slot.starting = false;
+  endNavRun();
+  signalGroup(slot.student, "SIGINT");
+  signalGroup(slot.nav, "SIGINT");
+  signalGroups("SIGINT");
+  void zeroTwist();
+  await enqueue(async () => {
+    await stopStudent();
+    await stopLabNav();
+    slot.nav = null;
+    slot.navKey = "";
+    slot.navLog = "";
+    slot.navRunLog = "";
+    await zeroTwist();
+    slot.studentLog = "Nav2 gestoppt.\n";
+    slot.starting = false;
+  });
+}
+
+export async function DELETE() {
+  await haltMission();
+  return Response.json({ ok: true, running: false, starting: false, log: "Nav2 gestoppt." });
+}
+
 export async function GET() {
   const running = slot.student !== null && slot.student.exitCode === null;
   const student = slot.studentLog.trim();
@@ -712,6 +802,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const stopMark = slot.stops;
   const body = await request.json().catch(() => null);
   const source = sourceOf(body && typeof body === "object" ? (body as { source?: unknown }).source : null);
   if (!source) {
@@ -834,8 +925,26 @@ export async function POST(request: Request) {
   }
   const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
   const result = await enqueue(() =>
-    runStudent(source, plugin, pose, through, controller, follower, planner, progress, goal, cityObstacles, smac, localCostmap, globalCostmap),
+    runStudent(
+      source,
+      plugin,
+      pose,
+      through,
+      controller,
+      follower,
+      planner,
+      progress,
+      goal,
+      cityObstacles,
+      smac,
+      localCostmap,
+      globalCostmap,
+      stopMark,
+    ),
   );
-  if (!result.ok) return Response.json(result, { status: 500 });
+  if (!result.ok) {
+    const status = "aborted" in result && result.aborted ? 200 : 500;
+    return Response.json(result, { status });
+  }
   return Response.json(result);
 }

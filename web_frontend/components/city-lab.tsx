@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { LocateFixed, Play } from "lucide-react";
+import { LocateFixed, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { parseCity, type CityMap, type LapState, type Rect } from "@/lib/city-map";
 import { draw } from "@/lib/city-paint";
@@ -24,7 +24,7 @@ import {
 import { formatDe } from "@/lib/format";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
-import { noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
+import { holdRunTerminal, noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
 import { ROBOT_API, openTwin, type CostmapGrid, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
@@ -222,6 +222,8 @@ export function CityLab({
   playReady = false,
   runKey = 0,
   timing = false,
+  costmapToggle = false,
+  walls = false,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
@@ -243,6 +245,8 @@ export function CityLab({
   playReady?: boolean;
   runKey?: number;
   timing?: boolean;
+  costmapToggle?: boolean;
+  walls?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -253,8 +257,6 @@ export function CityLab({
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const costmapRef = useRef<CostmapGrid | null>(null);
-  const missionRef = useRef(missionKey);
-  missionRef.current = missionKey;
   const linkRef = useRef<TwinLink | null>(null);
   const havePose = useRef(false);
   const clientId = useRef(useId());
@@ -264,6 +266,9 @@ export function CityLab({
   const [phase, setPhase] = useState<TwinPhase>("connecting");
   const nodeLog = useSyncExternalStore(subscribeRunTerminal, readRunTerminal, serverRunTerminal);
   const [booting, setBooting] = useState(false);
+  const [runLive, setRunLive] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const stoppingRef = useRef(false);
   const logRef = useRef<HTMLPreElement>(null);
   const [mapUp, setMapUp] = useState(false);
   const [drift, setDrift] = useState(false);
@@ -277,6 +282,11 @@ export function CityLab({
   const [showCostmap, setShowCostmap] = useState(false);
   const showCostmapRef = useRef(false);
   showCostmapRef.current = showCostmap;
+  const costmapToggleRef = useRef(costmapToggle);
+  costmapToggleRef.current = costmapToggle;
+  useEffect(() => {
+    if (!costmapToggle) setShowCostmap(false);
+  }, [costmapToggle]);
   const cameraRef = useRef(false);
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
@@ -297,6 +307,9 @@ export function CityLab({
   ghostOnRef.current = ghost;
   const courseRef = useRef(course);
   courseRef.current = course;
+  const wallsRef = useRef(walls);
+  wallsRef.current = walls;
+  const wallsHitRef = useRef(0);
   const needBackupRef = useRef(needBackup);
   needBackupRef.current = needBackup;
   const trapRef = useRef(false);
@@ -331,6 +344,7 @@ export function CityLab({
   const dragRef = useRef<{ id: number; x: number; y: number; lookX: number; lookY: number } | null>(null);
   const melonsRef = useRef(freshMelons());
   const [melonsLeft, setMelonsLeft] = useState(MELONS.length);
+  const [wallsHit, setWallsHit] = useState(0);
 
   useLayoutEffect(() => {
     if (!melons) return;
@@ -461,6 +475,7 @@ export function CityLab({
               client: session,
               obstacles: running.obstacles,
               checkpoints: running.checkpoints,
+              walls: wallsRef.current,
             });
           }
           const id = kapitelRef.current;
@@ -485,7 +500,11 @@ export function CityLab({
         sampleGhostRef.current(sample);
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
-        if (sample.costmap) costmapRef.current = sample.costmap;
+        if (sample.costmap !== undefined) costmapRef.current = sample.costmap;
+        if (typeof sample.bumps === "number") {
+          wallsHitRef.current = sample.bumps;
+          setWallsHit((previous) => (previous === sample.bumps ? previous : sample.bumps ?? previous));
+        }
         runnerRef.current = sample.runner
           ? { x: sample.runner.x, y: sample.runner.y, w: sample.runner.w, h: sample.runner.h, color: "#ece8d6" }
           : null;
@@ -563,7 +582,7 @@ export function CityLab({
         lapRef.current?.next ?? "",
         lapRef.current?.done ? "1" : "0",
         lapRef.current?.grass ? "1" : "0",
-        missionRef.current === "costmap" && showCostmapRef.current ? costmapKey(costmapRef.current) : "",
+        costmapToggleRef.current && showCostmapRef.current ? costmapKey(costmapRef.current) : "",
       ].join("|");
       if (raysRef.current && rangesRef.current) {
         signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
@@ -589,7 +608,7 @@ export function CityLab({
           courseRef.current?.checkpoints ?? null,
           ghostPose,
           spotsRef.current,
-          missionRef.current === "costmap" && showCostmapRef.current ? costmapRef.current : null,
+          costmapToggleRef.current && showCostmapRef.current ? costmapRef.current : null,
         );
       }
       const runningCourse = courseRef.current;
@@ -603,13 +622,14 @@ export function CityLab({
             client: sessionRef.current,
             obstacles: runningCourse.later,
             checkpoints: runningCourse.checkpoints,
+            walls: wallsRef.current,
           });
         }
       }
       if (needBackupRef.current && motionRef.current.linear < -0.03 && !backedRef.current) {
         backedRef.current = true;
         if (melonsOnRef.current && melonsRef.current.length > 0 && melonsRef.current.every((alive) => !alive)) {
-          clearedRef.current?.();
+          if (!wallsRef.current || wallsHitRef.current === 0) clearedRef.current?.();
         }
       }
       if (!kapitelRef.current && melonsOnRef.current) {
@@ -623,7 +643,9 @@ export function CityLab({
           melonsRef.current = next;
           const left = next.filter(Boolean).length;
           setMelonsLeft(left);
-          if (left === 0 && (!needBackupRef.current || backedRef.current)) clearedRef.current?.();
+          if (left === 0 && (!needBackupRef.current || backedRef.current) && (!wallsRef.current || wallsHitRef.current === 0)) {
+            clearedRef.current?.();
+          }
         }
       }
       const gatesOn = gatesOnRef.current;
@@ -730,6 +752,7 @@ export function CityLab({
       client: sessionRef.current,
       obstacles: running?.obstacles ?? [],
       checkpoints: running?.checkpoints ?? null,
+      walls: wallsRef.current,
     });
   }, [courseKey, rosUp, round]);
 
@@ -818,6 +841,7 @@ export function CityLab({
         client: sessionRef.current,
         obstacles: running.obstacles,
         checkpoints: running.checkpoints,
+        walls: wallsRef.current,
       });
     }
   };
@@ -916,7 +940,9 @@ export function CityLab({
         const log = typeof body.log === "string" ? body.log : "";
         noteRunPhase(body.starting === true, body.running === true, log);
         setBooting(body.starting === true && log.trim() === "" && !readRunTerminal().trim());
-        const active = playBusy || body.running === true || body.starting === true;
+        const serverLive = body.running === true || body.starting === true;
+        setRunLive(serverLive);
+        const active = playBusy || serverLive;
         if (body.running === true || body.starting === true) seenRunRef.current = true;
         if (!active) {
           if (seenRunRef.current) {
@@ -949,6 +975,8 @@ export function CityLab({
     const box = logRef.current;
     if (box) box.scrollTop = box.scrollHeight;
   }, [nodeLog]);
+
+  const showStop = playBusy || runLive || stopping;
 
   return (
     <div className="flex flex-col gap-4">
@@ -996,11 +1024,18 @@ export function CityLab({
             {raceNote || lap.text}
           </p>
         ) : null}
-        {!kapitel && melons ? (
+        {!kapitel && (melons || walls) ? (
           <div className="absolute top-3 left-8 z-10 flex max-w-[18rem] flex-col gap-1">
-            <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
-              {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
-            </p>
+            {melons ? (
+              <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
+                {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
+              </p>
+            ) : null}
+            {walls ? (
+              <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
+                {wallsHit === 1 ? "Wand 1" : `Wände ${wallsHit}`}
+              </p>
+            ) : null}
             {melonNote ? (
               <p className="max-w-full rounded-xl bg-[#1c1404]/80 px-3 py-1 text-xs leading-4 font-semibold text-[#f4efe4]">
                 {melonNote}
@@ -1061,7 +1096,7 @@ export function CityLab({
             >
               Vergrößert
             </FlagBox>
-            {missionKey === "costmap" ? (
+            {costmapToggle ? (
               <FlagBox
                 on={showCostmap}
                 title="Legt die globale Costmap von Nav2 über die ganze Karte. Das Auto bleibt davor."
@@ -1091,9 +1126,29 @@ export function CityLab({
           {onPlay ? (
             <button
               type="button"
-              aria-label="Code abspielen"
+              aria-label={showStop ? "Nav2 stoppen" : "Code abspielen"}
               autoComplete="off"
               onClick={() => {
+                if (showStop) {
+                  if (stoppingRef.current) return;
+                  stoppingRef.current = true;
+                  setStopping(true);
+                  holdRunTerminal("Stoppe Nav2.");
+                  void fetch("/api/waypoint-run", { method: "DELETE" })
+                    .then((response) => {
+                      if (!response.ok) {
+                        setRunTerminal("Nav2 ließ sich nicht stoppen.");
+                        return;
+                      }
+                      setRunTerminal("Nav2 gestoppt.");
+                    })
+                    .catch(() => setRunTerminal("Nav2 ließ sich nicht stoppen."))
+                    .finally(() => {
+                      stoppingRef.current = false;
+                      setStopping(false);
+                    });
+                  return;
+                }
                 reset();
                 if (ghost && takeGhostRef.current) {
                   ghostGen.current += 1;
@@ -1118,10 +1173,14 @@ export function CityLab({
                 }
                 onPlay();
               }}
-              disabled={!playReady || playBusy}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#2f6b4f] text-white shadow-sm disabled:opacity-60"
+              disabled={showStop ? stopping : !playReady}
+              className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm disabled:opacity-60 ${showStop ? "bg-[#9d2c2c]" : "bg-[#2f6b4f]"}`}
             >
-              <Play className="size-4 translate-x-px fill-current" />
+              {showStop ? (
+                <Square className="size-3.5 fill-current" />
+              ) : (
+                <Play className="size-4 translate-x-px fill-current" />
+              )}
             </button>
           ) : null}
           <div className="relative min-w-0 flex-1">

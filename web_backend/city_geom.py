@@ -40,6 +40,27 @@ def foot_radius() -> float:
     return 0.5 * math.hypot(BODY_LENGTH_M, BODY_WIDTH_M)
 
 
+def overlapping(
+    x: float,
+    y: float,
+    radius: float,
+    rects: list[tuple[float, float, float, float]],
+) -> set[int]:
+    """Indices of rectangles the circle cuts. Sitting exactly on the edge does not count."""
+    if radius <= 0.0 or not math.isfinite(x) or not math.isfinite(y):
+        return set()
+    limit = radius * radius
+    hits: set[int] = set()
+    for index, (xmin, ymin, xmax, ymax) in enumerate(rects):
+        cx = min(max(x, xmin), xmax)
+        cy = min(max(y, ymin), ymax)
+        dx = x - cx
+        dy = y - cy
+        if dx * dx + dy * dy < limit:
+            hits.add(index)
+    return hits
+
+
 def push_circle(
     x: float,
     y: float,

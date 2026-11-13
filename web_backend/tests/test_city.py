@@ -32,6 +32,53 @@ def _pixel(bmp: bytes, x: int, y: int) -> tuple[int, int, int]:
     return red, green, blue
 
 
+def test_a_touch_counts_once_until_the_car_leaves() -> None:
+    from city_geom import overlapping
+
+    wall = (1.0, 0.0, 2.0, 1.0)
+    assert overlapping(0.5, 0.5, 0.1, [wall]) == set()
+    assert overlapping(0.95, 0.5, 0.1, [wall]) == {0}
+
+    CITY.set_clutter(False)
+    try:
+        plant = CanvasPlant()
+        apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
+        home_x = plant.odom.pose.x
+        home_y = plant.odom.pose.y
+        obstacle = {"x": home_x + 0.3, "y": home_y, "w": 0.4, "h": 0.4}
+        apply_message(
+            plant,
+            {"type": "mission", "client": "labor", "obstacles": [obstacle], "checkpoints": None},
+        )
+        plant.command_twist(0.25, 0.0)
+        for _ in range(40):
+            plant.step(1.0 / TICK_HZ)
+        assert plant.bumps == 0
+        plant.reset(home_x, home_y, 0.0)
+        apply_message(
+            plant,
+            {"type": "mission", "client": "labor", "obstacles": [obstacle], "checkpoints": None, "walls": True},
+        )
+        plant.command_twist(0.25, 0.0)
+        for _ in range(40):
+            plant.step(1.0 / TICK_HZ)
+        assert plant.bumps == 1
+        for _ in range(20):
+            plant.step(1.0 / TICK_HZ)
+        assert plant.bumps == 1
+        plant.command_twist(-0.25, 0.0)
+        for _ in range(40):
+            plant.step(1.0 / TICK_HZ)
+        plant.command_twist(0.25, 0.0)
+        for _ in range(40):
+            plant.step(1.0 / TICK_HZ)
+        assert plant.bumps == 2
+        apply_message(plant, {"type": "mission", "client": "labor", "obstacles": [], "checkpoints": None})
+        assert plant.bumps == 0
+    finally:
+        CITY.set_clutter(False)
+
+
 def test_a_circle_slides_along_the_wall() -> None:
     x, y = push_circle(1.15, 0.8, 0.1, [(1.0, 0.0, 2.0, 1.0)])
     assert math.isclose(x, 0.9, abs_tol=1e-9)
@@ -185,6 +232,10 @@ def test_costmap_keeps_origin_and_drops_free_cells() -> None:
     assert hub.city_view()["costmap"] == packet
     hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)
     assert hub.city_view()["costmap"] == packet
+    hub.store_costmap(None)
+    assert hub.city_view()["costmap"] is None
+    hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)
+    assert hub.city_view()["costmap"] is None
     hub.clear_city()
     assert "costmap" not in hub.city_view()
     assert pack_costmap(0, 2, 0.05, 0.0, 0.0, [1]) is None

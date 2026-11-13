@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import math
 import struct
+import time
 from collections import deque
 
 from brick_core.chassis import Chassis, load_chassis
 from brick_core.geometry import yaw_from_quaternion, yaw_to_quaternion
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
+from nav2_msgs.srv import ClearEntireCostmap
 from nav_msgs.msg import OccupancyGrid, Odometry
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
@@ -89,6 +91,13 @@ class CanvasTwinNode(Node):
         self._cloud_pub = self.create_publisher(PointCloud2, "city_obstacles", 10)
         self._cloud_tick = 0
         self._cloud_key: tuple[tuple[float, float, float, float], ...] | None = None
+        self._cloud_republish = False
+        self._clear_global = self.create_client(ClearEntireCostmap, "global_costmap/clear_entirely_global_costmap")
+        self._clear_local = self.create_client(ClearEntireCostmap, "local_costmap/clear_entirely_local_costmap")
+        self._clear_gen = 0
+        self._clear_left = 0
+        self._clear_wait = False
+        self._clear_since = 0.0
         self._image_pub = self.create_publisher(Image, "camera/image_raw", 10)
         self._imu_pub = self.create_publisher(Imu, "imu", 10)
         self._tf = TransformBroadcaster(self)
@@ -324,6 +333,7 @@ class CanvasTwinNode(Node):
                 "dock": city.dock_on,
                 "runner": city.runner_dict() if city.runner_on else None,
                 "lap": self.plant.lap_status(),
+                "bumps": self.plant.bumps,
             },
             keep_image=False,
         )
@@ -347,7 +357,43 @@ class CanvasTwinNode(Node):
             return
         self._cloud_tick += 1
         key = tuple(city.collision_rects())
-        if key == self._cloud_key and self._cloud_tick % 10 != 0:
+        changed = key != self._cloud_key
+        if changed:
+            self._cloud_key = key
+            # Lesson blocks are not a map. Drop the old picture and mark only what is set now.
+            self.hub.store_costmap(None)
+            self._begin_costmap_clear()
+        if self._clear_wait:
+            if time.monotonic() - self._clear_since > 1.0:
+                self._clear_wait = False
+                self._cloud_republish = True
+            else:
+                return
+        if not changed and not self._cloud_republish and self._cloud_tick % 10 != 0:
             return
-        self._cloud_key = key
+        self._cloud_republish = False
         self._cloud_pub.publish(obstacle_cloud(city.obstacle_samples(), stamp))
+
+    def _begin_costmap_clear(self) -> None:
+        ready = [client for client in (self._clear_global, self._clear_local) if client.service_is_ready()]
+        self._clear_gen += 1
+        if not ready:
+            self._clear_wait = False
+            self._cloud_republish = True
+            return
+        self._clear_wait = True
+        self._clear_left = len(ready)
+        self._clear_since = time.monotonic()
+        generation = self._clear_gen
+        for client in ready:
+            future = client.call_async(ClearEntireCostmap.Request())
+            future.add_done_callback(lambda _done, generation=generation: self._on_costmap_cleared(generation))
+
+    def _on_costmap_cleared(self, generation: int) -> None:
+        if generation != self._clear_gen:
+            return
+        self._clear_left -= 1
+        if self._clear_left > 0:
+            return
+        self._clear_wait = False
+        self._cloud_republish = True

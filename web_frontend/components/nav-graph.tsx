@@ -44,7 +44,7 @@ function GoalCheckerEditor({
       />
       {goalProblem ? <p className="text-sm leading-6">{goalProblem}</p> : null}
       <p className="text-sm leading-6 text-muted-foreground">
-        stateful merkt sich den Ort beim ersten Treffer. false prüft Ort und Blickrichtung zusammen.
+        stateful merkt sich den Ort beim ersten Treffer. yaw_goal_tolerance über 3.14 lässt die Blickrichtung egal.
       </p>
     </>
   );
