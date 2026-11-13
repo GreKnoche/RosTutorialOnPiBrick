@@ -1,6 +1,8 @@
+import { SHOW_LOCAL_COSTMAP } from "@/lib/costmap-yaml";
 import anhalten from "./anhalten";
 import baum1 from "./baum-1";
 import controller from "./controller";
+import costmap from "./costmap";
 import folgen from "./folgen";
 import nochmal from "./nochmal";
 import planner from "./planner";
@@ -9,8 +11,22 @@ import type { Nav2Station } from "./types";
 
 export type { GraphNodeId, Nav2Station } from "./types";
 
+/** Drop the local costmap node until a mission reads it. The yaml and the editor stay. */
+function shown(station: Nav2Station): Nav2Station {
+  if (SHOW_LOCAL_COSTMAP) return station;
+  const defaults = { ...station.defaults };
+  delete defaults.localCostmap;
+  return {
+    ...station,
+    nodes: station.nodes.filter((node) => node.id !== "local_costmap"),
+    edges: station.edges.filter((edge) => edge.from !== "local_costmap" && edge.to !== "local_costmap"),
+    fields: station.fields.filter((field) => field !== "localCostmap"),
+    defaults,
+  };
+}
+
 /** Road order, without the driveway. */
-export const STATIONS: Nav2Station[] = [folgen, controller, plugin, planner, baum1, nochmal, anhalten];
+export const STATIONS: Nav2Station[] = [folgen, controller, plugin, costmap, planner, baum1, nochmal, anhalten].map(shown);
 
 for (const station of STATIONS) {
   for (const field of station.fields) {

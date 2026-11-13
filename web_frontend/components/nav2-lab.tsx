@@ -15,7 +15,7 @@ import {
   writeNav2Progress,
   writePluginPlanners,
 } from "@/lib/browser-draft";
-import { PATH_STEPS, missionAt, missionById, stationGraph } from "@/lib/nav2-lessons";
+import { MISSION_ORDER, isMissionId, missionById, stationGraph, type MissionId } from "@/lib/nav2-lessons";
 import { PLANNER_CLASSES, absorbPlugin, plannerClass, plannerShort } from "@/lib/planner-yaml";
 
 function openPlanners(done: readonly string[]): string {
@@ -27,19 +27,17 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
   const pluginDone = useSyncExternalStore(subscribeDrafts, readPluginPlanners, serverPluginPlanners);
   const done = progress.done;
+  const runningId = progress.runningId;
+  const started = runningId !== null;
   const [hint, setHint] = useState(false);
-  const [replay, setReplay] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<MissionId | null>(null);
   const [round, setRound] = useState(0);
   const [driveBusy, setDriveBusy] = useState(false);
   const [spawnBoot, setSpawnBoot] = useState(0);
   const [runKey, setRunKey] = useState(0);
   const driveRef = useRef<() => void>(() => {});
-  const started = progress.started;
-  const frontier = missionAt(done);
-  const runningId = started ? (replay ?? frontier?.id ?? null) : null;
-  const finishedId = PATH_STEPS[done - 1]?.id;
-  const stationId = runningId ?? picked ?? (finishedId && finishedId !== "start" ? finishedId : null);
+  const lastDoneId = [...MISSION_ORDER].reverse().find((id) => done[id]) ?? null;
+  const stationId = runningId ?? picked ?? lastDoneId;
   const station = stationId ? missionById(stationId) : null;
   const graph = stationGraph(stationId);
   const kind = station?.kind ?? null;
@@ -56,57 +54,54 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
     if (!graph) return;
     fillStationDefaults(graph.id, graph.defaults);
   }, [graph]);
-  const finishRun = (advance: boolean) => {
-    if (stationId) setPicked(stationId);
+  const finishRun = (completedId?: MissionId) => {
+    const id = completedId ?? stationId;
+    if (id) setPicked(id);
     setHint(false);
-    setReplay(null);
-    if (station?.kind) setRound((value) => value + 1);
+    if ((id ? missionById(id) : station)?.kind) setRound((value) => value + 1);
     writeNav2Progress({
-      started: false,
-      done: advance ? Math.min(done + 1, PATH_STEPS.length) : done,
+      runningId: null,
+      done: id ? { ...done, [id]: true } : done,
     });
   };
-  const retry = () => {
-    if (station?.kind) setRound((value) => value + 1);
+  const retry = (id?: MissionId | null) => {
+    const target = id !== undefined ? (id ? missionById(id) : null) : station;
+    if (target?.kind) setRound((value) => value + 1);
   };
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
       <MissionPath
-        active={started}
         done={done}
         runningId={runningId}
         heldId={stationId}
         onSelect={(id) => {
-          const index = PATH_STEPS.findIndex((step) => step.id === id);
-          if (index <= 0 || index >= done || id === stationId) return;
+          if (id === stationId && !started) return;
           setPicked(id);
-          setReplay(null);
           setHint(false);
-          if (started) writeNav2Progress({ started: false, done });
+          if (started) writeNav2Progress({ runningId: null, done });
+          setSpawnBoot((value) => value + 1);
           setRound((value) => value + 1);
         }}
         onStart={(id) => {
           setPicked(id);
-          setReplay(id === frontier?.id ? null : id);
-          writeNav2Progress({ started: true, done });
+          writeNav2Progress({ runningId: id, done });
           setRunKey((value) => value + 1);
           setHint(true);
           setSpawnBoot((value) => value + 1);
-          retry();
+          retry(id);
         }}
-        onComplete={() => finishRun(replay === null)}
-        onBack={(next) => {
+        onSetDone={(id, nextDone) => {
+          if (nextDone) {
+            finishRun(id);
+            return;
+          }
+          setPicked(id);
           setHint(false);
-          setReplay(null);
-          setPicked((current) => {
-            if (!current) return null;
-            const index = PATH_STEPS.findIndex((step) => step.id === current);
-            if (index <= 0 || index >= next) return null;
-            return current;
+          if (id === "plugin") writePluginPlanners([]);
+          writeNav2Progress({
+            runningId: runningId === id ? null : runningId,
+            done: { ...done, [id]: false },
           });
-          const pluginAt = PATH_STEPS.findIndex((step) => step.id === "plugin");
-          if (pluginAt >= 0 && next <= pluginAt) writePluginPlanners([]);
-          writeNav2Progress({ started: false, done: next });
         }}
       />
       <div>
@@ -119,7 +114,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           melonNote={
             station?.id !== "plugin"
               ? null
-              : PATH_STEPS.findIndex((step) => step.id === "plugin") < done
+              : done.plugin
                 ? "Alle Planner"
                 : openPlanners(pluginDone)
           }
@@ -130,10 +125,9 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           spawn={station?.spawn ?? null}
           spawnBoot={spawnBoot}
           onMelonsCleared={() => {
-            if (kind !== "melons" || !station) return;
-            const advance = started && replay === null && station.id === frontier?.id;
+            if (kind !== "melons" || !station || !isMissionId(station.id)) return;
             if (station.id !== "plugin") {
-              finishRun(advance);
+              finishRun(station.id);
               return;
             }
             const fallback = graph?.defaults.planner ?? "";
@@ -144,7 +138,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
             const names = PLANNER_CLASSES.filter((item) => have.has(item));
             if (names.length === PLANNER_CLASSES.length) {
               writePluginPlanners([]);
-              finishRun(advance);
+              finishRun(station.id);
               return;
             }
             writePluginPlanners(names);
@@ -152,9 +146,15 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
             setHint(true);
           }}
           onGatesCleared={() => {
-            if (kind === "gates") finishRun(started && replay === null && station?.id === frontier?.id);
+            if (kind === "gates" && station && isMissionId(station.id)) {
+              finishRun(station.id);
+            }
           }}
           onPlay={() => {
+            if (stationId && runningId !== stationId) {
+              writeNav2Progress({ runningId: stationId, done });
+              setRunKey((value) => value + 1);
+            }
             if (!started) retry();
             driveRef.current();
           }}

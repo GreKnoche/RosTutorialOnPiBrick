@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { GlossarySpoiler } from "@/components/glossary-spoiler";
-import { LessonIndex } from "@/components/lesson-index";
+import { TrackPath } from "@/components/track-path";
 import { CopySection } from "@/components/lessons/copy-section";
 import { ComposedLab } from "@/components/lessons/composed-lab";
 import { lessonModule, type LessonModule } from "@/components/lessons/registry";
@@ -10,7 +10,6 @@ import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { RobotLab } from "@/components/robot-lab";
 import { readCatalog } from "@/lib/catalog-file";
 import {
-  getTrackMeta,
   lessonHref,
   lessonNeighbors,
   lessonsForTrack,
@@ -31,7 +30,6 @@ export function LessonPage({
   level?: LessonLevel;
 }) {
   const catalog = readCatalog();
-  const track = getTrackMeta(lesson.track, catalog);
   const { next, index, total } = lessonNeighbors(lesson, catalog);
   const lessons = lessonsForTrack(lesson.track, catalog);
   const active = lessonModule(lesson.track, lesson.slug);
@@ -42,7 +40,8 @@ export function LessonPage({
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumbs items={trackCrumbs(lesson.track, lesson, catalog)} />
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
+      <div className="grid items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <TrackPath lessons={lessons} currentId={lesson.id} />
         <div className="flex min-w-0 flex-col gap-6">
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -91,12 +90,6 @@ export function LessonPage({
           )}
           {level !== "beginner" ? <LevelTask lesson={lesson} level={level} /> : null}
         </div>
-        <aside className="flex flex-col gap-2">
-          <h2 className="px-2 text-sm font-medium text-heading">
-            In diesem Lernpfad{track ? ` · ${track.title}` : ""}
-          </h2>
-          <LessonIndex lessons={lessons} currentId={lesson.id} columns={1} />
-        </aside>
       </div>
       {next && (
         <footer className="border-t border-border pt-4">

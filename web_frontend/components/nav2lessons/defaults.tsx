@@ -3,6 +3,8 @@ import { followerSection } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 import { pluginSection } from "@/lib/planner-yaml";
 
+export { GLOBAL_CITY, GLOBAL_COSTMAP, LOCAL_CITY, LOCAL_COSTMAP, SHOW_LOCAL_COSTMAP } from "@/lib/costmap-yaml";
+
 const PARAMS = `controller_server:
   ros__parameters:
     controller_frequency: 20.0
@@ -81,29 +83,49 @@ export const HYBRID = NAVFN.replace(
   'plugin: "nav2_smac_planner::SmacPlannerHybrid"',
 );
 
-export const SMAC = `plugin: "nav2_smac_planner::SmacPlannerHybrid"
+export const SMAC = `# Klasse. Bleibt Smac Hybrid, der Baum ruft weiter GridBased.
+plugin: "nav2_smac_planner::SmacPlannerHybrid"
+# Meter. So nah muss die gefundene Pose am Ziel liegen.
 tolerance: 0.20
+# false sucht auf jeder Zelle. true macht die Karte vorher gröber.
 downsample_costmap: false
+# Teiler, falls die Karte vergröbert wird. 1 lässt sie, wie sie ist.
 downsampling_factor: 1
+# true darf über unbekannte Zellen planen.
 allow_unknown: true
+# Die Suche bricht nach so vielen Knoten ab.
 max_iterations: 1000000
+# Extra-Knoten nahe am Ziel, damit die Nase noch passt.
 max_on_approach_iterations: 1000
+# Sekunden, danach gibt die Suche auf.
 max_planning_time: 3.5
 # DUBIN fährt nur vorwärts. REEDS_SHEPP darf rückwärts.
 motion_model_for_search: "DUBIN"
+# Die Nase kennt nur so viele feste Richtungen.
 angle_quantization_bins: 64
+# Etwa jeden dritten Knoten ein direkter Bogen zum Ziel.
 analytic_expansion_ratio: 3.5
+# Meter. Weiter reicht dieser direkte Bogen nicht.
 analytic_expansion_max_length: 3.0
+# Der Bogen entfällt, wenn eine Zelle teurer als dieser Wert ist.
 analytic_expansion_max_cost: 200.0
 # Meter. Radstand geteilt durch tan vom maximalen Lenkwinkel.
 minimum_turning_radius: 0.40
+# Rückwärts kostet das Vielfache eines Vorwärtsschritts.
 reverse_penalty: 2.1
+# Zusatz, wenn links und rechts wechseln. 0 bestraft das nicht.
 change_penalty: 0.0
+# Eine Kurve kostet das Vielfache derselben Strecke geradeaus.
 non_straight_penalty: 1.20
+# Graue Zellen neben Hindernissen kosten mehr als freier Asphalt.
 cost_penalty: 2.0
+# Kleiner Abzug auf jeden Schritt, damit graue Zellen schwerer wiegen.
 retrospective_penalty: 0.025
+# Meter. So weit sind die Bogenlängen zum Ziel vorausgerechnet.
 lookup_table_size: 20.0
+# true hebt die Hindernis-Schätzung für dasselbe Ziel auf.
 cache_obstacle_heuristic: false
+# true glättet den Pfad, bevor FollowPath ihn fährt.
 smooth_path: true
 `;
 export const WIGGLE = MANEUVER_PLUGIN_SOURCE;

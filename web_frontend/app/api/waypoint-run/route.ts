@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlin
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withCityObstacles } from "@/lib/city-costmap";
+import { costmapError, mergeCostmap, type CostmapRoot } from "@/lib/costmap-yaml";
 import { followPathError, goalError, mergeFollowPath, mergeGoal, mergeProgress, progressError } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
 import { mergePlugin, mergeSmac, pluginError, smacError } from "@/lib/planner-yaml";
@@ -164,9 +165,21 @@ async function resolveParams(
   goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
+  localCostmap: string | null,
+  globalCostmap: string | null,
 ): Promise<{ file: string; error: string | null }> {
   const stock = stockParams();
-  if (controller === null && follower === null && planner === null && progress === null && goal === null && smac === null && !cityObstacles) {
+  if (
+    controller === null &&
+    follower === null &&
+    planner === null &&
+    progress === null &&
+    goal === null &&
+    smac === null &&
+    localCostmap === null &&
+    globalCostmap === null &&
+    !cityObstacles
+  ) {
     return { file: stock, error: null };
   }
   let merged = await readFile(stock, "utf8").catch(() => "");
@@ -212,7 +225,19 @@ async function resolveParams(
     if (!next) return { file: stock, error: "general_goal_checker fehlt in nav2_params.yaml." };
     merged = next;
   }
-  if (cityObstacles) {
+  const costmaps: { root: CostmapRoot; text: string | null; missing: string }[] = [
+    { root: "local_costmap", text: localCostmap, missing: "local_costmap fehlt in nav2_params.yaml." },
+    { root: "global_costmap", text: globalCostmap, missing: "global_costmap fehlt in nav2_params.yaml." },
+  ];
+  for (const costmap of costmaps) {
+    if (costmap.text === null) continue;
+    const shape = costmapError(costmap.text, costmap.root);
+    if (shape) return { file: stock, error: shape };
+    const next = mergeCostmap(merged, costmap.text, costmap.root);
+    if (!next) return { file: stock, error: costmap.missing };
+    merged = next;
+  }
+  if (cityObstacles && localCostmap === null && globalCostmap === null) {
     const next = withCityObstacles(merged);
     if (!next) return { file: stock, error: "Die Costmap hat keine Inflation-Schicht." };
     merged = next;
@@ -609,6 +634,8 @@ async function runStudent(
   goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
+  localCostmap: string | null,
+  globalCostmap: string | null,
 ) {
   const gen = ++slot.startGen;
   slot.starting = true;
@@ -618,7 +645,7 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower, planner, progress, goal, cityObstacles, smac);
+  const params = await resolveParams(controller, follower, planner, progress, goal, cityObstacles, smac, localCostmap, globalCostmap);
   if (params.error) {
     stopStarting(gen);
     return { ok: false as const, error: params.error };
@@ -755,6 +782,26 @@ export async function POST(request: Request) {
     const shape = pluginError(planner);
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
+  let localCostmap: string | null = null;
+  if (body && typeof body === "object" && "localCostmap" in body && (body as { localCostmap?: unknown }).localCostmap !== undefined) {
+    const raw = (body as { localCostmap?: unknown }).localCostmap;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Die lokale Costmap ist leer." }, { status: 400 });
+    }
+    localCostmap = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = costmapError(localCostmap, "local_costmap");
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
+  let globalCostmap: string | null = null;
+  if (body && typeof body === "object" && "globalCostmap" in body && (body as { globalCostmap?: unknown }).globalCostmap !== undefined) {
+    const raw = (body as { globalCostmap?: unknown }).globalCostmap;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Die globale Costmap ist leer." }, { status: 400 });
+    }
+    globalCostmap = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const shape = costmapError(globalCostmap, "global_costmap");
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  }
   let smac: string | null = null;
   if (body && typeof body === "object" && "smac" in body && (body as { smac?: unknown }).smac !== undefined) {
     const raw = (body as { smac?: unknown }).smac;
@@ -786,7 +833,9 @@ export async function POST(request: Request) {
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
   const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
-  const result = await enqueue(() => runStudent(source, plugin, pose, through, controller, follower, planner, progress, goal, cityObstacles, smac));
+  const result = await enqueue(() =>
+    runStudent(source, plugin, pose, through, controller, follower, planner, progress, goal, cityObstacles, smac, localCostmap, globalCostmap),
+  );
   if (!result.ok) return Response.json(result, { status: 500 });
   return Response.json(result);
 }

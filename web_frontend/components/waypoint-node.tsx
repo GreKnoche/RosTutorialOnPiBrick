@@ -35,6 +35,8 @@ export function WaypointNode({
   const follower = useField(missionId, "follower");
   const planner = useField(missionId, "planner");
   const smac = useField(missionId, "smac");
+  const localCostmap = useField(missionId, "localCostmap");
+  const globalCostmap = useField(missionId, "globalCostmap");
   const progress = useField(missionId, "progress");
   const goal = useField(missionId, "goal");
   const base = station.defaults[field] ?? "";
@@ -60,6 +62,8 @@ export function WaypointNode({
     if (has("follower")) body.follower = kept(follower, station.defaults.follower);
     if (has("planner")) body.planner = kept(planner, station.defaults.planner);
     if (has("smac")) body.smac = kept(smac, station.defaults.smac);
+    if (has("localCostmap")) body.localCostmap = kept(localCostmap, station.defaults.localCostmap);
+    if (has("globalCostmap")) body.globalCostmap = kept(globalCostmap, station.defaults.globalCostmap);
     try {
       const response = await fetch("/api/waypoint-run", {
         method: "POST",
@@ -77,7 +81,7 @@ export function WaypointNode({
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, goal, has, maneuver, mission, onBusy, planner, progress, smac, source, station]);
+  }, [controller, follower, globalCostmap, goal, has, localCostmap, maneuver, mission, onBusy, planner, progress, smac, source, station]);
 
   useEffect(() => {
     driveRef.current = () => {

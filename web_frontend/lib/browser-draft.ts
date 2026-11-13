@@ -1,3 +1,4 @@
+import { MISSION_ORDER, isMissionId, type MissionId } from "@/lib/nav2-lessons";
 import { writeCompleted } from "@/lib/progress";
 
 const NAV2_PROGRESS_KEY = "learn2ros.nav2.progress";
@@ -12,6 +13,8 @@ const NAV2_TEXT_KEYS = {
   follower: "learn2ros.nav2.follower",
   planner: "learn2ros.nav2.planner",
   smac: "learn2ros.nav2.smac",
+  localCostmap: "learn2ros.nav2.localCostmap",
+  globalCostmap: "learn2ros.nav2.globalCostmap",
 } as const;
 const LESSONS_KEY = "learn2ros.nav2.lessons";
 const PLUGIN_PLANNERS_KEY = "learn2ros.nav2.plugin-planners";
@@ -21,12 +24,23 @@ const MAX_TEXT = 100_000;
 
 export type Nav2TextField = keyof typeof NAV2_TEXT_KEYS;
 
+export type Nav2Done = Readonly<Record<MissionId, boolean>>;
+
 export type Nav2Progress = {
-  started: boolean;
-  done: number;
+  runningId: MissionId | null;
+  done: Nav2Done;
 };
 
-const DEFAULT_PROGRESS: Nav2Progress = { started: false, done: 1 };
+function makeDone(source?: Partial<Record<string, unknown>>): Nav2Done {
+  const next = {} as Record<MissionId, boolean>;
+  for (const id of MISSION_ORDER) {
+    next[id] = source?.[id] === true;
+  }
+  return next;
+}
+
+const DEFAULT_DONE: Nav2Done = makeDone();
+const DEFAULT_PROGRESS: Nav2Progress = { runningId: null, done: DEFAULT_DONE };
 
 const listeners = new Set<() => void>();
 let progressCache: { raw: string | null; value: Nav2Progress } | null = null;
@@ -75,12 +89,23 @@ function usableText(value: string | null): string | null {
 function parseProgress(raw: string | null): Nav2Progress {
   if (!raw) return DEFAULT_PROGRESS;
   try {
-    const parsed = JSON.parse(raw) as { started?: unknown; done?: unknown };
-    const done = typeof parsed.done === "number" && Number.isInteger(parsed.done) ? parsed.done : DEFAULT_PROGRESS.done;
-    return {
-      started: parsed.started === true,
-      done: Math.min(24, Math.max(0, done)),
-    };
+    const parsed = JSON.parse(raw) as { runningId?: unknown; started?: unknown; done?: unknown };
+    let done = DEFAULT_DONE;
+    if (typeof parsed.done === "number" && Number.isInteger(parsed.done)) {
+      const legacy: Record<string, boolean> = {};
+      for (let i = 0; i < MISSION_ORDER.length; i += 1) {
+        legacy[MISSION_ORDER[i]] = i < parsed.done - 1;
+      }
+      done = makeDone(legacy);
+    } else if (parsed.done && typeof parsed.done === "object" && !Array.isArray(parsed.done)) {
+      done = makeDone(parsed.done as Record<string, unknown>);
+    }
+    const runningId = isMissionId(parsed.runningId)
+      ? parsed.runningId
+      : parsed.started === true && typeof parsed.done === "number"
+        ? (MISSION_ORDER[parsed.done - 1] ?? null)
+        : null;
+    return { runningId, done };
   } catch {
     return DEFAULT_PROGRESS;
   }
@@ -137,8 +162,14 @@ export function readNav2Progress(): Nav2Progress {
   return value;
 }
 
-export function writeNav2Progress(progress: Nav2Progress) {
-  const value = { started: progress.started, done: progress.done };
+export function writeNav2Progress(progress: {
+  runningId: string | null;
+  done: Partial<Record<MissionId, boolean>>;
+}) {
+  const value: Nav2Progress = {
+    runningId: isMissionId(progress.runningId) ? progress.runningId : null,
+    done: makeDone(progress.done),
+  };
   const raw = JSON.stringify(value);
   writeRaw(NAV2_PROGRESS_KEY, raw);
   progressCache = { raw, value };

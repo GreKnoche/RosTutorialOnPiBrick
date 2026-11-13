@@ -1,4 +1,4 @@
-import { GOAL, HYBRID, PROGRESS, REVERSE_PATH, SMAC, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import { GLOBAL_CITY, GOAL, HYBRID, LOCAL_CITY, PROGRESS, REVERSE_PATH, SMAC, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
 import type { Nav2Station } from "./types";
 
 const POCKET_THROUGH = THROUGH_SOURCE.replace(
@@ -6,13 +6,20 @@ const POCKET_THROUGH = THROUGH_SOURCE.replace(
     # (1.4, 5.59, 0.0),
 ]`,
   `POINTS = [
+    (8.277, 5.554, 0.0),
+    (8.677, 5.954, math.pi / 2),
     (8.677, 4.22, math.pi / 2),
 ]`,
 );
 
 const POCKET_PATH = REVERSE_PATH.replace("use_rotate_to_heading: true", "use_rotate_to_heading: false");
 
-if (POCKET_THROUGH === THROUGH_SOURCE || !POCKET_THROUGH.includes("math.pi / 2")) {
+if (
+  POCKET_THROUGH === THROUGH_SOURCE ||
+  !POCKET_THROUGH.includes("(8.277, 5.554, 0.0)") ||
+  !POCKET_THROUGH.includes("(8.677, 5.954, math.pi / 2)") ||
+  !POCKET_THROUGH.includes("(8.677, 4.22, math.pi / 2)")
+) {
   throw new Error("Sackgassen-Ziel fehlt");
 }
 if (!POCKET_PATH.includes("allow_reversing: true") || POCKET_PATH.includes("use_rotate_to_heading: true")) {
@@ -34,14 +41,18 @@ const planner: Nav2Station = {
     { id: "planner_plugin", x: 46, y: 22 },
     { id: "controller", x: 86, y: 62 },
     { id: "goal", x: 86, y: 22 },
+    { id: "global_costmap", x: 22, y: 90 },
+    { id: "local_costmap", x: 70, y: 90 },
   ],
   edges: [
     { from: "waypoint_lesson", to: "planner", label: "compute_path_through_poses" },
+    { from: "global_costmap", to: "planner", label: "costmap" },
     { from: "planner", to: "controller", label: "follow_path" },
+    { from: "local_costmap", to: "controller", label: "costmap" },
     { from: "planner", to: "planner_plugin", label: "plugin" },
     { from: "controller", to: "goal", label: "is_goal_reached" },
   ],
-  fields: ["through", "controller", "planner", "smac", "progress", "goal", "mission"],
+  fields: ["through", "controller", "planner", "smac", "progress", "goal", "mission", "localCostmap", "globalCostmap"],
   defaults: {
     through: POCKET_THROUGH,
     controller: POCKET_PATH,
@@ -50,6 +61,8 @@ const planner: Nav2Station = {
     progress: PROGRESS,
     goal: GOAL,
     mission: THROUGH_XML,
+    localCostmap: LOCAL_CITY,
+    globalCostmap: GLOBAL_CITY,
   },
 };
 

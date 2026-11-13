@@ -33,7 +33,7 @@ export type NodeMission = {
 };
 
 /** Lesson id that first draws the node. */
-export type NodeShow = "folgen" | "controller" | "planner" | "plugin" | "baum-1";
+export type NodeShow = "folgen" | "controller" | "planner" | "plugin" | "costmap" | "baum-1";
 
 export type NavNode = {
   id: string;
@@ -187,6 +187,22 @@ export const NAV_NODES: NavNode[] = [
     ],
   },
   {
+    id: "local_costmap",
+    name: "local_costmap",
+    x: 84,
+    y: 40,
+    show: "costmap",
+    missions: [],
+  },
+  {
+    id: "global_costmap",
+    name: "global_costmap",
+    x: 50,
+    y: 40,
+    show: "costmap",
+    missions: [{ id: "costmap", title: "Costmap", kind: null, spawn: HOME, ...NONE }],
+  },
+  {
     id: "planner_plugin",
     name: "Smac Hybrid",
     x: 22,
@@ -224,7 +240,13 @@ export const NAV_NODES: NavNode[] = [
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-const MISSION_ORDER = ["folgen", "controller", "plugin", "planner", "baum-1", "nochmal", "anhalten"] as const;
+export const MISSION_ORDER = ["folgen", "controller", "plugin", "costmap", "planner", "baum-1", "nochmal", "anhalten"] as const;
+
+export type MissionId = (typeof MISSION_ORDER)[number];
+
+export function isMissionId(value: unknown): value is MissionId {
+  return typeof value === "string" && (MISSION_ORDER as readonly string[]).includes(value);
+}
 
 const owned = new Map(
   NAV_NODES.flatMap((node) => node.missions.map((mission) => [mission.id, { mission, node }] as const)),
@@ -238,20 +260,6 @@ export const PATH_STEPS: { id: string; title: string }[] = [
     return { id: found.mission.id, title: found.mission.title };
   }),
 ];
-
-export function missionAt(done: number): {
-  id: string;
-  kind: MissionKind | null;
-  node: string;
-  obstacles: MissionObstacle[];
-  checkpoints: MissionCheckpoint[];
-  laterObstacles?: MissionObstacle[];
-  trigger?: ObstacleTrigger;
-} | null {
-  const step = PATH_STEPS[done];
-  if (!step || step.id === "start") return null;
-  return missionById(step.id);
-}
 
 export function missionById(id: string): {
   id: string;

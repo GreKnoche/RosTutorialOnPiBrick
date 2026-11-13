@@ -1,7 +1,7 @@
 import { PathIcon } from "@/components/path-icon";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { LessonIndex } from "@/components/lesson-index";
+import { TrackPath } from "@/components/track-path";
 import { readCatalog } from "@/lib/catalog-file";
 import {
   getTrackMeta,
@@ -43,7 +43,7 @@ export function TrackLessons({
           </div>
         ) : null}
       </section>
-      {lessons.length > 0 ? <LessonIndex lessons={lessons} /> : null}
+      {lessons.length > 0 ? <TrackPath lessons={lessons} /> : null}
     </div>
   );
 }

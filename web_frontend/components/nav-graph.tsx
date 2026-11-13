@@ -6,6 +6,7 @@ import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import type { Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
 import { absorbFollowPath, absorbGoal, absorbProgress, followPathError, goalError, progressError } from "@/lib/controller-yaml";
+import { costmapError, type CostmapRoot } from "@/lib/costmap-yaml";
 import { absorbPlugin, pluginError, smacError } from "@/lib/planner-yaml";
 import { NAV_NODES } from "@/lib/nav2-lessons";
 
@@ -49,6 +50,40 @@ function GoalCheckerEditor({
   );
 }
 
+function CostmapEditor({
+  missionId,
+  field,
+  root,
+  title,
+  yaml,
+  fallback,
+}: {
+  missionId: string;
+  field: "localCostmap" | "globalCostmap";
+  root: CostmapRoot;
+  title: string;
+  yaml: string;
+  fallback: string;
+}) {
+  const problem = yaml.trim() ? costmapError(yaml, root) : null;
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">{title}</h3>
+        <ResetCodeButton disabled={!fallback || yaml === fallback} onClick={() => writeLessonText(missionId, field, null)} />
+      </div>
+      <CodeEditor
+        value={yaml}
+        onChange={(value) => writeLessonText(missionId, field, value === fallback ? null : value)}
+        label={title}
+        language="yaml"
+        height="h-[28rem]"
+      />
+      {problem ? <p className="text-sm leading-6">{problem}</p> : null}
+    </div>
+  );
+}
+
 function useField(missionId: string, field: Nav2TextField) {
   const read = useCallback(() => readLessonText(missionId, field), [missionId, field]);
   return useSyncExternalStore(subscribeDrafts, read, serverText);
@@ -63,6 +98,8 @@ const NODE_FILL: Record<string, string> = {
   planner_plugin: "bg-[#ddc8f4]",
   mission: "bg-[#f0a3bc]",
   goal: "bg-[#9fd0c4]",
+  local_costmap: "bg-[#e7d3a1]",
+  global_costmap: "bg-[#cbb57a]",
 };
 
 function nodeTone(id: string, state: "on" | "focus" | "idle") {
@@ -105,6 +142,8 @@ export function NavGraph({
   const followerDraft = useField(missionId, "follower");
   const plannerDraft = useField(missionId, "planner");
   const smacDraft = useField(missionId, "smac");
+  const localCostmapDraft = useField(missionId, "localCostmap");
+  const globalCostmapDraft = useField(missionId, "globalCostmap");
   const progressDraft = useField(missionId, "progress");
   const goalDraft = useField(missionId, "goal");
   const ownDrive = useRef<() => void>(() => {});
@@ -115,6 +154,8 @@ export function NavGraph({
   const followerDefault = graph.defaults.follower ?? "";
   const plannerDefault = graph.defaults.planner ?? "";
   const smacDefault = graph.defaults.smac ?? "";
+  const localCostmapDefault = graph.defaults.localCostmap ?? "";
+  const globalCostmapDefault = graph.defaults.globalCostmap ?? "";
   const progressDefault = graph.defaults.progress ?? "";
   const goalDefault = graph.defaults.goal ?? "";
   const xml = missionDraft ?? missionDefault;
@@ -126,6 +167,8 @@ export function NavGraph({
   const plannerProblem = plannerYaml.trim() ? pluginError(plannerYaml) : null;
   const smacYaml = smacDraft ?? smacDefault;
   const smacProblem = smacYaml.trim() ? smacError(smacYaml) : null;
+  const localCostmapYaml = localCostmapDraft ?? localCostmapDefault;
+  const globalCostmapYaml = globalCostmapDraft ?? globalCostmapDefault;
   const progressYaml = absorbProgress(progressDraft ?? progressDefault);
   const progressProblem = progressYaml.trim() ? progressError(progressYaml) : null;
   const goalYaml = absorbGoal(goalDraft ?? goalDefault);
@@ -311,6 +354,26 @@ export function NavGraph({
           />
           {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
         </div>
+      ) : null}
+      {current?.id === "local_costmap" ? (
+        <CostmapEditor
+          missionId={missionId}
+          field="localCostmap"
+          root="local_costmap"
+          title="local_costmap"
+          yaml={localCostmapYaml}
+          fallback={localCostmapDefault}
+        />
+      ) : null}
+      {current?.id === "global_costmap" ? (
+        <CostmapEditor
+          missionId={missionId}
+          field="globalCostmap"
+          root="global_costmap"
+          title="global_costmap"
+          yaml={globalCostmapYaml}
+          fallback={globalCostmapDefault}
+        />
       ) : null}
       {current?.id === "mission" ? (
         <div className="flex flex-col gap-3">

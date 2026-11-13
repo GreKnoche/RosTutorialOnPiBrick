@@ -8,7 +8,9 @@ export type GraphNodeId =
   | "planner"
   | "planner_plugin"
   | "mission"
-  | "goal";
+  | "goal"
+  | "local_costmap"
+  | "global_costmap";
 
 export type Nav2Station = {
   id: string;

@@ -1,4 +1,4 @@
-import { GOAL, NAVFN, PROGRESS, REVERSE_PATH, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import { GLOBAL_CITY, GOAL, HYBRID, LOCAL_CITY, PROGRESS, REVERSE_PATH, SMAC, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
 import type { Nav2Station } from "./types";
 
 const baum1: Nav2Station = {
@@ -14,24 +14,33 @@ const baum1: Nav2Station = {
     { id: "waypoint_lesson", x: 8, y: 50 },
     { id: "mission", x: 36, y: 50 },
     { id: "planner", x: 66, y: 18 },
+    { id: "planner_plugin", x: 46, y: 74 },
     { id: "controller", x: 86, y: 74 },
     { id: "goal", x: 86, y: 18 },
+    { id: "global_costmap", x: 36, y: 18 },
+    { id: "local_costmap", x: 16, y: 82 },
   ],
   edges: [
     { from: "waypoint_lesson", to: "mission", label: "navigate_through_poses" },
     { from: "mission", to: "planner", label: "compute_path_through_poses" },
     { from: "mission", to: "controller", label: "follow_path" },
+    { from: "global_costmap", to: "planner", label: "costmap" },
+    { from: "local_costmap", to: "controller", label: "costmap" },
     { from: "planner", to: "controller", label: "follow_path" },
+    { from: "planner", to: "planner_plugin", label: "plugin" },
     { from: "controller", to: "goal", label: "is_goal_reached" },
   ],
-  fields: ["through", "controller", "planner", "progress", "goal", "mission"],
+  fields: ["through", "controller", "planner", "smac", "progress", "goal", "mission", "localCostmap", "globalCostmap"],
   defaults: {
     through: THROUGH_SOURCE,
     controller: REVERSE_PATH,
-    planner: NAVFN,
+    planner: HYBRID,
+    smac: SMAC,
     progress: PROGRESS,
     goal: GOAL,
     mission: THROUGH_XML,
+    localCostmap: LOCAL_CITY,
+    globalCostmap: GLOBAL_CITY,
   },
 };
 

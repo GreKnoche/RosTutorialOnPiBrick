@@ -29,3 +29,8 @@ export function markLessonComplete(track: TrackId, id: string) {
   if (current.includes(key)) return;
   writeCompleted([...current, key]);
 }
+
+export function unmarkLessonComplete(track: TrackId, id: string) {
+  const key = lessonProgressKey(track, id);
+  writeCompleted(readCompleted().filter((item) => item !== key));
+}
