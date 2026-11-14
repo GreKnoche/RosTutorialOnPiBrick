@@ -7,7 +7,16 @@ import type { Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
 import { absorbFollowPath, absorbGoal, absorbProgress, followPathError, goalError, progressError } from "@/lib/controller-yaml";
 import { costmapError, type CostmapRoot } from "@/lib/costmap-yaml";
-import { absorbPlugin, pluginError, smacError } from "@/lib/planner-yaml";
+import {
+  PLANNER_CLASSES,
+  PLANNER_PARAM_FIELD,
+  plannerChoice,
+  plannerClass,
+  plannerMark,
+  plannerSection,
+  pluginParamsError,
+  type PlannerParamField,
+} from "@/lib/planner-yaml";
 import { NAV_NODES } from "@/lib/nav2-lessons";
 
 const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
@@ -89,15 +98,26 @@ function useField(missionId: string, field: Nav2TextField) {
   return useSyncExternalStore(subscribeDrafts, read, serverText);
 }
 
+const RING_RADIUS = 104;
+
+/** Five spots on a circle. Index 0 sits above the node, then clockwise. */
+function ringShifts(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const angle = ((-90 + index * (360 / count)) * Math.PI) / 180;
+    return {
+      dx: Math.round(Math.cos(angle) * RING_RADIUS),
+      dy: Math.round(Math.sin(angle) * RING_RADIUS),
+    };
+  });
+}
+
 const NODE_FILL: Record<string, string> = {
   waypoint_lesson: "bg-[#f6d56b]",
   waypoint_follower: "bg-[#8fceaa]",
   maneuver: "bg-[#f3b183]",
   controller: "bg-[#8ec0ea]",
   planner: "bg-[#c9b4ee]",
-  planner_plugin: "bg-[#ddc8f4]",
   mission: "bg-[#f0a3bc]",
-  goal: "bg-[#9fd0c4]",
   local_costmap: "bg-[#e7d3a1]",
   global_costmap: "bg-[#cbb57a]",
 };
@@ -125,14 +145,18 @@ export function NavGraph({
   const missionId = graph.id;
   const focusNode = graph.focus;
   const placed = graph.nodes.map((node) => ({ ...node, name: NAMES.get(node.id) ?? node.id }));
-  const ys = placed.map((node) => node.y);
-  const span = ys.length === 0 ? 0 : Math.max(...ys) - Math.min(...ys);
-  const graphHeight = span < 1 ? "6rem" : `${4 + span * 0.25}rem`;
   const [pickedNode, setPickedNode] = useState<string | null>(null);
   const [pickedFocus, setPickedFocus] = useState(focusNode);
+  const [ring, setRing] = useState(false);
+  const [ringKey, setRingKey] = useState(`${missionId}:${focusNode}`);
+  const ringNow = `${missionId}:${focusNode}`;
   if (pickedFocus !== focusNode) {
     setPickedFocus(focusNode);
     setPickedNode(null);
+  }
+  if (ringKey !== ringNow) {
+    setRingKey(ringNow);
+    setRing(false);
   }
   const wanted = pickedNode ?? focusNode;
   const selected = placed.some((node) => node.id === wanted) ? wanted : (placed[0]?.id ?? "waypoint_lesson");
@@ -141,7 +165,11 @@ export function NavGraph({
   const controllerDraft = useField(missionId, "controller");
   const followerDraft = useField(missionId, "follower");
   const plannerDraft = useField(missionId, "planner");
+  const navfnDraft = useField(missionId, "navfn");
+  const smac2dDraft = useField(missionId, "smac2d");
+  const thetaDraft = useField(missionId, "theta");
   const smacDraft = useField(missionId, "smac");
+  const latticeDraft = useField(missionId, "lattice");
   const localCostmapDraft = useField(missionId, "localCostmap");
   const globalCostmapDraft = useField(missionId, "globalCostmap");
   const progressDraft = useField(missionId, "progress");
@@ -153,7 +181,6 @@ export function NavGraph({
   const controllerDefault = graph.defaults.controller ?? "";
   const followerDefault = graph.defaults.follower ?? "";
   const plannerDefault = graph.defaults.planner ?? "";
-  const smacDefault = graph.defaults.smac ?? "";
   const localCostmapDefault = graph.defaults.localCostmap ?? "";
   const globalCostmapDefault = graph.defaults.globalCostmap ?? "";
   const progressDefault = graph.defaults.progress ?? "";
@@ -163,10 +190,26 @@ export function NavGraph({
   const controllerYaml = absorbFollowPath(controllerDefault, controllerDraft ?? controllerDefault);
   const controllerProblem = controllerYaml.trim() ? followPathError(controllerYaml) : null;
   const followerYaml = followerDraft ?? followerDefault;
-  const plannerYaml = absorbPlugin(plannerDefault, plannerDraft ?? plannerDefault);
-  const plannerProblem = plannerYaml.trim() ? pluginError(plannerYaml) : null;
-  const smacYaml = smacDraft ?? smacDefault;
-  const smacProblem = smacYaml.trim() ? smacError(smacYaml) : null;
+  const plannerYaml = plannerDraft ?? plannerDefault;
+  const choices = graph.planners ?? PLANNER_CLASSES;
+  const selectedClass = plannerChoice(plannerYaml, graph.planners);
+  const paramField = selectedClass ? PLANNER_PARAM_FIELD[selectedClass] : null;
+  const paramDrafts: Record<PlannerParamField, string | null> = {
+    navfn: navfnDraft,
+    smac2d: smac2dDraft,
+    theta: thetaDraft,
+    smac: smacDraft,
+    lattice: latticeDraft,
+  };
+  const paramDefault = paramField ? (graph.defaults[paramField] ?? "") : "";
+  const paramYaml = paramField ? (paramDrafts[paramField] ?? paramDefault) : "";
+  const paramProblem = paramYaml.trim() && selectedClass ? pluginParamsError(paramYaml, selectedClass) : null;
+  const mark = selectedClass ? plannerMark(selectedClass) : "—";
+  const plannerSpot = placed.find((node) => node.id === "planner");
+  const shifts = ringShifts(choices.length);
+  const ys = placed.map((node) => node.y);
+  const span = ys.length === 0 ? 0 : Math.max(...ys) - Math.min(...ys);
+  const graphHeight = span < 1 ? "6rem" : `${4 + span * 0.25}rem`;
   const localCostmapYaml = localCostmapDraft ?? localCostmapDefault;
   const globalCostmapYaml = globalCostmapDraft ?? globalCostmapDefault;
   const progressYaml = absorbProgress(progressDraft ?? progressDefault);
@@ -174,6 +217,7 @@ export function NavGraph({
   const goalYaml = absorbGoal(goalDraft ?? goalDefault);
   const goalProblem = goalYaml.trim() ? goalError(goalYaml) : null;
   const showProgress = graph.showProgress && placed.some((node) => node.id === "controller");
+  const showGoalOnController = Boolean(goalDefault) && graph.fields.includes("goal");
   const current = placed.find((node) => node.id === selected) ?? placed[0];
   const byId = new Map(placed.map((node) => [node.id, node]));
   const edges = graph.edges.flatMap((link) => {
@@ -195,11 +239,11 @@ export function NavGraph({
   });
 
   return (
-    <section className="mt-6 flex flex-col gap-4">
+    <section className="mt-6 flex flex-col gap-4" onClick={() => setRing(false)}>
       <h2 className="text-base font-semibold">Erklärung</h2>
       <p className="text-sm leading-6 text-muted-foreground">{graph.explain}</p>
       <h2 className="text-base font-semibold">Code Graph</h2>
-      <div className="overflow-x-auto">
+      <div className={ring ? "overflow-visible py-28" : "overflow-x-auto"}>
         <div className="relative w-full" style={{ height: graphHeight }} role="group" aria-label="Verbundene Knoten">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
             {edges.map((edge) => (
@@ -229,16 +273,64 @@ export function NavGraph({
               key={node.id}
               type="button"
               aria-pressed={node.id === current?.id}
-              onClick={() => setPickedNode(node.id)}
-              className={`absolute z-20 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full px-2.5 py-1.5 text-center ${nodeTone(
-                node.id,
-                node.id === current?.id ? "on" : node.id === focusNode ? "focus" : "idle",
-              )}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (node.id === "planner") {
+                  setPickedNode("planner");
+                  if (choices.length > 1) setRing((open) => !open);
+                  else setRing(false);
+                  return;
+                }
+                setRing(false);
+                setPickedNode(node.id);
+              }}
+              className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 text-center ${
+                node.id === "planner" ? "w-32 rounded-md px-2 py-1" : "w-28 rounded-full px-2.5 py-1.5"
+              } ${nodeTone(node.id, node.id === current?.id ? "on" : node.id === focusNode ? "focus" : "idle")}`}
               style={{ left: `${node.x}%`, top: `${node.y}%` }}
             >
-              <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{node.name}</span>
+              {node.id === "planner" ? (
+                <>
+                  <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">planner_plugin</span>
+                  <span className="my-0.5 block border-t border-[#3c3214]/45" />
+                  <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{mark}</span>
+                </>
+              ) : (
+                <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{node.name}</span>
+              )}
             </button>
           ))}
+          {ring && plannerSpot && choices.length > 1
+            ? choices.map((name, index) => {
+                const shift = shifts[index];
+                if (!shift) return null;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-pressed={name === selectedClass}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const next = plannerSection(name);
+                      writeLessonText(missionId, "planner", next === plannerDefault ? null : next);
+                      setRing(false);
+                      setPickedNode("planner");
+                    }}
+                    className={`absolute z-30 w-max rounded-full px-2.5 py-1 text-center ${nodeTone(
+                      "planner",
+                      name === selectedClass ? "on" : "idle",
+                    )}`}
+                    style={{
+                      left: `${plannerSpot.x}%`,
+                      top: `${plannerSpot.y}%`,
+                      transform: `translate(calc(-50% + ${shift.dx}px), calc(-50% + ${shift.dy}px))`,
+                    }}
+                  >
+                    <span className="block whitespace-nowrap font-mono text-[0.55rem] leading-3">{plannerMark(name)}</span>
+                  </button>
+                );
+              })
+            : null}
         </div>
       </div>
       <div hidden={current?.id !== "waypoint_lesson"}>
@@ -264,8 +356,17 @@ export function NavGraph({
       ) : null}
       {current?.id === "controller" ? (
         <div className="flex flex-col gap-3">
+          <h3 className="text-base font-semibold">controller_server</h3>
+          {showProgress || showGoalOnController ? (
+            <p className="text-sm leading-6 text-muted-foreground">
+              FollowPath fährt
+              {showProgress ? ". progress_checker bricht ab, wenn nichts mehr geht" : ""}
+              {showGoalOnController ? ". general_goal_checker sagt, wann das Ziel da ist" : ""}
+              .
+            </p>
+          ) : null}
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">controller_server</h3>
+            <h3 className="text-base font-semibold">FollowPath</h3>
             <ResetCodeButton
               disabled={!controllerDefault || controllerYaml === controllerDefault}
               onClick={() => writeLessonText(missionId, "controller", null)}
@@ -303,56 +404,42 @@ export function NavGraph({
               />
               {progressProblem ? <p className="text-sm leading-6">{progressProblem}</p> : null}
               <p className="text-sm leading-6 text-muted-foreground">
-                FollowPath endet, wenn das Auto den Radius in der Zeit nicht schafft. Das Zeitfenster bleibt länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.
+                FollowPath endet, wenn das Auto den Radius in der Zeit nicht schafft.
               </p>
             </>
           ) : null}
-        </div>
-      ) : null}
-      {current?.id === "goal" ? (
-        <div className="flex flex-col gap-3">
-          <GoalCheckerEditor missionId={missionId} goalYaml={goalYaml} goalDefault={goalDefault} goalProblem={goalProblem} />
-        </div>
-      ) : null}
-      {current?.id === "planner_plugin" ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">Smac Hybrid</h3>
-            <ResetCodeButton
-              disabled={!smacDefault || smacYaml === smacDefault}
-              onClick={() => writeLessonText(missionId, "smac", null)}
+          {showGoalOnController ? (
+            <GoalCheckerEditor
+              missionId={missionId}
+              goalYaml={goalYaml}
+              goalDefault={goalDefault}
+              goalProblem={goalProblem}
             />
-          </div>
-          <CodeEditor
-            value={smacYaml}
-            onChange={(value) => writeLessonText(missionId, "smac", value === smacDefault ? null : value)}
-            label="Smac Hybrid"
-            language="yaml"
-            height="h-[28rem]"
-          />
-          {smacProblem ? <p className="text-sm leading-6">{smacProblem}</p> : null}
+          ) : null}
         </div>
       ) : null}
       {current?.id === "planner" ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">planner plugin</h3>
+            <h3 className="text-base font-semibold">{mark}</h3>
             <ResetCodeButton
-              disabled={!plannerDefault || plannerYaml === plannerDefault}
-              onClick={() => writeLessonText(missionId, "planner", null)}
+              disabled={!paramField || !paramDefault || paramYaml === paramDefault}
+              onClick={() => {
+                if (paramField) writeLessonText(missionId, paramField, null);
+              }}
             />
           </div>
           <CodeEditor
-            value={plannerYaml}
+            value={paramYaml}
             onChange={(value) => {
-              const next = absorbPlugin(plannerYaml, value);
-              writeLessonText(missionId, "planner", next === plannerDefault ? null : next);
+              if (!paramField) return;
+              writeLessonText(missionId, paramField, value === paramDefault ? null : value);
             }}
-            label="planner plugin"
+            label={mark}
             language="yaml"
-            height="h-[12rem]"
+            height="h-[28rem]"
           />
-          {plannerProblem ? <p className="text-sm leading-6">{plannerProblem}</p> : null}
+          {paramProblem ? <p className="text-sm leading-6">{paramProblem}</p> : null}
         </div>
       ) : null}
       {current?.id === "local_costmap" ? (

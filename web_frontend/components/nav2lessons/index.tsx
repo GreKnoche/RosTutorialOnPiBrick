@@ -24,7 +24,7 @@ function shown(station: Nav2Station): Nav2Station {
 }
 
 /** Road order, without the driveway. */
-export const STATIONS: Nav2Station[] = [folgen, controller, plugin, costmap, planner, baum1].map(shown);
+export const STATIONS: Nav2Station[] = [folgen, controller, costmap, planner, plugin, baum1].map(shown);
 
 for (const station of STATIONS) {
   for (const field of station.fields) {

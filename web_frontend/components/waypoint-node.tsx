@@ -4,6 +4,7 @@ import { useCallback, useEffect, useSyncExternalStore, type RefObject } from "re
 import type { Nav2Station } from "@/components/nav2lessons";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
+import { PLANNER_PARAM_FIELD, plannerChoice, plannerClass, plannerSection, type PlannerParamField } from "@/lib/planner-yaml";
 import { holdRunTerminal, setRunTerminal } from "@/lib/run-terminal";
 
 function useField(missionId: string, field: Nav2TextField) {
@@ -34,7 +35,11 @@ export function WaypointNode({
   const controller = useField(missionId, "controller");
   const follower = useField(missionId, "follower");
   const planner = useField(missionId, "planner");
+  const navfn = useField(missionId, "navfn");
+  const smac2d = useField(missionId, "smac2d");
+  const theta = useField(missionId, "theta");
   const smac = useField(missionId, "smac");
+  const lattice = useField(missionId, "lattice");
   const localCostmap = useField(missionId, "localCostmap");
   const globalCostmap = useField(missionId, "globalCostmap");
   const progress = useField(missionId, "progress");
@@ -60,8 +65,16 @@ export function WaypointNode({
     if (has("goal")) body.goal = kept(goal, station.defaults.goal);
     if (station.cityObstacles) body.cityObstacles = true;
     if (has("follower")) body.follower = kept(follower, station.defaults.follower);
-    if (has("planner")) body.planner = kept(planner, station.defaults.planner);
-    if (has("smac")) body.smac = kept(smac, station.defaults.smac);
+    const plannerText = kept(planner, station.defaults.planner);
+    const selected = plannerChoice(plannerText, station.planners);
+    if (has("planner")) {
+      body.planner = selected && plannerClass(plannerText) !== selected ? plannerSection(selected) : plannerText;
+    }
+    const paramDrafts: Record<PlannerParamField, string | null> = { navfn, smac2d, theta, smac, lattice };
+    const paramField = selected ? PLANNER_PARAM_FIELD[selected] : null;
+    if (paramField && has(paramField)) {
+      body.pluginParams = kept(paramDrafts[paramField], station.defaults[paramField]);
+    }
     if (has("localCostmap")) body.localCostmap = kept(localCostmap, station.defaults.localCostmap);
     if (has("globalCostmap")) body.globalCostmap = kept(globalCostmap, station.defaults.globalCostmap);
     try {
@@ -81,7 +94,7 @@ export function WaypointNode({
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, globalCostmap, goal, has, localCostmap, maneuver, mission, onBusy, planner, progress, smac, source, station]);
+  }, [controller, follower, globalCostmap, goal, has, lattice, localCostmap, maneuver, mission, navfn, onBusy, planner, progress, smac, smac2d, source, station, theta]);
 
   useEffect(() => {
     driveRef.current = () => {

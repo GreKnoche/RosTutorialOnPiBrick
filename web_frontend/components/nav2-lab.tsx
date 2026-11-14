@@ -177,7 +177,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                     <li>NavFn, Smac2D und Theta* legen die Ecke verschieden.</li>
                     <li>theta ist die Nase. Die Zellplaner ignorieren sie, Hybrid und Lattice halten sie.</li>
                     <li>Süd 0, Ost math.pi / 2, Nord math.pi, West -math.pi / 2.</li>
-                    <li>Tausche die Klasse und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
+                    <li>Wähl die Klasse am Knoten und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
                     {PLANNER_CLASSES.map((name) => (
                       <li key={name}>
                         {plannerShort(name)}

@@ -7,7 +7,7 @@ import { withCityObstacles } from "@/lib/city-costmap";
 import { costmapError, mergeCostmap, type CostmapRoot } from "@/lib/costmap-yaml";
 import { followPathError, goalError, mergeFollowPath, mergeGoal, mergeProgress, progressError } from "@/lib/controller-yaml";
 import { followerError, mergeFollower } from "@/lib/follower-yaml";
-import { mergePlugin, mergeSmac, pluginError, smacError } from "@/lib/planner-yaml";
+import { mergePlugin, mergePluginParams, mergeSmac, plannerClass, pluginError, pluginParamsError, smacError } from "@/lib/planner-yaml";
 
 export const runtime = "nodejs";
 
@@ -168,6 +168,7 @@ async function resolveParams(
   goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
+  pluginParams: string | null,
   localCostmap: string | null,
   globalCostmap: string | null,
 ): Promise<{ file: string; error: string | null }> {
@@ -179,6 +180,7 @@ async function resolveParams(
     progress === null &&
     goal === null &&
     smac === null &&
+    pluginParams === null &&
     localCostmap === null &&
     globalCostmap === null &&
     !cityObstacles
@@ -193,7 +195,15 @@ async function resolveParams(
     if (!next) return { file: stock, error: "planner_plugins fehlt in nav2_params.yaml." };
     merged = next;
   }
-  if (smac !== null) {
+  if (pluginParams !== null) {
+    const expected = planner ? plannerClass(planner) : null;
+    if (!expected) return { file: stock, error: "Die Plugin-Klasse fehlt." };
+    const shape = pluginParamsError(pluginParams, expected);
+    if (shape) return { file: stock, error: shape };
+    const next = mergePluginParams(merged, pluginParams, expected);
+    if (!next) return { file: stock, error: "GridBased fehlt in nav2_params.yaml." };
+    merged = next;
+  } else if (smac !== null) {
     const shape = smacError(smac);
     if (shape) return { file: stock, error: shape };
     const next = mergeSmac(merged, smac);
@@ -652,6 +662,7 @@ async function runStudent(
   goal: string | null,
   cityObstacles: boolean,
   smac: string | null,
+  pluginParams: string | null,
   localCostmap: string | null,
   globalCostmap: string | null,
   stopMark: number,
@@ -670,7 +681,18 @@ async function runStudent(
   slot.starting = true;
   const dir = cacheDir();
   await mkdir(dir, { recursive: true });
-  const params = await resolveParams(controller, follower, planner, progress, goal, cityObstacles, smac, localCostmap, globalCostmap);
+  const params = await resolveParams(
+    controller,
+    follower,
+    planner,
+    progress,
+    goal,
+    cityObstacles,
+    smac,
+    pluginParams,
+    localCostmap,
+    globalCostmap,
+  );
   if (slot.startGen !== gen || slot.stops !== stopMark) {
     stopStarting(gen);
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
@@ -894,7 +916,18 @@ export async function POST(request: Request) {
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
   let smac: string | null = null;
-  if (body && typeof body === "object" && "smac" in body && (body as { smac?: unknown }).smac !== undefined) {
+  let pluginParams: string | null = null;
+  if (body && typeof body === "object" && "pluginParams" in body && (body as { pluginParams?: unknown }).pluginParams !== undefined) {
+    const raw = (body as { pluginParams?: unknown }).pluginParams;
+    if (typeof raw !== "string") {
+      return Response.json({ ok: false, error: "Die Plugin-Konfiguration ist leer." }, { status: 400 });
+    }
+    pluginParams = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const expected = planner ? plannerClass(planner) : null;
+    if (!expected) return Response.json({ ok: false, error: "Die Plugin-Klasse fehlt." }, { status: 400 });
+    const shape = pluginParamsError(pluginParams, expected);
+    if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
+  } else if (body && typeof body === "object" && "smac" in body && (body as { smac?: unknown }).smac !== undefined) {
     const raw = (body as { smac?: unknown }).smac;
     if (typeof raw !== "string") {
       return Response.json({ ok: false, error: "Die Smac-Konfiguration ist leer." }, { status: 400 });
@@ -937,6 +970,7 @@ export async function POST(request: Request) {
       goal,
       cityObstacles,
       smac,
+      pluginParams,
       localCostmap,
       globalCostmap,
       stopMark,

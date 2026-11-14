@@ -1,4 +1,18 @@
-import { GLOBAL_CITY, GOAL, HYBRID, LOCAL_CITY, PROGRESS, REVERSE_PATH, SMAC, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import {
+  GLOBAL_CITY,
+  GOAL,
+  HYBRID,
+  LATTICE,
+  LOCAL_CITY,
+  NAVFN_PARAMS,
+  PROGRESS,
+  REVERSE_PATH,
+  SMAC,
+  SMAC2D,
+  THETA,
+  THROUGH_SOURCE,
+  THROUGH_XML,
+} from "./defaults";
 import type { Nav2Station } from "./types";
 
 const POCKET_THROUGH = THROUGH_SOURCE.replace(
@@ -28,19 +42,18 @@ if (!POCKET_PATH.includes("allow_reversing: true") || POCKET_PATH.includes("use_
 
 const planner: Nav2Station = {
   id: "planner",
-  focus: "planner_plugin",
+  focus: "planner",
   client: "through",
   tree: "through",
-  showProgress: false,
+  showProgress: true,
   cityObstacles: true,
+  planners: ["nav2_smac_planner::SmacPlannerHybrid"],
   explain:
     "Radius 0,40 schafft die Ecke, die Nase nach Norden nur mit REEDS_SHEPP. Radius 0,80 und DUBIN bleiben stehen.",
   nodes: [
     { id: "waypoint_lesson", x: 10, y: 62 },
     { id: "planner", x: 46, y: 62 },
-    { id: "planner_plugin", x: 46, y: 22 },
-    { id: "controller", x: 86, y: 62 },
-    { id: "goal", x: 86, y: 22 },
+    { id: "controller", x: 86, y: 42 },
     { id: "global_costmap", x: 22, y: 90 },
     { id: "local_costmap", x: 70, y: 90 },
   ],
@@ -49,15 +62,31 @@ const planner: Nav2Station = {
     { from: "global_costmap", to: "planner", label: "costmap" },
     { from: "planner", to: "controller", label: "follow_path" },
     { from: "local_costmap", to: "controller", label: "costmap" },
-    { from: "planner", to: "planner_plugin", label: "plugin" },
-    { from: "controller", to: "goal", label: "is_goal_reached" },
   ],
-  fields: ["through", "controller", "planner", "smac", "progress", "goal", "mission", "localCostmap", "globalCostmap"],
+  fields: [
+    "through",
+    "controller",
+    "planner",
+    "navfn",
+    "smac2d",
+    "theta",
+    "smac",
+    "lattice",
+    "progress",
+    "goal",
+    "mission",
+    "localCostmap",
+    "globalCostmap",
+  ],
   defaults: {
     through: POCKET_THROUGH,
     controller: POCKET_PATH,
     planner: HYBRID,
+    navfn: NAVFN_PARAMS,
+    smac2d: SMAC2D,
+    theta: THETA,
     smac: SMAC,
+    lattice: LATTICE,
     progress: PROGRESS,
     goal: GOAL,
     mission: THROUGH_XML,

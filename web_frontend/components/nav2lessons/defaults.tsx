@@ -1,7 +1,7 @@
 import { followPathSection, goalSection, progressSection } from "@/lib/controller-yaml";
 import { followerSection } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
-import { pluginSection } from "@/lib/planner-yaml";
+import { pluginParamsError, pluginSection } from "@/lib/planner-yaml";
 
 export { GLOBAL_CITY, GLOBAL_COSTMAP, LOCAL_CITY, LOCAL_COSTMAP, SHOW_LOCAL_COSTMAP } from "@/lib/costmap-yaml";
 
@@ -83,6 +83,123 @@ export const HYBRID = NAVFN.replace(
   'plugin: "nav2_smac_planner::SmacPlannerHybrid"',
 );
 
+export const NAVFN_PARAMS = `# Klasse. Bleibt NavFn, der Baum ruft weiter GridBased.
+plugin: "nav2_navfn_planner::NavfnPlanner"
+# Meter. So nah muss die gefundene Pose am Ziel liegen.
+tolerance: 0.2
+# true sucht mit A*. false sucht Dijkstra.
+use_astar: false
+# true darf über unbekannte Zellen planen.
+allow_unknown: true
+`;
+
+export const SMAC2D = `# Klasse. Bleibt Smac 2D, der Baum ruft weiter GridBased.
+plugin: "nav2_smac_planner::SmacPlanner2D"
+# Meter. So nah muss die gefundene Pose am Ziel liegen.
+tolerance: 0.5
+# false sucht auf jeder Zelle. true macht die Karte vorher gröber.
+downsample_costmap: false
+# Teiler, falls die Karte vergröbert wird. 1 lässt sie, wie sie ist.
+downsampling_factor: 1
+# true darf über unbekannte Zellen planen.
+allow_unknown: true
+# Die Suche bricht nach so vielen Knoten ab.
+max_iterations: 1000000
+# Extra-Knoten nahe am Ziel.
+max_on_approach_iterations: 1000
+# Sekunden, danach gibt die Suche auf.
+max_planning_time: 2.0
+# So oft prüft die Suche, ob sie abgebrochen wurde.
+terminal_checking_interval: 5000
+# Umweg durch teure Zellen kostet das Vielfache der Luftlinie.
+cost_travel_multiplier: 2.0
+# false lässt die Nase am Ziel, wie die Suche sie fand.
+use_final_approach_orientation: false
+# Glättung des Pfads nach der Suche.
+smoother:
+  # Abbruch, wenn der Pfad sich weniger als das ändert.
+  tolerance: 1.0e-10
+  # So oft darf die Glättung laufen.
+  max_iterations: 1000
+  # Gewicht, das den Pfad an den gefundenen Zellen hält.
+  w_data: 0.2
+  # Gewicht, das Ecken rund macht.
+  w_smooth: 0.3
+  # true glättet danach noch einmal feiner.
+  do_refinement: true
+  # So viele feine Durchgänge.
+  refinement_num: 2
+`;
+
+export const THETA = `# Klasse. Bleibt Theta*, der Baum ruft weiter GridBased.
+plugin: "nav2_theta_star_planner::ThetaStarPlanner"
+# 4 oder 8. 8 sucht auch die Diagonalen.
+how_many_corners: 8
+# Gewicht der Luftlinie.
+w_euc_cost: 1.0
+# Gewicht der Zellkosten auf der Costmap.
+w_traversal_cost: 2.0
+# Gewicht der Schätzung bis zum Ziel.
+w_heuristic_cost: 1.0
+# true darf über unbekannte Zellen planen.
+allow_unknown: true
+`;
+
+export const LATTICE = `# Klasse. Bleibt Smac Lattice, der Baum ruft weiter GridBased.
+plugin: "nav2_smac_planner::SmacPlannerLattice"
+# Meter. So nah muss die gefundene Pose am Ziel liegen.
+tolerance: 0.25
+# true darf über unbekannte Zellen planen.
+allow_unknown: true
+# Die Suche bricht nach so vielen Knoten ab.
+max_iterations: 1000000
+# Extra-Knoten nahe am Ziel, damit die Nase noch passt.
+max_on_approach_iterations: 1000
+# Sekunden, danach gibt die Suche auf.
+max_planning_time: 5.0
+# Etwa jeden dritten Knoten ein direktes Manöver zum Ziel.
+analytic_expansion_ratio: 3.5
+# Meter. Weiter reicht dieses Manöver nicht.
+analytic_expansion_max_length: 3.0
+# Das Manöver entfällt, wenn eine Zelle teurer als dieser Wert ist.
+analytic_expansion_max_cost: 200.0
+# Manöverdatei aus dem Paket nav2_smac_planner.
+lattice_filepath: "/opt/ros/jazzy/share/nav2_smac_planner/sample_primitives/5cm_resolution/0.5m_turning_radius/diff/output.json"
+# Meter. So weit sind die Manöver zum Ziel vorausgerechnet.
+lookup_table_size: 20.0
+# true hebt die Hindernis-Schätzung für dasselbe Ziel auf.
+cache_obstacle_heuristic: false
+# Rückwärts kostet das Vielfache eines Vorwärtsschritts.
+reverse_penalty: 2.0
+# Zusatz, wenn links und rechts wechseln. 0 bestraft das nicht.
+change_penalty: 0.0
+# Eine Kurve kostet das Vielfache derselben Strecke geradeaus.
+non_straight_penalty: 1.05
+# Graue Zellen neben Hindernissen kosten mehr als freier Asphalt.
+cost_penalty: 2.0
+# Drehen auf der Stelle kostet das Vielfache eines Schritts.
+rotation_penalty: 5.0
+# Kleiner Abzug auf jeden Schritt, damit graue Zellen schwerer wiegen.
+retrospective_penalty: 0.015
+# true darf ein Rückwärtsmanöver an ein Vorwärtsmanöver hängen.
+allow_reverse_expansion: false
+# true glättet den Pfad, bevor FollowPath ihn fährt.
+smooth_path: true
+`;
+
+if (pluginParamsError(NAVFN_PARAMS, "nav2_navfn_planner::NavfnPlanner")) {
+  throw new Error("NavFn-Parameter");
+}
+if (pluginParamsError(SMAC2D, "nav2_smac_planner::SmacPlanner2D")) {
+  throw new Error("Smac2D-Parameter");
+}
+if (pluginParamsError(THETA, "nav2_theta_star_planner::ThetaStarPlanner")) {
+  throw new Error("Theta-Parameter");
+}
+if (pluginParamsError(LATTICE, "nav2_smac_planner::SmacPlannerLattice")) {
+  throw new Error("Lattice-Parameter");
+}
+
 export const SMAC = `# Klasse. Bleibt Smac Hybrid, der Baum ruft weiter GridBased.
 plugin: "nav2_smac_planner::SmacPlannerHybrid"
 # Meter. So nah muss die gefundene Pose am Ziel liegen.
@@ -128,6 +245,9 @@ cache_obstacle_heuristic: false
 # true glättet den Pfad, bevor FollowPath ihn fährt.
 smooth_path: true
 `;
+if (pluginParamsError(SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
+  throw new Error("Smac-Parameter");
+}
 export const WIGGLE = MANEUVER_PLUGIN_SOURCE;
 
 export const POSE_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">

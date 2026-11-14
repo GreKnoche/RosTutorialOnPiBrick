@@ -12,7 +12,11 @@ const NAV2_TEXT_KEYS = {
   goal: "learn2ros.nav2.goal",
   follower: "learn2ros.nav2.follower",
   planner: "learn2ros.nav2.planner",
+  navfn: "learn2ros.nav2.navfn",
+  smac2d: "learn2ros.nav2.smac2d",
+  theta: "learn2ros.nav2.theta",
   smac: "learn2ros.nav2.smac",
+  lattice: "learn2ros.nav2.lattice",
   localCostmap: "learn2ros.nav2.localCostmap",
   globalCostmap: "learn2ros.nav2.globalCostmap",
 } as const;

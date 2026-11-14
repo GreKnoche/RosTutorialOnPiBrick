@@ -1,5 +1,18 @@
 import { COSTMAP_MISSION } from "@/lib/costmap-yaml";
-import { FOLLOW_PATH, GOAL, LOCAL_CITY, NAVFN, PROGRESS, SHOW_LOCAL_COSTMAP, THROUGH_SOURCE, THROUGH_XML } from "./defaults";
+import {
+  FOLLOW_PATH,
+  GOAL,
+  LATTICE,
+  LOCAL_CITY,
+  NAVFN,
+  NAVFN_PARAMS,
+  PROGRESS,
+  SMAC,
+  SMAC2D,
+  THETA,
+  THROUGH_SOURCE,
+  THROUGH_XML,
+} from "./defaults";
 import type { Nav2Station } from "./types";
 
 const costmap: Nav2Station = {
@@ -7,7 +20,7 @@ const costmap: Nav2Station = {
   focus: "global_costmap",
   client: "through",
   tree: "through",
-  showProgress: false,
+  showProgress: true,
   cityObstacles: true,
   explain: "Hier bearbeiten wir die Konfiguration der \"global Costmap\". Costmaps werden von den Plannern verwendet um auf diesen die Wegpunkte auszurechnen, die Costmaps liefern dazu die Hindernisse bzw. Einschränkungen. Die Mission ist zu bestehen in dem nur Einstellungen in der global_costmap vorgenommen werden. Zur Not können Einstellungen auch im Controller erfolgen. Toggle die Costmap am Button unter der Karte an und aus, vor dem ersten Start kann es etwas fehlerhaft sein",
   nodes: [
@@ -23,11 +36,30 @@ const costmap: Nav2Station = {
     { from: "planner", to: "controller", label: "follow_path" },
     { from: "local_costmap", to: "controller", label: "costmap" },
   ],
-  fields: ["through", "controller", "planner", "progress", "goal", "mission", "localCostmap", "globalCostmap"],
+  fields: [
+    "through",
+    "controller",
+    "planner",
+    "navfn",
+    "smac2d",
+    "theta",
+    "smac",
+    "lattice",
+    "progress",
+    "goal",
+    "mission",
+    "localCostmap",
+    "globalCostmap",
+  ],
   defaults: {
     through: THROUGH_SOURCE,
     controller: FOLLOW_PATH,
     planner: NAVFN,
+    navfn: NAVFN_PARAMS,
+    smac2d: SMAC2D,
+    theta: THETA,
+    smac: SMAC,
+    lattice: LATTICE,
     progress: PROGRESS,
     goal: GOAL,
     mission: THROUGH_XML,

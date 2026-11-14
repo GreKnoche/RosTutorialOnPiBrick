@@ -144,7 +144,7 @@ const COSTMAP: NodeMission = {
     { x: 5.6, y: MID-DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
     { x: 6.6, y: MID+DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
     { x: 7.6, y: MID-DIFF_MID, w: COST_BOX_SIDE, h: COST_BOX_SIDE },
-    { x: 9.3, y: 5.53, w: 1.0, h:1.0 },
+    { x: 9.2, y: 5.53, w: 0.28, h:1.5 },
     
   ],
   melons: [[8.63, 6.59]],
@@ -204,11 +204,11 @@ const BAUM_1: NodeMission = {
   obstacles: [],
   checkpoints: [],
   laterObstacles: [
-    { x: 6.675, y: 5.984, w: 0.95, h: 0.42 },
-    { x: 6.675, y: 5.124, w: 0.95, h: 0.42 },
-    { x: 7.1, y: 5.554, w: 0.3, h: 1.28 },
+    { x: MID+2.8, y: MID+3.0, w: 6.0, h: 0.4 },
+    { x: MID, y: MID-0.75, w: 0.4, h: 3.5 },
+    { x: MID+2.8, y: MID-4.5, w: 6.0, h: 0.4 },
   ],
-  trigger: { x: 5.35, yMin: 5.19, yMax: 5.92 },
+  trigger: { x: 5.9, yMin: 5.19, yMax: 8.2 },
 };
 
 export const NAV_NODES: NavNode[] = [
@@ -250,7 +250,7 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "plugin",
-    missions: [PLUGIN],
+    missions: [PLUGIN, PLANNER],
   },
   {
     id: "local_costmap",
@@ -269,22 +269,6 @@ export const NAV_NODES: NavNode[] = [
     missions: [COSTMAP],
   },
   {
-    id: "planner_plugin",
-    name: "Smac Hybrid",
-    x: 22,
-    y: 58,
-    show: "planner",
-    missions: [PLANNER],
-  },
-  {
-    id: "goal",
-    name: "goal_checker",
-    x: 84,
-    y: 88,
-    show: "plugin",
-    missions: [],
-  },
-  {
     id: "mission",
     name: "mission",
     x: 50,
@@ -295,7 +279,7 @@ export const NAV_NODES: NavNode[] = [
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-export const MISSION_ORDER = ["folgen", "controller", "plugin", "costmap", "planner", "baum-1"] as const;
+export const MISSION_ORDER = ["folgen", "controller", "costmap", "planner", "plugin", "baum-1"] as const;
 
 export type MissionId = (typeof MISSION_ORDER)[number];
 
