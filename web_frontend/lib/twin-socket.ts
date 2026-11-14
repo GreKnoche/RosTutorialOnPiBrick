@@ -11,6 +11,8 @@ export type CostmapGrid = {
   cells: Array<[number, number, number]>;
 };
 
+export type NavPath = Array<{ x: number; y: number }>;
+
 export type TwinState = {
   x: number;
   y: number;
@@ -34,6 +36,7 @@ export type TwinState = {
   lap?: { text: string; done: boolean; grass: boolean; next: string } | null;
   bumps?: number;
   costmap?: CostmapGrid | null;
+  path?: NavPath | null;
 };
 
 export type TwinDone = {
@@ -102,6 +105,7 @@ function asState(data: Record<string, unknown>): TwinState | null {
     lap: asLap(data.lap),
     bumps: typeof data.bumps === "number" ? data.bumps : undefined,
     costmap: "costmap" in data ? (asCostmap(data.costmap) ?? null) : undefined,
+    path: "path" in data ? (asPath(data.path) ?? null) : undefined,
   };
 }
 
@@ -175,6 +179,19 @@ function asCostmap(value: unknown): CostmapGrid | undefined {
     height: grid.height,
     cells,
   };
+}
+
+function asPath(value: unknown): NavPath | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const points: NavPath = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const point = item as Record<string, unknown>;
+    if (typeof point.x !== "number" || typeof point.y !== "number") continue;
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+    points.push({ x: point.x, y: point.y });
+  }
+  return points.length ? points : undefined;
 }
 
 function asRanges(value: unknown): Array<number | null> | undefined {

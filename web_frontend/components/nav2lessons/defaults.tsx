@@ -290,7 +290,11 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 
 # Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
-# Ost math.pi * 0, Nord math.pi / 2, West math.pi, Süd -math.pi / 2.
+EAST = 0.0
+NORTH = math.pi / 2
+WEST = math.pi
+SOUTH = -math.pi / 2
+
 POINTS = [
     # (1.4, 5.59, 0.0),
 ]
@@ -368,7 +372,11 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 
 # Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
-# Ost math.pi * 0, Nord math.pi / 2, West math.pi, Süd -math.pi / 2.
+EAST = 0.0
+NORTH = math.pi / 2
+WEST = math.pi
+SOUTH = -math.pi / 2
+
 POINTS = [
     # (1.4, 5.59, 0.0),
 ]

@@ -23,6 +23,7 @@ type Slot = {
   navRun: boolean;
   navKey: string;
   pluginHash: string;
+  btPluginHash: string;
   studentGen: number;
   starting: boolean;
   startGen: number;
@@ -38,6 +39,7 @@ const slot: Slot = ((globalThis as { __waypointSlot?: Slot }).__waypointSlot ??=
   navRun: false,
   navKey: "",
   pluginHash: "",
+  btPluginHash: "",
   studentGen: 0,
   starting: false,
   startGen: 0,
@@ -48,6 +50,7 @@ slot.startGen ??= 0;
 slot.stops ??= 0;
 slot.navRunLog ??= "";
 slot.navRun ??= false;
+slot.btPluginHash ??= "";
 
 let gate: Promise<void> = Promise.resolve();
 
@@ -275,6 +278,16 @@ function pluginOf(value: unknown): string | null {
     return null;
   }
   if (!value.includes("PLUGINLIB_EXPORT_CLASS") || !value.includes("maneuver_at_waypoint::ManeuverAtWaypoint")) {
+    return null;
+  }
+  return value.endsWith("\n") ? value : `${value}\n`;
+}
+
+function btPluginOf(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim() || value.length > MAX_TEXT || value.includes("\0")) {
+    return null;
+  }
+  if (!value.includes("BT_REGISTER_NODES") || !value.includes("path_clear_bt_node::PathClear") || !value.includes('"PathClear"')) {
     return null;
   }
   return value.endsWith("\n") ? value : `${value}\n`;
@@ -580,12 +593,49 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
   return null;
 }
 
+async function buildBtPlugin(source: string, hash: string): Promise<string | null> {
+  const setup = path.join(pluginWorkspace(), "install", "setup.bash");
+  const builtCpp = path.join(pluginWorkspace(), "src", "path_clear_bt_node", "src", "path_clear_bt_node.cpp");
+  const previous = await readFile(builtCpp, "utf8").catch(() => "");
+  if (previous === source) {
+    const existing = await readFile(setup, "utf8").catch(() => "");
+    if (existing) {
+      slot.btPluginHash = hash;
+      return null;
+    }
+  }
+  const ws = pluginWorkspace();
+  const pkg = path.join(ws, "src", "path_clear_bt_node");
+  const skeleton = path.join(process.cwd(), "scripts", "path_clear_bt_node");
+  await mkdir(path.join(pkg, "src"), { recursive: true });
+  for (const name of ["package.xml", "CMakeLists.txt"]) {
+    await copyFile(path.join(skeleton, name), path.join(pkg, name));
+  }
+  await writeText(path.join(pkg, "src", "path_clear_bt_node.cpp"), source);
+  const built = await rosBash(
+    [`cd ${sh(ws)}`, "colcon build --packages-select path_clear_bt_node --symlink-install"].join("\n"),
+    16_000,
+  );
+  if (built.code !== 0) {
+    slot.btPluginHash = "";
+    const stderr = await readFile(
+      path.join(ws, "log", "latest_build", "path_clear_bt_node", "stderr.log"),
+      "utf8",
+    ).catch(() => "");
+    return `${built.out}\n${stderr}`.trim().slice(-8_000) || "PathClear lässt sich nicht bauen.";
+  }
+  slot.btPluginHash = hash;
+  return null;
+}
+
 async function ensureNav(
   navKey: string,
   posePath: string,
   throughPath: string,
   paramsPath: string,
   withFollower: boolean,
+  pluginLibs: string[],
+  needPluginWs: boolean,
   gen: number,
 ): Promise<string | null> {
   if (slot.startGen !== gen) return "Nav2 gestoppt.";
@@ -603,10 +653,11 @@ async function ensureNav(
   }
   const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
   const pluginSetup = path.join(pluginWorkspace(), "install", "setup.bash");
+  const libs = pluginLibs.join(":");
   const command = [
     rosPrelude(),
-    withFollower ? `source ${sh(pluginSetup)}` : "",
-    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"}`,
+    needPluginWs ? `source ${sh(pluginSetup)}` : "",
+    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"} plugin_lib_names:=${sh(libs)}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -653,6 +704,7 @@ function stopStarting(gen: number) {
 async function runStudent(
   source: string,
   plugin: string | null,
+  btPlugin: string | null,
   pose: string,
   through: string,
   controller: string | null,
@@ -709,6 +761,7 @@ async function runStudent(
   await writeText(sourcePath, source);
   const withFollower = plugin !== null;
   const pluginHash = plugin ? createHash("sha256").update(plugin).digest("hex") : "none";
+  const btHash = btPlugin ? createHash("sha256").update(btPlugin).digest("hex") : "none";
   if (plugin) {
     const built = await buildPlugin(plugin, pluginHash);
     if (slot.startGen !== gen || slot.stops !== stopMark) {
@@ -720,9 +773,22 @@ async function runStudent(
       return { ok: false as const, error: built };
     }
   }
+  if (btPlugin) {
+    const built = await buildBtPlugin(btPlugin, btHash);
+    if (slot.startGen !== gen || slot.stops !== stopMark) {
+      stopStarting(gen);
+      return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
+    }
+    if (built) {
+      stopStarting(gen);
+      return { ok: false as const, error: built };
+    }
+  }
+  const pluginLibs = btPlugin ? ["path_clear_bt_node"] : [];
+  const needPluginWs = plugin !== null || btPlugin !== null;
   const paramsBytes = await readFile(params.file, "utf8");
-  const navKey = `${createHash("sha256").update(pose).digest("hex")}:${createHash("sha256").update(through).digest("hex")}:${pluginHash}:${createHash("sha256").update(paramsBytes).digest("hex")}:${withFollower ? "1" : "0"}`;
-  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower, gen);
+  const navKey = `${createHash("sha256").update(pose).digest("hex")}:${createHash("sha256").update(through).digest("hex")}:${pluginHash}:${btHash}:${createHash("sha256").update(paramsBytes).digest("hex")}:${withFollower ? "1" : "0"}:${pluginLibs.join(",")}`;
+  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower, pluginLibs, needPluginWs, gen);
   if (slot.startGen !== gen || slot.stops !== stopMark) {
     stopStarting(gen);
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
@@ -837,6 +903,18 @@ export async function POST(request: Request) {
     if (!plugin) {
       return Response.json(
         { ok: false, error: "Das Manöver muss maneuver_at_waypoint::ManeuverAtWaypoint exportieren." },
+        { status: 400 },
+      );
+    }
+  }
+  const rawBtPlugin =
+    body && typeof body === "object" && "btPlugin" in body ? (body as { btPlugin?: unknown }).btPlugin : undefined;
+  let btPlugin: string | null = null;
+  if (rawBtPlugin !== undefined) {
+    btPlugin = btPluginOf(rawBtPlugin);
+    if (!btPlugin) {
+      return Response.json(
+        { ok: false, error: "PathClear muss path_clear_bt_node::PathClear per BT_REGISTER_NODES registrieren." },
         { status: 400 },
       );
     }
@@ -961,6 +1039,7 @@ export async function POST(request: Request) {
     runStudent(
       source,
       plugin,
+      btPlugin,
       pose,
       through,
       controller,

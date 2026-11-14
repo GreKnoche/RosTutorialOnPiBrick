@@ -1,5 +1,6 @@
 import { SHOW_LOCAL_COSTMAP } from "@/lib/costmap-yaml";
-import baum1 from "./baum-1";
+import btMonitor from "./bt-monitor";
+import btStruktur from "./bt-struktur";
 import controller from "./controller";
 import costmap from "./costmap";
 import folgen from "./folgen";
@@ -24,7 +25,7 @@ function shown(station: Nav2Station): Nav2Station {
 }
 
 /** Road order, without the driveway. */
-export const STATIONS: Nav2Station[] = [folgen, controller, costmap, planner, plugin, baum1].map(shown);
+export const STATIONS: Nav2Station[] = [folgen, controller, costmap, planner, plugin, btStruktur, btMonitor].map(shown);
 
 for (const station of STATIONS) {
   for (const field of station.fields) {

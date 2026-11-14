@@ -25,7 +25,7 @@ import { formatDe } from "@/lib/format";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { holdRunTerminal, noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
-import { ROBOT_API, openTwin, type CostmapGrid, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
+import { ROBOT_API, openTwin, type CostmapGrid, type NavPath, type TwinLink, type TwinPhase, type TwinState } from "@/lib/twin-socket";
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
 
@@ -201,6 +201,13 @@ function costmapKey(grid: CostmapGrid | null) {
   return `${grid.originX.toFixed(2)}:${grid.originY.toFixed(2)}:${grid.resolution}:${grid.cells.length}:${last ? last.join(",") : ""}`;
 }
 
+function pathKey(path: NavPath | null) {
+  if (!path?.length) return "";
+  const first = path[0];
+  const last = path[path.length - 1];
+  return `${path.length}:${first.x.toFixed(2)},${first.y.toFixed(2)}:${last.x.toFixed(2)},${last.y.toFixed(2)}`;
+}
+
 export function CityLab({
   kapitel = null,
   notice = null,
@@ -209,6 +216,7 @@ export function CityLab({
   ghost = false,
   course = null,
   needBackup = false,
+  needMonitorStop = false,
   missionKey = "",
   round = 0,
   spawn = null,
@@ -223,6 +231,7 @@ export function CityLab({
   runKey = 0,
   timing = false,
   costmapToggle = false,
+  pathToggle = false,
   walls = false,
 }: {
   kapitel?: string | null;
@@ -232,6 +241,8 @@ export function CityLab({
   ghost?: boolean;
   course?: Course | null;
   needBackup?: boolean;
+  /** After the deferred wall spawns: clean stop without a wall hit finishes the mission. */
+  needMonitorStop?: boolean;
   missionKey?: string;
   round?: number;
   spawn?: { x: number; y: number; theta: number } | null;
@@ -246,6 +257,7 @@ export function CityLab({
   runKey?: number;
   timing?: boolean;
   costmapToggle?: boolean;
+  pathToggle?: boolean;
   walls?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -257,6 +269,7 @@ export function CityLab({
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
   const clutterRef = useRef<Rect[]>([]);
   const costmapRef = useRef<CostmapGrid | null>(null);
+  const pathRef = useRef<NavPath | null>(null);
   const linkRef = useRef<TwinLink | null>(null);
   const havePose = useRef(false);
   const clientId = useRef(useId());
@@ -284,9 +297,17 @@ export function CityLab({
   showCostmapRef.current = showCostmap;
   const costmapToggleRef = useRef(costmapToggle);
   costmapToggleRef.current = costmapToggle;
+  const [showPath, setShowPath] = useState(false);
+  const showPathRef = useRef(false);
+  showPathRef.current = showPath;
+  const pathToggleRef = useRef(pathToggle);
+  pathToggleRef.current = pathToggle;
   useEffect(() => {
     if (!costmapToggle) setShowCostmap(false);
   }, [costmapToggle]);
+  useEffect(() => {
+    if (!pathToggle) setShowPath(false);
+  }, [pathToggle]);
   const cameraRef = useRef(false);
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
@@ -312,8 +333,13 @@ export function CityLab({
   const wallsHitRef = useRef(0);
   const needBackupRef = useRef(needBackup);
   needBackupRef.current = needBackup;
+  const needMonitorStopRef = useRef(needMonitorStop);
+  needMonitorStopRef.current = needMonitorStop;
   const trapRef = useRef(false);
   const backedRef = useRef(false);
+  const monitorMovedRef = useRef(false);
+  const monitorStillRef = useRef(0);
+  const monitorDoneRef = useRef(false);
   const clearedRef = useRef(onMelonsCleared);
   clearedRef.current = onMelonsCleared;
   const gatesClearedRef = useRef(onGatesCleared);
@@ -501,6 +527,7 @@ export function CityLab({
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter) clutterRef.current = sample.clutter;
         if (sample.costmap !== undefined) costmapRef.current = sample.costmap;
+        if (sample.path !== undefined) pathRef.current = sample.path;
         if (typeof sample.bumps === "number") {
           wallsHitRef.current = sample.bumps;
           setWallsHit((previous) => (previous === sample.bumps ? previous : sample.bumps ?? previous));
@@ -583,6 +610,7 @@ export function CityLab({
         lapRef.current?.done ? "1" : "0",
         lapRef.current?.grass ? "1" : "0",
         costmapToggleRef.current && showCostmapRef.current ? costmapKey(costmapRef.current) : "",
+        pathToggleRef.current && showPathRef.current ? pathKey(pathRef.current) : "",
       ].join("|");
       if (raysRef.current && rangesRef.current) {
         signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
@@ -609,6 +637,7 @@ export function CityLab({
           ghostPose,
           spotsRef.current,
           costmapToggleRef.current && showCostmapRef.current ? costmapRef.current : null,
+          pathToggleRef.current && showPathRef.current ? pathRef.current : null,
         );
       }
       const runningCourse = courseRef.current;
@@ -632,7 +661,23 @@ export function CityLab({
           if (!wallsRef.current || wallsHitRef.current === 0) clearedRef.current?.();
         }
       }
-      if (!kapitelRef.current && melonsOnRef.current) {
+      if (needMonitorStopRef.current && trapRef.current && !monitorDoneRef.current && wallsHitRef.current === 0) {
+        const melonsGone =
+          !melonsOnRef.current ||
+          (melonsRef.current.length > 0 && melonsRef.current.every((alive) => !alive));
+        const speed = Math.abs(motionRef.current.linear);
+        if (speed > 0.05) {
+          monitorMovedRef.current = true;
+          monitorStillRef.current = 0;
+        } else if (melonsGone && monitorMovedRef.current && speed < 0.03) {
+          monitorStillRef.current += 1;
+          if (monitorStillRef.current >= 25) {
+            monitorDoneRef.current = true;
+            clearedRef.current?.();
+          }
+        }
+      }
+      if (!kapitelRef.current && melonsOnRef.current && !needMonitorStopRef.current) {
         const pose = poseRef.current;
         if (holdMelons.current) {
           const home = spawnRef.current ?? cityRef.current?.start;
@@ -646,6 +691,18 @@ export function CityLab({
           if (left === 0 && (!needBackupRef.current || backedRef.current) && (!wallsRef.current || wallsHitRef.current === 0)) {
             clearedRef.current?.();
           }
+        }
+      }
+      if (!kapitelRef.current && melonsOnRef.current && needMonitorStopRef.current) {
+        const pose = poseRef.current;
+        if (holdMelons.current) {
+          const home = spawnRef.current ?? cityRef.current?.start;
+          if (!home || Math.hypot(pose.x - home.x, pose.y - home.y) < 0.25) holdMelons.current = false;
+        }
+        const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y, spotsRef.current);
+        if (next !== melonsRef.current) {
+          melonsRef.current = next;
+          setMelonsLeft(next.filter(Boolean).length);
         }
       }
       const gatesOn = gatesOnRef.current;
@@ -743,6 +800,9 @@ export function CityLab({
   useEffect(() => {
     trapRef.current = false;
     backedRef.current = false;
+    monitorMovedRef.current = false;
+    monitorStillRef.current = 0;
+    monitorDoneRef.current = false;
     if (!rosUp) return;
     if (!courseRef.current && !courseWasOn.current) return;
     courseWasOn.current = courseRef.current !== null;
@@ -824,6 +884,9 @@ export function CityLab({
     memoryRef.current = emptyMemory();
     trapRef.current = false;
     backedRef.current = false;
+    monitorMovedRef.current = false;
+    monitorStillRef.current = 0;
+    monitorDoneRef.current = false;
     if (melonsOnRef.current) holdMelons.current = true;
     melonsRef.current = freshMelons(spotsRef.current);
     setMelonsLeft(spotsRef.current.length);
@@ -1103,6 +1166,15 @@ export function CityLab({
                 onToggle={() => setShowCostmap((current) => !current)}
               >
                 Costmap
+              </FlagBox>
+            ) : null}
+            {pathToggle ? (
+              <FlagBox
+                on={showPath}
+                title="Zeichnet den globalen Nav2-Pfad (/plan) über die Karte."
+                onToggle={() => setShowPath((current) => !current)}
+              >
+                Pfad
               </FlagBox>
             ) : null}
             <FlagBox

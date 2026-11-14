@@ -37,7 +37,7 @@ export type NodeMission = {
 };
 
 /** Lesson id that first draws the node. */
-export type NodeShow = "folgen" | "controller" | "planner" | "plugin" | "costmap" | "baum-1";
+export type NodeShow = "folgen" | "controller" | "planner" | "plugin" | "costmap" | "bt-struktur" | "bt-monitor";
 
 export type NavNode = {
   id: string;
@@ -183,14 +183,13 @@ const PLANNER: NodeMission = {
 };
 
 /**
- * baum-1: nothing at the start. The U spawns once the car has passed x on the
+ * bt-struktur: nothing at the start. The U spawns once the car has passed x on the
  * drive through the U. The band covers the north arm, the stem, and the south
- * arm. The first melon sits on the open mid-road stretch. The other five are
- * past the U.
+ * arm. The first melon sits on the open mid-road stretch. The other is past the U.
  */
-const BAUM_1: NodeMission = {
-  id: "baum-1",
-  title: "Behavior Tree 1",
+const BT_STRUKTUR: NodeMission = {
+  id: "bt-struktur",
+  title: "Behavior Tree - Struktur",
   kind: "melons",
   spawn: HOME,
   melons: [
@@ -198,17 +197,33 @@ const BAUM_1: NodeMission = {
     [7.2, 5.5],
   ],
   obstacles: [
-    { x: MID-2, y: MID+0.4, w: 4.5, h: 0.2 },
-    { x: MID-2, y: MID-0.4, w: 4.5, h: 0.2 },
-    { x: MID-4.3, y: MID, w: 0.2, h: 1 }
+    { x: MID - 2, y: MID + 0.4, w: 4.5, h: 0.2 },
+    { x: MID - 2, y: MID - 0.4, w: 4.5, h: 0.2 },
+    { x: MID - 4.3, y: MID, w: 0.2, h: 1 },
   ],
   checkpoints: [],
   laterObstacles: [
-    { x: MID-2, y: MID+0.4, w: 4.5, h: 0.2 },
-    { x: MID-2, y: MID-0.4, w: 4.5, h: 0.2 },
-    { x: MID+0.3, y: MID, w: 0.2, h: 1 },
+    { x: MID - 2, y: MID + 0.4, w: 4.5, h: 0.2 },
+    { x: MID - 2, y: MID - 0.4, w: 4.5, h: 0.2 },
+    { x: MID + 0.3, y: MID, w: 0.2, h: 1 },
   ],
   trigger: { x: 5.15, yMin: MID - 5.0, yMax: MID + 3.6 },
+};
+
+/**
+ * bt-monitor: open road, one melon, then a wall across the lane after the trigger.
+ * PathClear must fail the tree before the chassis hits the wall.
+ */
+const BT_MONITOR: NodeMission = {
+  id: "bt-monitor",
+  title: "Behavior Tree - Monitor",
+  kind: "melons",
+  spawn: HOME,
+  melons: [[4.6, 5.55]],
+  obstacles: [],
+  checkpoints: [],
+  laterObstacles: [{ x: MID + 0.2, y: MID, w: 0.2, h: 0.9 }],
+  trigger: { x: 4.55, yMin: MID - 0.5, yMax: MID + 0.5 },
 };
 
 export const NAV_NODES: NavNode[] = [
@@ -270,16 +285,24 @@ export const NAV_NODES: NavNode[] = [
   },
   {
     id: "mission",
-    name: "mission",
+    name: "behavior tree",
     x: 50,
     y: 88,
-    show: "baum-1",
-    missions: [BAUM_1],
+    show: "bt-struktur",
+    missions: [BT_STRUKTUR, BT_MONITOR],
+  },
+  {
+    id: "path_clear",
+    name: "path_clear",
+    x: 22,
+    y: 88,
+    show: "bt-monitor",
+    missions: [],
   },
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-export const MISSION_ORDER = ["folgen", "controller", "costmap", "planner", "plugin", "baum-1"] as const;
+export const MISSION_ORDER = ["folgen", "controller", "costmap", "planner", "plugin", "bt-struktur", "bt-monitor"] as const;
 
 export type MissionId = (typeof MISSION_ORDER)[number];
 

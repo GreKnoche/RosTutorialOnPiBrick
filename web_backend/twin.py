@@ -466,6 +466,35 @@ def pack_costmap(
     }
 
 
+def pack_path(poses: object) -> list[dict[str, float]] | None:
+    """Nav2 Path poses as [{x, y}, ...]. Empty or bad input clears the overlay."""
+    if not isinstance(poses, (list, tuple)):
+        return None
+    points: list[dict[str, float]] = []
+    for item in poses:
+        pose = getattr(item, "pose", None)
+        if pose is None and isinstance(item, dict):
+            pose = item.get("pose", item)
+        position = getattr(pose, "position", None)
+        if position is None and isinstance(pose, dict):
+            position = pose.get("position", pose)
+        if position is None:
+            continue
+        try:
+            if isinstance(position, dict):
+                x = float(position["x"])
+                y = float(position["y"])
+            else:
+                x = float(position.x)
+                y = float(position.y)
+        except (TypeError, ValueError, KeyError, AttributeError):
+            continue
+        if not math.isfinite(x) or not math.isfinite(y):
+            continue
+        points.append({"x": x, "y": y})
+    return points if points else None
+
+
 def sample_dict(sample: TwinSample) -> dict[str, object]:
     goal = None
     if sample.goal_x is not None and sample.goal_y is not None and sample.goal_theta is not None:
@@ -626,6 +655,13 @@ class TwinHub:
         with self._lock:
             view = dict(self._city_view)
             view["costmap"] = packet
+            self._city_view = view
+
+    def store_path(self, points: list[dict[str, float]] | None) -> None:
+        """Keep the latest Nav2 plan. None clears the overlay."""
+        with self._lock:
+            view = dict(self._city_view)
+            view["path"] = points
             self._city_view = view
 
     def clear_city(self) -> None:

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { ChevronRight } from "lucide-react";
 import { WaypointNode } from "@/components/waypoint-node";
 import { BtTickAnimation } from "@/components/bt-tick-animation";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
@@ -21,6 +22,28 @@ import {
 import { NAV_NODES } from "@/lib/nav2-lessons";
 
 const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
+
+/** Plain text plus **bold** spans. Newlines stay via whitespace-pre-line. */
+function explainNodes(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  const pattern = /\*\*(.+?)\*\*/g;
+  let cursor = 0;
+  let match = pattern.exec(text);
+  let key = 0;
+  while (match) {
+    if (match.index > cursor) parts.push(text.slice(cursor, match.index));
+    parts.push(
+      <strong key={key} className="font-semibold text-foreground">
+        {match[1]}
+      </strong>,
+    );
+    key += 1;
+    cursor = match.index + match[0].length;
+    match = pattern.exec(text);
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
 
 function GoalCheckerEditor({
   missionId,
@@ -163,6 +186,7 @@ export function NavGraph({
   const selected = placed.some((node) => node.id === wanted) ? wanted : (placed[0]?.id ?? "waypoint_lesson");
   const missionDraft = useField(missionId, "mission");
   const maneuverDraft = useField(missionId, "maneuver");
+  const pathClearDraft = useField(missionId, "pathClear");
   const controllerDraft = useField(missionId, "controller");
   const followerDraft = useField(missionId, "follower");
   const plannerDraft = useField(missionId, "planner");
@@ -179,6 +203,7 @@ export function NavGraph({
   const driveRef = playRef ?? ownDrive;
   const missionDefault = graph.defaults.mission ?? "";
   const maneuverDefault = graph.defaults.maneuver ?? "";
+  const pathClearDefault = graph.defaults.pathClear ?? "";
   const controllerDefault = graph.defaults.controller ?? "";
   const followerDefault = graph.defaults.follower ?? "";
   const plannerDefault = graph.defaults.planner ?? "";
@@ -188,6 +213,7 @@ export function NavGraph({
   const goalDefault = graph.defaults.goal ?? "";
   const xml = missionDraft ?? missionDefault;
   const maneuver = maneuverDraft ?? maneuverDefault;
+  const pathClear = pathClearDraft ?? pathClearDefault;
   const controllerYaml = absorbFollowPath(controllerDefault, controllerDraft ?? controllerDefault);
   const controllerProblem = controllerYaml.trim() ? followPathError(controllerYaml) : null;
   const followerYaml = followerDraft ?? followerDefault;
@@ -239,12 +265,53 @@ export function NavGraph({
     ];
   });
 
+  const [explainOpen, setExplainOpen] = useState(true);
+  const [graphOpen, setGraphOpen] = useState(true);
+
   return (
     <section className="mt-6 flex flex-col gap-4" onClick={() => setRing(false)}>
-      <h2 className="text-base font-semibold">Erklärung</h2>
-      <p className="text-sm leading-6 text-muted-foreground">{graph.explain}</p>
-      {graph.id === "baum-1" ? <BtTickAnimation /> : null}
-      <h2 className="text-base font-semibold">Code Graph</h2>
+      <div className="group flex flex-col gap-4">
+        <button
+          type="button"
+          aria-expanded={explainOpen}
+          onClick={() => setExplainOpen((open) => !open)}
+          className="flex w-fit items-center gap-1.5 text-left"
+        >
+          <ChevronRight
+            aria-hidden
+            className={`size-4 shrink-0 text-muted-foreground transition-[opacity,transform] duration-200 ${
+              explainOpen ? "rotate-90" : "rotate-0"
+            } opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`}
+          />
+          <h2 className="text-base font-semibold">Erklärung</h2>
+        </button>
+        {explainOpen ? (
+          <>
+            <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">{explainNodes(graph.explain)}</p>
+            {graph.id === "bt-struktur" ? <BtTickAnimation mode="struktur" /> : null}
+            {graph.id === "bt-monitor" ? <BtTickAnimation mode="monitor" /> : null}
+          </>
+        ) : null}
+      </div>
+      <div className="group flex flex-col gap-4">
+        <button
+          type="button"
+          aria-expanded={graphOpen}
+          onClick={() => {
+            setGraphOpen((open) => !open);
+            setRing(false);
+          }}
+          className="flex w-fit items-center gap-1.5 text-left"
+        >
+          <ChevronRight
+            aria-hidden
+            className={`size-4 shrink-0 text-muted-foreground transition-[opacity,transform] duration-200 ${
+              graphOpen ? "rotate-90" : "rotate-0"
+            } opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`}
+          />
+          <h2 className="text-base font-semibold">Code Graph</h2>
+        </button>
+        {graphOpen ? (
       <div className={ring ? "overflow-visible py-28" : "overflow-x-auto"}>
         <div className="relative w-full" style={{ height: graphHeight }} role="group" aria-label="Verbundene Knoten">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
@@ -334,6 +401,8 @@ export function NavGraph({
               })
             : null}
         </div>
+      </div>
+        ) : null}
       </div>
       <div hidden={current?.id !== "waypoint_lesson"}>
         <WaypointNode station={graph} driveRef={driveRef} onBusy={onPlayBusy} />
@@ -492,6 +561,24 @@ export function NavGraph({
             value={maneuver}
             onChange={(value) => writeLessonText(missionId, "maneuver", value === maneuverDefault ? null : value)}
             label="Manöver maneuver_at_waypoint"
+            language="cpp"
+            height="h-[36rem]"
+          />
+        </div>
+      ) : null}
+      {current?.id === "path_clear" ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">path_clear_bt_node.cpp</h3>
+            <ResetCodeButton
+              disabled={pathClear === pathClearDefault}
+              onClick={() => writeLessonText(missionId, "pathClear", null)}
+            />
+          </div>
+          <CodeEditor
+            value={pathClear}
+            onChange={(value) => writeLessonText(missionId, "pathClear", value === pathClearDefault ? null : value)}
+            label="BT-Knoten PathClear"
             language="cpp"
             height="h-[36rem]"
           />

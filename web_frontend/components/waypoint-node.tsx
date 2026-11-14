@@ -31,6 +31,7 @@ export function WaypointNode({
   const waypoint = useField(missionId, "waypoint");
   const through = useField(missionId, "through");
   const maneuver = useField(missionId, "maneuver");
+  const pathClear = useField(missionId, "pathClear");
   const mission = useField(missionId, "mission");
   const controller = useField(missionId, "controller");
   const follower = useField(missionId, "follower");
@@ -55,9 +56,16 @@ export function WaypointNode({
 
   const drive = useCallback(async () => {
     onBusy?.(true);
-    holdRunTerminal(has("maneuver") ? "Baue maneuver_at_waypoint und starte Nav2." : "Starte Nav2.");
+    holdRunTerminal(
+      has("pathClear")
+        ? "Baue PathClear und starte Nav2."
+        : has("maneuver")
+          ? "Baue maneuver_at_waypoint und starte Nav2."
+          : "Starte Nav2.",
+    );
     const body: Record<string, unknown> = { source };
     if (has("maneuver")) body.plugin = kept(maneuver, station.defaults.maneuver);
+    if (has("pathClear")) body.btPlugin = kept(pathClear, station.defaults.pathClear);
     if (station.tree === "through") body.tree = kept(mission, station.defaults.mission);
     if (station.tree === "pose") body.pose = kept(mission, station.defaults.mission);
     if (has("controller")) body.controller = kept(controller, station.defaults.controller);
@@ -94,7 +102,7 @@ export function WaypointNode({
     } finally {
       onBusy?.(false);
     }
-  }, [controller, follower, globalCostmap, goal, has, lattice, localCostmap, maneuver, mission, navfn, onBusy, planner, progress, smac, smac2d, source, station, theta]);
+  }, [controller, follower, globalCostmap, goal, has, lattice, localCostmap, maneuver, mission, navfn, onBusy, pathClear, planner, progress, smac, smac2d, source, station, theta]);
 
   useEffect(() => {
     driveRef.current = () => {

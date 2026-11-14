@@ -73,6 +73,11 @@ def _setup(context, *_args, **_kwargs):
     cache = context.perform_substitution(LaunchConfiguration("cache_dir")).strip()
     given = context.perform_substitution(LaunchConfiguration("params_file")).strip()
     with_follower = context.perform_substitution(LaunchConfiguration("with_follower")).strip().lower() != "false"
+    plugin_libs = [
+        name
+        for name in context.perform_substitution(LaunchConfiguration("plugin_lib_names")).strip().split(":")
+        if name
+    ]
     params = os.path.join(cache, "nav2_params.yaml")
     _widen(given or _params_source(), params)
     remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
@@ -83,6 +88,12 @@ def _setup(context, *_args, **_kwargs):
         "behavior_server",
         "bt_navigator",
     ]
+    bt_params = {
+        "default_nav_to_pose_bt_xml": pose_xml,
+        "default_nav_through_poses_bt_xml": through_xml,
+    }
+    if plugin_libs:
+        bt_params["plugin_lib_names"] = plugin_libs
     nodes = [
         Node(
             package="nav2_controller",
@@ -107,10 +118,7 @@ def _setup(context, *_args, **_kwargs):
             output="screen",
             parameters=[
                 *common,
-                {
-                    "default_nav_to_pose_bt_xml": pose_xml,
-                    "default_nav_through_poses_bt_xml": through_xml,
-                },
+                bt_params,
             ],
             remappings=remappings,
         ),
@@ -161,6 +169,11 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("cache_dir"),
             DeclareLaunchArgument("params_file", default_value=""),
             DeclareLaunchArgument("with_follower", default_value="true"),
+            DeclareLaunchArgument(
+                "plugin_lib_names",
+                default_value="",
+                description="Colon-separated custom BT plugin library names for bt_navigator.",
+            ),
             OpaqueFunction(function=_setup),
         ]
     )

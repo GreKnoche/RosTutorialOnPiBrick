@@ -3,7 +3,7 @@ import type { CityProbe } from "@/lib/city-probe";
 import { SCAN_MIN, SCAN_STEP, cityScreen } from "@/lib/city-view";
 import { MELONS } from "@/lib/melons";
 import { TRACK_CAR } from "@/lib/track-car";
-import type { CostmapGrid } from "@/lib/twin-socket";
+import type { CostmapGrid, NavPath } from "@/lib/twin-socket";
 import type { CityMap, Gate, LapState, Rect, Shore } from "@/lib/city-map";
 
 const BODY_L = 0.128;
@@ -51,6 +51,28 @@ function paintCostmap(ctx: CanvasRenderingContext2D, to: (x: number, y: number) 
   const bottomRight = to(originX + width * resolution, originY);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(raster, topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+}
+
+function paintPath(ctx: CanvasRenderingContext2D, to: (x: number, y: number) => Screen, path: NavPath, ppm: number) {
+  if (path.length < 1) return;
+  const screens = path.map((point) => to(point.x, point.y));
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.95)";
+  ctx.lineWidth = Math.max(2, ppm * 0.035);
+  ctx.beginPath();
+  ctx.moveTo(screens[0].x, screens[0].y);
+  for (let index = 1; index < screens.length; index += 1) {
+    ctx.lineTo(screens[index].x, screens[index].y);
+  }
+  ctx.stroke();
+  const dot = Math.max(2.2, ppm * 0.045);
+  ctx.fillStyle = "rgba(14, 165, 233, 0.95)";
+  for (const screen of screens) {
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, dot, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function tileKind(ix: number, iy: number) {
@@ -434,6 +456,7 @@ export function draw(
   ghost: Pose | null = null,
   melonSpots: ReadonlyArray<readonly [number, number]> = MELONS,
   costmap: CostmapGrid | null = null,
+  path: NavPath | null = null,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -446,6 +469,7 @@ export function draw(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(layer, 0, 0);
   if (costmap) paintCostmap(ctx, to, costmap);
+  if (path) paintPath(ctx, to, path, ppm);
   if (gates && city) drawGates(ctx, to, ppm, courseGates ?? city.gates, lap);
 
   if (melons) {

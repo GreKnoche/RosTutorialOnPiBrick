@@ -6,6 +6,7 @@ const NAV2_TEXT_KEYS = {
   waypoint: "learn2ros.nav2.waypoint",
   through: "learn2ros.nav2.through",
   maneuver: "learn2ros.nav2.maneuver",
+  pathClear: "learn2ros.nav2.pathClear",
   mission: "learn2ros.nav2.mission",
   controller: "learn2ros.nav2.controller",
   progress: "learn2ros.nav2.progress",
@@ -102,10 +103,16 @@ function parseProgress(raw: string | null): Nav2Progress {
       }
       done = makeDone(legacy);
     } else if (parsed.done && typeof parsed.done === "object" && !Array.isArray(parsed.done)) {
-      done = makeDone(parsed.done as Record<string, unknown>);
+      const rawDone = { ...(parsed.done as Record<string, unknown>) };
+      // Old slug from before the BT mission split.
+      if (rawDone["baum-1"] === true && rawDone["bt-struktur"] === undefined) {
+        rawDone["bt-struktur"] = true;
+      }
+      done = makeDone(rawDone);
     }
-    const runningId = isMissionId(parsed.runningId)
-      ? parsed.runningId
+    const runningRaw = parsed.runningId === "baum-1" ? "bt-struktur" : parsed.runningId;
+    const runningId = isMissionId(runningRaw)
+      ? runningRaw
       : parsed.started === true && typeof parsed.done === "number"
         ? (MISSION_ORDER[parsed.done - 1] ?? null)
         : null;

@@ -16,7 +16,7 @@ from brick_core.chassis import Chassis, load_chassis
 from brick_core.geometry import yaw_from_quaternion, yaw_to_quaternion
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 from nav2_msgs.srv import ClearEntireCostmap
-from nav_msgs.msg import OccupancyGrid, Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -36,7 +36,7 @@ from city import (
     SCAN_INCREMENT,
     SCAN_MIN,
 )
-from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message, pack_costmap
+from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message, pack_costmap, pack_path
 
 
 def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointCloud2:
@@ -84,6 +84,7 @@ class CanvasTwinNode(Node):
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self.create_subscription(OccupancyGrid, "global_costmap/costmap", self._on_costmap, costmap_qos)
+        self.create_subscription(Path, "plan", self._on_plan, 10)
         self._odom_pub = self.create_publisher(Odometry, "odom", 10)
         self._joint_pub = self.create_publisher(JointState, "joint_states", 10)
         self._cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
@@ -351,6 +352,9 @@ class CanvasTwinNode(Node):
         if packet is not None:
             self.hub.store_costmap(packet)
 
+    def _on_plan(self, msg: Path) -> None:
+        self.hub.store_path(pack_path(msg.poses))
+
     def _publish_obstacles(self, stamp: object) -> None:
         city = self.plant.city
         if city is None:
@@ -362,6 +366,7 @@ class CanvasTwinNode(Node):
             self._cloud_key = key
             # Lesson blocks are not a map. Drop the old picture and mark only what is set now.
             self.hub.store_costmap(None)
+            self.hub.store_path(None)
             self._begin_costmap_clear()
         if self._clear_wait:
             if time.monotonic() - self._clear_since > 1.0:

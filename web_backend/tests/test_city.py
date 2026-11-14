@@ -22,7 +22,7 @@ from city import (
     push_circle,
     ray_rect,
 )
-from twin import TICK_HZ, CanvasPlant, TwinHub, apply_message, pack_costmap
+from twin import TICK_HZ, CanvasPlant, TwinHub, apply_message, pack_costmap, pack_path
 
 
 def _pixel(bmp: bytes, x: int, y: int) -> tuple[int, int, int]:
@@ -239,6 +239,25 @@ def test_costmap_keeps_origin_and_drops_free_cells() -> None:
     hub.clear_city()
     assert "costmap" not in hub.city_view()
     assert pack_costmap(0, 2, 0.05, 0.0, 0.0, [1]) is None
+
+
+def test_path_keeps_points_and_clears_empty() -> None:
+    points = pack_path(
+        [
+            {"pose": {"position": {"x": 1.5, "y": 4.2}}},
+            {"pose": {"position": {"x": 2.0, "y": 4.2}}},
+        ]
+    )
+    assert points == [{"x": 1.5, "y": 4.2}, {"x": 2.0, "y": 4.2}]
+    hub = TwinHub()
+    hub.store_path(points)
+    assert hub.city_view()["path"] == points
+    hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)
+    assert hub.city_view()["path"] == points
+    hub.store_path(None)
+    assert hub.city_view()["path"] is None
+    assert pack_path([]) is None
+    assert pack_path([{"pose": {"position": {"x": "bad", "y": 1.0}}}]) is None
 
 
 def test_the_camera_shows_sky_road_and_a_house() -> None:

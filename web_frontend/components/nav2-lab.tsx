@@ -58,7 +58,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
     const id = completedId ?? stationId;
     if (id) setPicked(id);
     setHint(false);
-    if ((id ? missionById(id) : station)?.kind) setRound((value) => value + 1);
     writeNav2Progress({
       runningId: null,
       done: id ? { ...done, [id]: true } : done,
@@ -109,7 +108,19 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           kapitel={kapitel}
           missionKey={stationId ?? ""}
           costmapToggle={stationId === "costmap" || done.costmap}
-          walls={stationId === "costmap"}
+          pathToggle={
+            stationId === "planner" ||
+            stationId === "plugin" ||
+            stationId === "bt-struktur" ||
+            stationId === "bt-monitor" ||
+            stationId === "costmap" ||
+            done.planner ||
+            done.plugin ||
+            done["bt-struktur"] ||
+            done["bt-monitor"] ||
+            done.costmap
+          }
+          walls={stationId === "costmap" || stationId === "bt-monitor"}
           round={round}
           melons={kind === "melons"}
           melonSpots={station?.melons}
@@ -123,7 +134,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           gates={kind === "gates"}
           ghost={kind === "gates" && station?.ghost !== false}
           course={course}
-          needBackup={station?.id === "baum-1"}
+          needBackup={station?.id === "bt-struktur"}
+          needMonitorStop={station?.id === "bt-monitor"}
           spawn={station?.spawn ?? null}
           spawnBoot={spawnBoot}
           onMelonsCleared={() => {
@@ -144,7 +156,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
               return;
             }
             writePluginPlanners(names);
-            setRound((value) => value + 1);
             setHint(true);
           }}
           onGatesCleared={() => {
@@ -192,12 +203,19 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                     <li>Radius 0,80 findet die Einfahrt nicht. DUBIN bleibt stehen.</li>
                     <li>Gras macht die Strecke ungültig.</li>
                   </ul>
-                ) : station?.id === "baum-1" ? (
+                ) : station?.id === "bt-struktur" ? (
                   <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle die sechs Melonen.</li>
+                    <li>Sammle die Melonen.</li>
                     <li>Nach der ersten Strecke steht ein U auf der Straße.</li>
-                    <li>Im Baum: RecoveryNode, zweites Kind BackUp, danach dieselbe Pipeline noch einmal.</li>
+                    <li>Im Baum: Element1 und Element2 ersetzen; BackUp ist schon als Beispiel da.</li>
                     <li>Das Zeitfenster im Progress Checker ist länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.</li>
+                  </ul>
+                ) : station?.id === "bt-monitor" ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Sammle die Melone. Danach fährt der Client weiter auf die Wand zu.</li>
+                    <li>In C++: forwardClear — endliche Strahlen im Vorwärtskegel unter min_range → false.</li>
+                    <li>Im Baum: Parallel + RateController + PathClear um FollowPath legen.</li>
+                    <li>Bestanden, wenn der Monitor greift und du die Wand nicht berührst (Zähler 0).</li>
                   </ul>
                 ) : station?.id === "costmap" ? (
                   <ul className="list-disc space-y-1 pl-4">

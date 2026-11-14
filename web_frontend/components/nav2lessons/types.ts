@@ -8,6 +8,7 @@ export type GraphNodeId =
   | "controller"
   | "planner"
   | "mission"
+  | "path_clear"
   | "local_costmap"
   | "global_costmap";
 
