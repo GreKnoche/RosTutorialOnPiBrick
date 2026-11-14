@@ -594,19 +594,22 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
 }
 
 async function buildBtPlugin(source: string, hash: string): Promise<string | null> {
-  const setup = path.join(pluginWorkspace(), "install", "setup.bash");
-  const builtCpp = path.join(pluginWorkspace(), "src", "path_clear_bt_node", "src", "path_clear_bt_node.cpp");
+  const ws = pluginWorkspace();
+  const skeleton = path.join(process.cwd(), "scripts", "path_clear_bt_node");
+  const setup = path.join(ws, "install", "setup.bash");
+  const builtCpp = path.join(ws, "src", "path_clear_bt_node", "src", "path_clear_bt_node.cpp");
+  const builtCmake = path.join(ws, "src", "path_clear_bt_node", "CMakeLists.txt");
   const previous = await readFile(builtCpp, "utf8").catch(() => "");
-  if (previous === source) {
+  const previousCmake = await readFile(builtCmake, "utf8").catch(() => "");
+  const skeletonCmake = await readFile(path.join(skeleton, "CMakeLists.txt"), "utf8");
+  if (previous === source && previousCmake === skeletonCmake) {
     const existing = await readFile(setup, "utf8").catch(() => "");
     if (existing) {
       slot.btPluginHash = hash;
       return null;
     }
   }
-  const ws = pluginWorkspace();
   const pkg = path.join(ws, "src", "path_clear_bt_node");
-  const skeleton = path.join(process.cwd(), "scripts", "path_clear_bt_node");
   await mkdir(path.join(pkg, "src"), { recursive: true });
   for (const name of ["package.xml", "CMakeLists.txt"]) {
     await copyFile(path.join(skeleton, name), path.join(pkg, name));
@@ -654,10 +657,11 @@ async function ensureNav(
   const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
   const pluginSetup = path.join(pluginWorkspace(), "install", "setup.bash");
   const libs = pluginLibs.join(":");
+  const pluginArg = libs ? ` plugin_lib_names:=${sh(libs)}` : "";
   const command = [
     rosPrelude(),
     needPluginWs ? `source ${sh(pluginSetup)}` : "",
-    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"} plugin_lib_names:=${sh(libs)}`,
+    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"}${pluginArg}`,
   ]
     .filter(Boolean)
     .join("\n");

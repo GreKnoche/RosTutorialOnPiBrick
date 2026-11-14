@@ -214,7 +214,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                   <ul className="list-disc space-y-1 pl-4">
                     <li>Sammle die Melone. Danach fährt der Client weiter auf die Wand zu.</li>
                     <li>In C++: forwardClear — endliche Strahlen im Vorwärtskegel unter min_range → false.</li>
-                    <li>Im Baum: Parallel + RateController + PathClear um FollowPath legen.</li>
+                    <li>Im Baum: Parallel um FollowPath und KeepRunningUntilFailure(RateController(PathClear)).</li>
                     <li>Bestanden, wenn der Monitor greift und du die Wand nicht berührst (Zähler 0).</li>
                   </ul>
                 ) : station?.id === "costmap" ? (

@@ -14,6 +14,8 @@ ament_target_dependencies(
   rclcpp
   sensor_msgs
 )
+# Without this, BT_REGISTER_NODES is a static function and dlsym cannot see it.
+target_compile_definitions(path_clear_bt_node PRIVATE BT_PLUGIN_EXPORT)
 
 install(TARGETS path_clear_bt_node
   ARCHIVE DESTINATION lib

@@ -530,10 +530,10 @@ function MonitorCards() {
           <Example
             name="Parallel"
             attrs={[
-              ["success_count", "2"],
+              ["success_count", "1"],
               ["failure_count", "1"],
             ]}
-            children={["PathClear", "FollowPath"]}
+            children={["KeepRunningUntilFailure", "FollowPath"]}
           />
         }
       />

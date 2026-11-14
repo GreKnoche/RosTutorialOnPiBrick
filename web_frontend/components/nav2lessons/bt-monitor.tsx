@@ -22,10 +22,12 @@ const MONITOR_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
       <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
       <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
       <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}"/>
-      <!-- <Parallel success_count="2" failure_count="1"> -->
-        <!-- <RateController hz="5.0"> -->
-          <!-- <PathClear scan_topic="scan" min_range="0.45" half_angle="0.35"/> -->
-        <!-- </RateController> -->
+      <!-- <Parallel success_count="1" failure_count="1"> -->
+        <!-- <KeepRunningUntilFailure> -->
+          <!-- <RateController hz="5.0"> -->
+            <!-- <PathClear scan_topic="scan" min_range="0.45" half_angle="0.35"/> -->
+          <!-- </RateController> -->
+        <!-- </KeepRunningUntilFailure> -->
         <FollowPath path="{path}" controller_id="{selected_controller}" error_code_id="{follow_path_error_code}"/>
       <!-- </Parallel> -->
     </PipelineSequence>
@@ -113,7 +115,7 @@ const btMonitor: Nav2Station = {
   showProgress: false,
   cityObstacles: true,
   explain:
-    "Hier baust du einen eigenen Behavior-Knoten: **PathClear** liest `/scan` und lässt den Baum failen, wenn direkt voraus etwas im Kegel steht.\n\n**1.** In `path_clear_bt_node.cpp` die Funktion **forwardClear** füllen.\n**2.** Im Baum **Parallel** + **RateController** um PathClear und FollowPath legen (Kommentare ersetzen).\n\n**Parallel** tickt beide Kinder. `failure_count=\"1\"` beendet den Ast, sobald PathClear FAILURE liefert.\n**RateController** begrenzt, wie oft PathClear geprüft wird (z.B. 5 Hz).",
+    "Hier baust du einen eigenen Behavior-Knoten: **PathClear** liest `/scan` und lässt den Baum failen, wenn direkt voraus etwas im Kegel steht.\n\n**1.** In `path_clear_bt_node.cpp` die Funktion **forwardClear** füllen.\n**2.** Im Baum die Kommentare ersetzen: **Parallel** um FollowPath und den Monitor, **KeepRunningUntilFailure** + **RateController** um PathClear.\n\n**Parallel** mit `failure_count=\"1\"` bricht ab, sobald ein Kind FAILURE liefert. `success_count=\"1\"`: FollowPath allein darf das Parallel beenden.\nOhne **KeepRunningUntilFailure** merkt sich Parallel das erste PathClear-SUCCESS und tickt den Monitor nie wieder — dann knallt es in die Wand.\n**RateController** begrenzt PathClear auf z.B. 5 Hz.",
   nodes: [
     { id: "waypoint_lesson", x: 8, y: 50 },
     { id: "mission", x: 36, y: 50 },

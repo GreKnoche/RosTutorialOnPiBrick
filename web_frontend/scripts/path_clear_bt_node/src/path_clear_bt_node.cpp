@@ -21,7 +21,7 @@ public:
   : BT::ConditionNode(name, config),
     scan_topic_("scan"),
     min_range_(0.4),
-    half_angle_(0.35),
+    ahead_m_(std::numeric_limits<double>::infinity()),
     have_scan_(false)
   {
   }
@@ -31,22 +31,34 @@ public:
     return {
       BT::InputPort<std::string>("scan_topic", "scan", "LaserScan topic"),
       BT::InputPort<double>("min_range", 0.4, "Meter. Closer than this fails."),
-      BT::InputPort<double>("half_angle", 0.35, "Radian. Forward cone half-width."),
+      // Alter Baum darf das Attribut noch setzen. Der Kegel wird nicht mehr gelesen.
+      BT::InputPort<double>("half_angle", 0.35, "Unused. Only the forward beam is read."),
     };
   }
 
-  // true = free ahead (SUCCESS). false = obstacle on the nose (FAILURE).
-  bool forwardClear(
-    const sensor_msgs::msg::LaserScan & scan,
-    double min_range,
-    double half_angle)
+  // Ein Strahl: Winkel 0, geradeaus.
+  static double straightAhead(const sensor_msgs::msg::LaserScan & scan)
   {
-    // TODO: Strahlen in ±half_angle prüfen.
-    // Wenn ein endlicher range-Wert < min_range ist → return false.
-    (void)scan;
-    (void)min_range;
-    (void)half_angle;
-    return true;
+    if (scan.ranges.empty()) {
+      return std::numeric_limits<double>::infinity();
+    }
+    const double increment = static_cast<double>(scan.angle_increment);
+    if (!std::isfinite(increment) || std::fabs(increment) < 1e-9) {
+      return static_cast<double>(scan.ranges[scan.ranges.size() / 2]);
+    }
+    const double raw = (0.0 - static_cast<double>(scan.angle_min)) / increment;
+    const long last = static_cast<long>(scan.ranges.size()) - 1;
+    const long index = std::clamp(std::lround(raw), 0L, last);
+    return static_cast<double>(scan.ranges[static_cast<size_t>(index)]);
+  }
+
+  // true = frei (SUCCESS). false = Hindernis (FAILURE).
+  static bool forwardClear(double range_m, double min_range)
+  {
+    if (!std::isfinite(range_m)) {
+      return true;
+    }
+    return range_m >= min_range;
   }
 
   BT::NodeStatus tick() override
@@ -55,12 +67,11 @@ public:
       initialize();
     }
     callback_group_executor_.spin_some();
-    if (!have_scan_ || !last_scan_) {
+    if (!have_scan_) {
       return BT::NodeStatus::SUCCESS;
     }
     getInput("min_range", min_range_);
-    getInput("half_angle", half_angle_);
-    if (forwardClear(*last_scan_, min_range_, half_angle_)) {
+    if (forwardClear(ahead_m_, min_range_)) {
       return BT::NodeStatus::SUCCESS;
     }
     return BT::NodeStatus::FAILURE;
@@ -71,7 +82,6 @@ private:
   {
     getInput("scan_topic", scan_topic_);
     getInput("min_range", min_range_);
-    getInput("half_angle", half_angle_);
     if (scan_sub_) {
       return;
     }
@@ -87,7 +97,7 @@ private:
       scan_topic_,
       rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::LaserScan::SharedPtr msg) {
-        last_scan_ = msg;
+        ahead_m_ = straightAhead(*msg);
         have_scan_ = true;
       },
       options);
@@ -98,10 +108,9 @@ private:
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::executors::SingleThreadedExecutor callback_group_executor_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
-  sensor_msgs::msg::LaserScan::SharedPtr last_scan_;
   std::string scan_topic_;
   double min_range_;
-  double half_angle_;
+  double ahead_m_;
   bool have_scan_;
 };
 
