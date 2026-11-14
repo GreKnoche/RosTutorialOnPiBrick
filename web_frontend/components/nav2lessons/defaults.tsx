@@ -358,6 +358,7 @@ if __name__ == "__main__":
 export const THROUGH_SOURCE = `"""Ein Pfad durch alle Wegpunkte. Kein Halt an den Zwischenpunkten."""
 
 import math
+import time
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -389,6 +390,21 @@ class Waypoints(Node):
     def __init__(self):
         super().__init__("waypoint_lesson")
         self._client = ActionClient(self, NavigateThroughPoses, "navigate_through_poses")
+        self._last_feedback = 0.0
+
+    def feedback(self, message):
+        now = time.monotonic()
+        if now - self._last_feedback < 5.0:
+            return
+        self._last_feedback = now
+        feedback = message.feedback
+        position = feedback.current_pose.pose.position
+        self.get_logger().info(
+            f"Fortschritt: {feedback.distance_remaining:.2f} m, "
+            f"{feedback.number_of_poses_remaining} Wegpunkte übrig, "
+            f"Position ({position.x:.2f}, {position.y:.2f}), "
+            f"Recoveries {feedback.number_of_recoveries}"
+        )
 
     def run(self):
         self.get_logger().info("warte auf navigate_through_poses")
@@ -399,7 +415,7 @@ class Waypoints(Node):
         goal = NavigateThroughPoses.Goal()
         goal.poses = [pose(self, x, y, theta) for x, y, theta in POINTS]
         self.get_logger().info(f"{len(goal.poses)} Wegpunkte, ein Pfad")
-        send = self._client.send_goal_async(goal)
+        send = self._client.send_goal_async(goal, feedback_callback=self.feedback)
         rclpy.spin_until_future_complete(self, send)
         handle = send.result()
         if handle is None or not handle.accepted:
@@ -409,7 +425,26 @@ class Waypoints(Node):
         rclpy.spin_until_future_complete(self, done)
         outcome = done.result()
         if outcome is None or outcome.status != GoalStatus.STATUS_SUCCEEDED:
-            self.get_logger().error("Pfad nicht gefahren")
+            status_names = {
+                GoalStatus.STATUS_UNKNOWN: "UNKNOWN",
+                GoalStatus.STATUS_ACCEPTED: "ACCEPTED",
+                GoalStatus.STATUS_EXECUTING: "EXECUTING",
+                GoalStatus.STATUS_CANCELING: "CANCELING",
+                GoalStatus.STATUS_SUCCEEDED: "SUCCEEDED",
+                GoalStatus.STATUS_CANCELED: "CANCELED",
+                GoalStatus.STATUS_ABORTED: "ABORTED",
+            }
+            if outcome is None:
+                self.get_logger().error("Nav2 lieferte kein Action-Ergebnis.")
+                return
+            result = outcome.result
+            error_code = getattr(result, "error_code", "nicht geliefert")
+            error_msg = getattr(result, "error_msg", "").strip() or "keine Fehlerbeschreibung geliefert"
+            status = status_names.get(outcome.status, f"UNBEKANNT ({outcome.status})")
+            self.get_logger().error(
+                f"Nav2 fehlgeschlagen: Status {status}, Fehlercode {error_code}, "
+                f"Fehlertext: {error_msg}"
+            )
             return
         self.get_logger().info("Pfad gefahren")
 

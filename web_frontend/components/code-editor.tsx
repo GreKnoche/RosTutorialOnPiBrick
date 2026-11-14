@@ -448,10 +448,9 @@ export function CodeEditor({
       apply(editEnter(box.value, box.selectionStart, box.selectionEnd, language));
     }
   };
-  const text = language === "xml" ? TEXT.replace("text-[0.65rem]", "text-sm") : TEXT;
   if (readOnly) {
     return (
-      <pre aria-label={label} className={`overflow-auto rounded-lg border border-border bg-[#1c1404] text-[#f4efe4] ${text}`}>
+      <pre aria-label={label} className={`overflow-auto rounded-lg border border-border bg-[#1c1404] text-[#f4efe4] ${TEXT}`}>
         <Highlighted source={value} language={language} />
         {"\n"}
       </pre>
@@ -462,7 +461,7 @@ export function CodeEditor({
       <pre
         ref={backdrop}
         aria-hidden
-        className={`pointer-events-none absolute top-0 left-0 min-h-full w-max min-w-full text-[#f4efe4] ${text}`}
+        className={`pointer-events-none absolute top-0 left-0 min-h-full w-max min-w-full text-[#f4efe4] ${TEXT}`}
       >
         <Highlighted source={value} language={language} />
         {"\n"}
@@ -476,7 +475,7 @@ export function CodeEditor({
         onScroll={(event) => placeHighlight(backdrop.current, event.currentTarget)}
         spellCheck={false}
         aria-label={label}
-        className={`absolute inset-0 z-10 h-full w-full resize-none overflow-auto overscroll-contain bg-transparent text-transparent caret-[#f4efe4] outline-none selection:bg-[#e6b325]/35 selection:text-transparent ${text}`}
+        className={`absolute inset-0 z-10 h-full w-full resize-none overflow-auto overscroll-contain bg-transparent text-transparent caret-[#f4efe4] outline-none selection:bg-[#e6b325]/35 selection:text-transparent ${TEXT}`}
       />
     </div>
   );

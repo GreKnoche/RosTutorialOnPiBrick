@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { WaypointNode } from "@/components/waypoint-node";
+import { BtTickAnimation } from "@/components/bt-tick-animation";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import type { Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
@@ -242,6 +243,7 @@ export function NavGraph({
     <section className="mt-6 flex flex-col gap-4" onClick={() => setRing(false)}>
       <h2 className="text-base font-semibold">Erklärung</h2>
       <p className="text-sm leading-6 text-muted-foreground">{graph.explain}</p>
+      {graph.id === "baum-1" ? <BtTickAnimation /> : null}
       <h2 className="text-base font-semibold">Code Graph</h2>
       <div className={ring ? "overflow-visible py-28" : "overflow-x-auto"}>
         <div className="relative w-full" style={{ height: graphHeight }} role="group" aria-label="Verbundene Knoten">

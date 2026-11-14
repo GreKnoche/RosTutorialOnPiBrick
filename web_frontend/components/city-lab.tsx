@@ -1188,7 +1188,7 @@ export function CityLab({
               ref={logRef}
               aria-label="Ausgabe von waypoint_client"
               aria-busy={booting}
-              className="box-content h-8 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
+              className="box-content h-24 overflow-auto rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-300"
             >
               {booting && !nodeLog.trim() ? "" : nodeLog}
             </pre>

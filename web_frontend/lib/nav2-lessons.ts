@@ -183,10 +183,10 @@ const PLANNER: NodeMission = {
 };
 
 /**
- * baum-1: nothing at the start. The U spawns once the car has passed the line
- * on the mid road. Mouth faces west, side walls cross the curbs. Inner gap is
- * about 0.44 m, so the car enters and cannot slip past.
- * The first melon sits on the open mid-road stretch. The other five are past the U.
+ * baum-1: nothing at the start. The U spawns once the car has passed x on the
+ * drive through the U. The band covers the north arm, the stem, and the south
+ * arm. The first melon sits on the open mid-road stretch. The other five are
+ * past the U.
  */
 const BAUM_1: NodeMission = {
   id: "baum-1",
@@ -194,21 +194,21 @@ const BAUM_1: NodeMission = {
   kind: "melons",
   spawn: HOME,
   melons: [
-    [4.15, 5.59],
-    [8.62, 5.64],
-    [8.2, 7.6],
-    [4.05, 7.86],
-    [1.84, 7.52],
-    [8.62, 2.07],
+    [5.15, 5.59],
+    [7.2, 5.5],
   ],
-  obstacles: [],
+  obstacles: [
+    { x: MID-2, y: MID+0.4, w: 4.5, h: 0.2 },
+    { x: MID-2, y: MID-0.4, w: 4.5, h: 0.2 },
+    { x: MID-4.3, y: MID, w: 0.2, h: 1 }
+  ],
   checkpoints: [],
   laterObstacles: [
-    { x: MID+2.8, y: MID+3.0, w: 6.0, h: 0.4 },
-    { x: MID, y: MID-0.75, w: 0.4, h: 3.5 },
-    { x: MID+2.8, y: MID-4.5, w: 6.0, h: 0.4 },
+    { x: MID-2, y: MID+0.4, w: 4.5, h: 0.2 },
+    { x: MID-2, y: MID-0.4, w: 4.5, h: 0.2 },
+    { x: MID+0.3, y: MID, w: 0.2, h: 1 },
   ],
-  trigger: { x: 5.9, yMin: 5.19, yMax: 8.2 },
+  trigger: { x: 5.15, yMin: MID - 5.0, yMax: MID + 3.6 },
 };
 
 export const NAV_NODES: NavNode[] = [
