@@ -129,17 +129,10 @@ function rebuild(text: string, current: string): string | null {
   return lines.join("\n");
 }
 
-function dropHashLines(text: string): string {
-  return text
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("#"))
-    .join("\n");
-}
-
 /** Keep a pasted block. Bare key: value lines land under FollowPath; a whole params file keeps only that section. */
 export function absorbFollowPath(current: string, incoming: string): string {
   if (!incoming.trim()) return incoming;
-  let text = dropHashLines(tidy(incoming));
+  let text = tidy(incoming);
   if (text.split("\n").some((line) => FOREIGN_ROOT.test(line))) {
     text = extractFollowPath(text) ?? text;
   }
@@ -171,9 +164,9 @@ export function followPathError(section: string): string | null {
 const CHECKER = "nav2_controller::SimpleProgressChecker";
 
 const CHECKER_NOTES: Record<string, string> = {
-  plugin: "Dieser Checker beendet FollowPath, wenn das Auto stehen bleibt.",
-  required_movement_radius: "So weit, m, muss sich das Auto in der Zeit bewegen.",
-  movement_time_allowance: "Sekunden. Länger als eine Drehung auf der Stelle, kürzer als das Stehen im U.",
+  plugin: "Überwacht den Fortschritt und bricht FollowPath ab, wenn der Roboter stecken bleibt",
+  required_movement_radius: "Mindeststrecke in m, die sich der Roboter im Zeitfenster bewegen muss",
+  movement_time_allowance: "Zeitfenster in s, in dem die Mindeststrecke erreicht werden muss",
 };
 
 function annotateProgress(text: string): string {
@@ -273,10 +266,10 @@ export function mergeProgress(params: string, section: string): string | null {
 const GOAL = "nav2_controller::SimpleGoalChecker";
 
 const GOAL_NOTES: Record<string, string> = {
-  plugin: "SimpleGoalChecker prüft den Ort. Die Blickrichtung nur, wenn yaw_goal_tolerance klein ist.",
-  stateful: "true merkt sich den Ort beim ersten Treffer. Danach zählt der Ort nicht mehr.",
-  xy_goal_tolerance: "Meter. So nah muss das Auto am Zielort sein.",
-  yaw_goal_tolerance: "Bogenmaß. Über 3.14 gilt jede Blickrichtung.",
+  plugin: "Prüft, ob der Roboter Position und Ausrichtung des Ziels erreicht hat",
+  stateful: "Merkt sich eine einmal erreichte Position, sodass danach nur noch die Ausrichtung zählt (true/false)",
+  xy_goal_tolerance: "Erlaubte Positionsabweichung zum Zielpunkt in m",
+  yaw_goal_tolerance: "Erlaubte Winkelabweichung am Ziel in rad (ab ca. 3.14 ist die Ausrichtung egal)",
 };
 
 function annotateGoal(text: string): string {

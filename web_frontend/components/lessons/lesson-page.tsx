@@ -30,7 +30,7 @@ export function LessonPage({
   level?: LessonLevel;
 }) {
   const catalog = readCatalog();
-  const { next, index, total } = lessonNeighbors(lesson, catalog);
+  const { next } = lessonNeighbors(lesson, catalog);
   const lessons = lessonsForTrack(lesson.track, catalog);
   const active = lessonModule(lesson.track, lesson.slug);
   const copy = loadLessonCopy(lesson.track, lesson.id, lesson.slug);
@@ -47,11 +47,6 @@ export function LessonPage({
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
               {lesson.status === "ready" ? <Badge variant="default">verfügbar</Badge> : null}
-              {index >= 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {index + 1} / {total}
-                </span>
-              )}
             </div>
             <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
               {lesson.title}

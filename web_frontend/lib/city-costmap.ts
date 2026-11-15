@@ -1,33 +1,33 @@
 const LAYER = `      plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
-        # Klasse. Schreibt Messpunkte in die Karte.
+        # Costmap-Schicht, die Sensordaten als Hindernisse in die Karte einträgt
         plugin: "nav2_costmap_2d::ObstacleLayer"
-        # Name der Quelle darunter.
+        # Liste der benannten Sensorquellen für diese Schicht
         observation_sources: city
         city:
-          # Punktwolke der Häuser und der gesetzten Blöcke.
+          # Topic, auf dem die Hindernisse der Stadt (Häuser und Blöcke) veröffentlicht werden
           topic: /city_obstacles
-          # Nachrichtentyp auf diesem Topic.
+          # Nachrichtentyp der Sensorquelle
           data_type: "PointCloud2"
-          # true schreibt getroffene Zellen als Hindernis.
+          # Trägt gemessene Punkte als Hindernis in die Costmap ein (true/false)
           marking: true
-          # false lässt eine gesetzte Zelle stehen.
+          # Löscht freie Bereiche entlang des Sensorstrahls wieder aus der Costmap (true/false)
           clearing: false
-          # Meter. Punkte bis zu dieser Entfernung werden Hindernisse.
+          # Maximale Entfernung in m, bis zu der Punkte als Hindernis markiert werden
           obstacle_max_range: 20.0
-          # Meter. Punkte ab dieser Entfernung zählen.
+          # Minimale Entfernung in m, ab der Punkte berücksichtigt werden
           obstacle_min_range: 0.0
-          # Meter. Reichweite eines räumenden Strahls. Wirkt bei clearing true.
+          # Maximale Reichweite in m für das Freiräumen (wirkt nur bei clearing: true)
           raytrace_max_range: 20.0
-          # Meter. Untergrenze der Höhe, ab der ein Punkt zählt.
+          # Minimale Höhe in m, ab der Messpunkte als Hindernis zählen
           min_obstacle_height: 0.0
-          # Meter. Obergrenze der Höhe, bis zu der ein Punkt zählt.
+          # Maximale Höhe in m, bis zu der Messpunkte als Hindernis zählen
           max_obstacle_height: 2.0
-          # Sekunden. 0 behält eine Markierung.
+          # Speicherdauer von Messpunkten in s (0.0 = dauerhaft ohne Clearing)
           observation_persistence: 0.0
-          # Hertz. 0 lässt eine Pause der Quelle zu.
+          # Erwartete Update-Rate der Quelle in Hz (0.0 = keine Zeitüberwachung)
           expected_update_rate: 0.0
-          # false übergeht unendliche Messwerte.
+          # Behandelt unendliche Messwerte (inf) als gültigen Maximalabstand statt sie zu ignorieren (true/false)
           inf_is_valid: false
       inflation_layer:`;
 

@@ -57,13 +57,13 @@ public:
     callback_group_executor_.spin_some();
     getInput("min_range", min_range_);
 
-    // Kein Scan noch: frei lassen.
+    // Solange noch kein LaserScan vorliegt, gilt der Weg als frei.
     if (!have_scan_) {
       return BT::NodeStatus::SUCCESS;
     }
-    // Kern: voraus zu nah → FAILURE (Hindernis), sonst frei → SUCCESS.
-    // range_m_   — Abstand geradeaus (setzt der LaserScan-Callback)
-    // min_range_ — Schwelle in m (Port/XML, oben per getInput)
+    // Kernlogik: Hindernis näher als min_range_ -> FAILURE, sonst Weg frei -> SUCCESS.
+    // range_m_   -- gemessener Abstand direkt voraus (aktualisiert im LaserScan-Callback)
+    // min_range_ -- Sicherheitsabstand in m (XML-Port, oben über getInput gelesen)
   /*##############################*/
     // hier Abstand prüfen
   /*##############################*/

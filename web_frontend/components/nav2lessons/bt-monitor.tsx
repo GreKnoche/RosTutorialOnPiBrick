@@ -66,7 +66,7 @@ class Client(Node):
     def run(self) -> None:
         self._client.wait_for_server()
         goal = NavigateThroughPoses.Goal()
-        # Melone, dann Ziel hinter der Wand. Ohne PathClear knallt FollowPath rein.
+        # Erst zur Melone fahren, dann zu einem Punkt hinter der Wand (ohne PathClear kollidiert FollowPath).
         goal.poses = [
             pose(4.6, 5.55, 0.0),
             pose(7.2, 5.55, 0.0),

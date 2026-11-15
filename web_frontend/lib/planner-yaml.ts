@@ -115,16 +115,17 @@ export function plannerClass(section: string): (typeof CLASSES)[number] | null {
 }
 
 const PLANNER_NOTES = [
-  ["nav2_navfn_planner::NavfnPlanner", "(x, y), Raster"],
-  ["nav2_smac_planner::SmacPlanner2D", "(x, y), acht Nachbarn"],
-  ["nav2_theta_star_planner::ThetaStarPlanner", "(x, y), Sichtlinie"],
-  ["nav2_smac_planner::SmacPlannerHybrid", "(x, y, theta), Mindestradius"],
-  ["nav2_smac_planner::SmacPlannerLattice", "(x, y, theta), Lattice / Manöverdatei"],
+  ["nav2_navfn_planner::NavfnPlanner", "Dijkstra/A* auf dem Raster (nur Position x, y)"],
+  ["nav2_smac_planner::SmacPlanner2D", "Kostenoptimierter 2D-A* auf 8 Nachbarzellen (nur Position x, y)"],
+  ["nav2_theta_star_planner::ThetaStarPlanner", "Any-Angle-Planung entlang freier Sichtlinien (nur Position x, y)"],
+  ["nav2_smac_planner::SmacPlannerHybrid", "Kinematischer Hybrid-A* mit Mindestwenderadius (x, y, theta)"],
+  ["nav2_smac_planner::SmacPlannerLattice", "A*-Suche mit vordefinierten Fahr-Manövern aus einer Datei (x, y, theta)"],
 ] as const;
 
 function render(list: string, plugin: string): string {
-  const notes = PLANNER_NOTES.map(([name, note]) => `# ${note}. ${name}`).join("\n");
-  return `# Eine Klasse. Der Name GridBased bleibt, den ruft der Baum auf.
+  const notes = PLANNER_NOTES.map(([name, note]) => `# - ${name}: ${note}`).join("\n");
+  return `# Wählt das aktive Planner-Plugin (der Name "GridBased" bleibt für den Behavior Tree erhalten)
+# Verfügbare Plugins:
 ${notes}
 planner_plugins: ${list}
 GridBased:

@@ -7,20 +7,34 @@ export const SHOW_LOCAL_COSTMAP = false;
 export const LOCAL_COSTMAP = `local_costmap:
   local_costmap:
     ros__parameters:
+      # Aktualisierungsrate in Hz, mit der die lokale Costmap neu berechnet wird
       update_frequency: 5.0
+      # Veröffentlichungsrate in Hz, mit der die lokale Costmap an andere Knoten gesendet wird
       publish_frequency: 2.0
+      # Bezugsrahmen der lokalen Karte ("odom" nutzt die Odometrie)
       global_frame: odom
+      # Koordinatenrahmen des Roboters, an dem das Fenster ausgerichtet wird
       robot_base_frame: base_link
+      # Lässt den Kartenausschnitt mit dem Roboter mitwandern (true/false)
       rolling_window: true
+      # Breite des lokalen Kartenfensters in m
       width: 4
+      # Höhe des lokalen Kartenfensters in m
       height: 4
+      # Kantenlänge einer einzelnen Rasterzelle in m
       resolution: 0.05
+      # Angenommener Radius des Roboters in m für die Kollisionsprüfung
       robot_radius: 0.09
+      # Aktive Costmap-Schichten von unten nach oben
       plugins: ["inflation_layer"]
       inflation_layer:
+        # Costmap-Schicht, die einen Sicherheitsabstand (Kostengradient) um Hindernisse legt
         plugin: "nav2_costmap_2d::InflationLayer"
+        # Steilheit des Kostenabfalls mit dem Abstand (größer = steilerer Abfall)
         cost_scaling_factor: 2.5
+        # Abstand in m um ein Hindernis, bis zu dem erhöhte Kosten berechnet werden
         inflation_radius: 0.12
+      # Sendet bei jeder Veröffentlichung die komplette Costmap statt nur geänderter Bereiche (true/false)
       always_send_full_costmap: true
 `;
 
@@ -28,36 +42,36 @@ export const LOCAL_COSTMAP = `local_costmap:
 export const GLOBAL_COSTMAP = `global_costmap:
   global_costmap:
     ros__parameters:
-      # Hertz. So oft wird die Karte neu gerechnet.
+      # Aktualisierungsrate in Hz, mit der die Costmap neu berechnet wird
       update_frequency: 2.0
-      # Hertz. So oft geht die Karte an die anderen Knoten.
+      # Veröffentlichungsrate in Hz, mit der die Costmap an andere Knoten gesendet wird
       publish_frequency: 1.0
-      # Rahmen der Karte. odom hängt an der Radodometrie.
+      # Bezugsrahmen der Karte ("odom" nutzt die Odometrie)
       global_frame: odom
-      # Das Fenster sitzt auf diesem Rahmen des Autos.
+      # Koordinatenrahmen des Roboters, an dem das Fenster ausgerichtet wird
       robot_base_frame: base_link
-      # true lässt das Fenster mit dem Auto mitfahren.
+      # Lässt den Kartenausschnitt mit dem Roboter mitwandern (true/false)
       rolling_window: true
-      # Meter. Breite des Fensters.
+      # Breite des Kartenfensters in m
       width: 40
-      # Meter. Höhe des Fensters.
+      # Höhe des Kartenfensters in m
       height: 40
-      # Meter. Kantenlänge einer Zelle.
+      # Kantenlänge einer einzelnen Rasterzelle in m
       resolution: 0.05
-      # Meter. Das Auto gilt als Kreis mit diesem Radius.
+      # Angenommener Radius des Roboters in m für die Kollisionsprüfung
       robot_radius: 0.09
-      # false zählt unbekannte Zellen als frei.
+      # Unterscheidet unbekannte von freien Zellen; false behandelt unbekannte Zellen als frei
       track_unknown_space: false
-      # Schichten von unten nach oben. Die letzte liest die Zellen der vorigen.
+      # Aktive Costmap-Schichten von unten nach oben
       plugins: ["inflation_layer"]
       inflation_layer:
-        # Klasse. Macht Zellen neben einem Hindernis teurer.
+        # Costmap-Schicht, die einen Sicherheitsabstand (Kostengradient) um Hindernisse legt
         plugin: "nav2_costmap_2d::InflationLayer"
-        # Wie steil die Kosten mit dem Abstand fallen. Größer heißt steiler.
+        # Steilheit des Kostenabfalls mit dem Abstand (größer = steilerer Abfall)
         cost_scaling_factor: 2.5
-        # Meter. Bis hierhin sind Zellen teurer als frei.
+        # Abstand in m um ein Hindernis, bis zu dem erhöhte Kosten berechnet werden
         inflation_radius: 0.12
-      # true schickt jedes Mal das ganze Fenster.
+      # Sendet bei jeder Veröffentlichung die komplette Costmap statt nur geänderter Bereiche (true/false)
       always_send_full_costmap: true
 `;
 

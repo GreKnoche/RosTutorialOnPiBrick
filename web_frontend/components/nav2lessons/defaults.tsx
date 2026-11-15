@@ -29,25 +29,45 @@ const PARAMS = `controller_server:
       xy_goal_tolerance: 0.05
       yaw_goal_tolerance: 6.28
     FollowPath:
+      # Controller-Plugin für die Pfadverfolgung (Regulated Pure Pursuit)
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      # Gewünschte Vorwärtsgeschwindigkeit in m/s
       desired_linear_vel: 0.5
+      # Fester Vorausschau-Abstand (m) auf dem Pfad, wenn geschwindigkeitsabhängiger Lookahead deaktiviert ist
       lookahead_dist: 0.22
+      # Minimaler Vorausschau-Abstand in m bei langsamer Fahrt
       min_lookahead_dist: 0.12
+      # Maximaler Vorausschau-Abstand in m bei hoher Geschwindigkeit
       max_lookahead_dist: 0.35
+      # Vorausschau-Zeit in s zur Berechnung des dynamischen Lookahead-Abstands (Geschwindigkeit * lookahead_time)
       lookahead_time: 1.5
+      # Drehgeschwindigkeit in rad/s beim Ausrichten auf der Stelle
       rotate_to_heading_angular_vel: 0.7
+      # Passt den Vorausschau-Abstand dynamisch an die aktuelle Geschwindigkeit an (true/false)
       use_velocity_scaled_lookahead_dist: true
+      # Minimale Vorwärtsgeschwindigkeit in m/s beim Heranfahren ans Ziel
       min_approach_linear_velocity: 0.04
+      # Abstand zum Ziel in m, ab dem die Geschwindigkeit schrittweise reduziert wird
       approach_velocity_scaling_dist: 0.25
+      # Prüft den vorausliegenden Pfad anhand der Costmap auf drohende Kollisionen (true/false)
       use_collision_detection: false
+      # Reduziert die Fahrgeschwindigkeit automatisch in engen Kurven (true/false)
       use_regulated_linear_velocity_scaling: true
+      # Reduziert die Geschwindigkeit in der Nähe von Hindernissen anhand der Costmap-Kosten (true/false)
       use_cost_regulated_linear_velocity_scaling: false
+      # Kurvenradius in m, unterhalb dessen die Kurvendrosselung stark eingreift
       regulated_linear_scaling_min_radius: 0.12
+      # Minimale Geschwindigkeit in m/s, auf die in engen Kurven gedrosselt wird
       regulated_linear_scaling_min_speed: 0.04
+      # Dreht den Roboter bei großer Winkelabweichung zuerst auf der Stelle Richtung Pfad (true/false)
       use_rotate_to_heading: true
+      # Winkelabweichung in rad, ab der zuerst auf der Stelle gedreht wird
       rotate_to_heading_min_angle: 0.4
+      # Maximale Winkelbeschleunigung beim Drehen in rad/s^2
       max_angular_accel: 1.2
+      # Suchradius in m entlang des Pfads für den nächsten Zielpunkt ab der Roboterposition
       max_robot_pose_search_dist: 1.0
+      # Erlaubt dem Controller, dem Pfad auch rückwärts zu folgen (true/false)
       allow_reversing: false
 
 planner_server:
@@ -63,12 +83,18 @@ planner_server:
 
 waypoint_follower:
   ros__parameters:
+    # Abfragefrequenz des Waypoint-Followers in Hz
     loop_rate: 20
+    # Bricht die gesamte Wegpunkt-Tour ab, wenn ein einzelner Wegpunkt fehlschlägt (true/false)
     stop_on_failure: false
+    # Maximale Wartezeit in s auf das Ergebnis einer einzelnen Navigationsaufgabe
     action_server_result_timeout: 900.0
+    # Koordinatenrahmen für die übergebenen Wegpunkte
     global_frame_id: odom
+    # Name des Plugins, das an jedem erreichten Wegpunkt ausgeführt wird
     waypoint_task_executor_plugin: "maneuver_at_waypoint"
     maneuver_at_waypoint:
+      # C++-Plugin-Klasse für das Manöver am Wegpunkt
       plugin: "maneuver_at_waypoint::ManeuverAtWaypoint"
 `;
 
@@ -91,107 +117,107 @@ export const HYBRID = NAVFN.replace(
   'plugin: "nav2_smac_planner::SmacPlannerHybrid"',
 );
 
-export const NAVFN_PARAMS = `# Klasse. Bleibt NavFn, der Baum ruft weiter GridBased.
+export const NAVFN_PARAMS = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_navfn_planner::NavfnPlanner"
-# Meter. So nah muss die gefundene Pose am Ziel liegen.
+# Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
 tolerance: 0.2
-# true sucht mit A*. false sucht Dijkstra.
+# Verwendet A* (true) statt Dijkstra (false) für die Pfadsuche
 use_astar: false
-# true darf über unbekannte Zellen planen.
+# Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
 `;
 
-export const SMAC2D = `# Klasse. Bleibt Smac 2D, der Baum ruft weiter GridBased.
+export const SMAC2D = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlanner2D"
-# Meter. So nah muss die gefundene Pose am Ziel liegen.
+# Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
 tolerance: 0.5
-# false sucht auf jeder Zelle. true macht die Karte vorher gröber.
+# Verkleinert die Costmap vor der Suche, um Rechenzeit zu sparen (true/false)
 downsample_costmap: false
-# Teiler, falls die Karte vergröbert wird. 1 lässt sie, wie sie ist.
+# Faktor, um den die Auflösung bei aktiviertem Downsampling vergröbert wird (1 = Original)
 downsampling_factor: 1
-# true darf über unbekannte Zellen planen.
+# Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
-# Die Suche bricht nach so vielen Knoten ab.
+# Maximale Anzahl an Suchschritten, bevor die Planung abgebrochen wird
 max_iterations: 1000000
-# Extra-Knoten nahe am Ziel.
+# Zusätzliche Suchschritte in Zielnähe, um die Toleranz noch zu erreichen
 max_on_approach_iterations: 1000
-# Sekunden, danach gibt die Suche auf.
+# Maximale Rechenzeit für die Pfadplanung in s
 max_planning_time: 2.0
-# So oft prüft die Suche, ob sie abgebrochen wurde.
+# Intervall (in Iterationen), in dem auf Timeout oder Abbruch geprüft wird
 terminal_checking_interval: 5000
-# Umweg durch teure Zellen kostet das Vielfache der Luftlinie.
+# Strafmultiplikator für hohe Costmap-Kosten: höhere Werte meiden Hindernisnähe stärker
 cost_travel_multiplier: 2.0
-# false lässt die Ausrichtung am Ziel, wie die Suche sie fand.
+# Übernimmt am Ziel die Ausrichtung des letzten Pfadsegments statt der Ziel-Orientierung (true/false)
 use_final_approach_orientation: false
-# Glättung des Pfads nach der Suche.
+# Einstellungen für die anschließende Glättung des geplanten Pfads
 smoother:
-  # Abbruch, wenn der Pfad sich weniger als das ändert.
+  # Abbruchschwelle für die Glättung, wenn sich der Pfad kaum noch ändert
   tolerance: 1.0e-10
-  # So oft darf die Glättung laufen.
+  # Maximale Anzahl an Glättungsdurchläufen (0 = keine Glättung)
   max_iterations: 1000
-  # Gewicht, das den Pfad an den gefundenen Zellen hält.
+  # Gewicht, wie stark der Pfad an den ursprünglichen Suchpunkten festgehalten wird
   w_data: 0.2
-  # Gewicht, das Ecken rund macht.
+  # Gewicht für die Glättung (höhere Werte runden Ecken stärker ab)
   w_smooth: 0.3
-  # true glättet danach noch einmal feiner.
+  # Führt nach der ersten Glättung weitere Verfeinerungsdurchläufe aus (true/false)
   do_refinement: true
-  # So viele feine Durchgänge.
+  # Anzahl der zusätzlichen Verfeinerungsdurchläufe
   refinement_num: 2
 `;
 
-export const THETA = `# Klasse. Bleibt Theta*, der Baum ruft weiter GridBased.
+export const THETA = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_theta_star_planner::ThetaStarPlanner"
-# 4 oder 8. 8 sucht auch die Diagonalen.
+# Suchnachbarschaft auf dem Raster: 4 (nur orthogonal) oder 8 (inkl. Diagonalen)
 how_many_corners: 8
-# Gewicht der Luftlinie.
+# Gewicht für die euklidische Pfadlänge (kürzeste Strecke)
 w_euc_cost: 1.0
-# Gewicht der Zellkosten auf der Costmap.
+# Gewicht für die Costmap-Kosten entlang des Pfads (Abstand zu Hindernissen)
 w_traversal_cost: 2.0
-# Gewicht der Schätzung bis zum Ziel.
+# Gewicht der geschätzten Reststrecke bis zum Ziel in der A*-Suche
 w_heuristic_cost: 1.0
-# true darf über unbekannte Zellen planen.
+# Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
 `;
 
-export const LATTICE = `# Klasse. Bleibt Lattice (SmacPlannerLattice), der Baum ruft weiter GridBased.
+export const LATTICE = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlannerLattice"
-# Meter. So nah muss die gefundene Pose am Ziel liegen.
+# Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
 tolerance: 0.25
-# true darf über unbekannte Zellen planen.
+# Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
-# Die Suche bricht nach so vielen Knoten ab.
+# Maximale Anzahl an Suchschritten, bevor die Planung abgebrochen wird
 max_iterations: 1000000
-# Extra-Knoten nahe am Ziel, damit die Ausrichtung noch passt.
+# Zusätzliche Suchschritte in Zielnähe, um die Ausrichtung am Ziel noch zu treffen
 max_on_approach_iterations: 1000
-# Sekunden, danach gibt die Suche auf.
+# Maximale Rechenzeit für die Pfadplanung in s
 max_planning_time: 5.0
-# Etwa jeden dritten Knoten ein direktes Manöver zum Ziel.
+# Häufigkeit direkter analytischer Zielmanöver während der Suche (höher = öfter)
 analytic_expansion_ratio: 3.5
-# Meter. Weiter reicht dieses Manöver nicht.
+# Maximale Länge in m, über die ein direktes Zielmanöver versucht wird
 analytic_expansion_max_length: 3.0
-# Das Manöver entfällt, wenn eine Zelle teurer als dieser Wert ist.
+# Maximale Costmap-Zellkosten, bis zu denen ein direktes Zielmanöver erlaubt ist
 analytic_expansion_max_cost: 200.0
-# Manöverdatei aus dem Paket nav2_smac_planner.
+# Pfad zur JSON-Datei mit den vorberechneten Fahr-Manövern (Motion Primitives)
 lattice_filepath: "/opt/ros/jazzy/share/nav2_smac_planner/sample_primitives/5cm_resolution/0.5m_turning_radius/diff/output.json"
-# Meter. So weit sind die Manöver zum Ziel vorausgerechnet.
+# Größe in m der vorberechneten Distanztabelle für die Ziel-Heuristik
 lookup_table_size: 20.0
-# true hebt die Hindernis-Schätzung für dasselbe Ziel auf.
+# Speichert die Hindernis-Heuristik zwischen Planungen bei gleichem Ziel (true/false)
 cache_obstacle_heuristic: false
-# Rückwärts kostet das Vielfache eines Vorwärtsschritts.
+# Kosten, die bei der Wegplanung fürs Rückwärtsfahren berechnet werden
 reverse_penalty: 2.0
-# Zusatz, wenn links und rechts wechseln. 0 bestraft das nicht.
+# Zusatzkosten beim Richtungswechsel zwischen Vorwärts- und Rückwärtsfahrt
 change_penalty: 0.0
-# Eine Kurve kostet das Vielfache derselben Strecke geradeaus.
+# Kostenfaktor für Kurvenfahrten im Vergleich zur Geradeausfahrt
 non_straight_penalty: 1.05
-# Graue Zellen neben Hindernissen kosten mehr als freier Asphalt.
+# Kostenfaktor für Zellen mit hohen Costmap-Kosten (Nähe zu Hindernissen)
 cost_penalty: 2.0
-# Drehen auf der Stelle kostet das Vielfache eines Schritts.
+# Kostenfaktor für Drehungen auf der Stelle
 rotation_penalty: 5.0
-# Kleiner Abzug auf jeden Schritt, damit graue Zellen schwerer wiegen.
+# Kleiner Abschlag auf frühere Pfadkosten, damit teure Zonen stärker vermieden werden
 retrospective_penalty: 0.015
-# true darf ein Rückwärtsmanöver an ein Vorwärtsmanöver hängen.
+# Erlaubt bei der Suche Manöver für die Rückwärtsfahrt (true/false)
 allow_reverse_expansion: false
-# true glättet den Pfad, bevor FollowPath ihn fährt.
+# Glättet den gefundenen Pfad nachträglich (true/false)
 smooth_path: true
 `;
 
@@ -208,49 +234,49 @@ if (pluginParamsError(LATTICE, "nav2_smac_planner::SmacPlannerLattice")) {
   throw new Error("Lattice-Parameter");
 }
 
-export const SMAC = `# Klasse. Bleibt Smac Hybrid, der Baum ruft weiter GridBased.
+export const SMAC = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlannerHybrid"
-# Meter. So nah muss die gefundene Pose am Ziel liegen.
+# Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
 tolerance: 0.20
-# false sucht auf jeder Zelle. true macht die Karte vorher gröber.
+# Verkleinert die Costmap vor der Suche, um Rechenzeit zu sparen (true/false)
 downsample_costmap: false
-# Teiler, falls die Karte vergröbert wird. 1 lässt sie, wie sie ist.
+# Faktor, um den die Auflösung bei aktiviertem Downsampling vergröbert wird (1 = Original)
 downsampling_factor: 1
-# true darf über unbekannte Zellen planen.
+# Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
-# Die Suche bricht nach so vielen Knoten ab.
+# Maximale Anzahl an Suchschritten, bevor die Planung abgebrochen wird
 max_iterations: 1000000
-# Extra-Knoten nahe am Ziel, damit die Ausrichtung noch passt.
+# Zusätzliche Suchschritte in Zielnähe, um die Ausrichtung am Ziel noch zu treffen
 max_on_approach_iterations: 1000
-# Sekunden, danach gibt die Suche auf.
+# Maximale Rechenzeit für die Pfadplanung in s
 max_planning_time: 3.5
-# DUBIN fährt nur vorwärts. REEDS_SHEPP darf rückwärts.
+# Bewegungsmodell: "DUBIN" fährt nur vorwärts, "REEDS_SHEPP" erlaubt auch Rückwärtsfahrt
 motion_model_for_search: "DUBIN"
-# Die Ausrichtung kennt nur so viele feste Richtungen.
+# Anzahl der diskreten Winkelstufen für die Ausrichtung (360 Grad / Wert)
 angle_quantization_bins: 64
-# Etwa jeden dritten Knoten ein direkter Bogen zum Ziel.
+# Häufigkeit direkter analytischer Bögen zum Ziel während der Suche (höher = öfter)
 analytic_expansion_ratio: 3.5
-# Meter. Weiter reicht dieser direkte Bogen nicht.
+# Maximale Länge in m, über die ein direkter Bogen zum Ziel versucht wird
 analytic_expansion_max_length: 3.0
-# Der Bogen entfällt, wenn eine Zelle teurer als dieser Wert ist.
+# Maximale Costmap-Zellkosten, bis zu denen ein direkter Bogen erlaubt ist
 analytic_expansion_max_cost: 200.0
-# Meter. Radstand geteilt durch tan vom maximalen Lenkwinkel.
+# Kleinster möglicher Wenderadius des Roboters in m (abhängig von Radstand und Lenkwinkel)
 minimum_turning_radius: 0.40
-# Rückwärts kostet das Vielfache eines Vorwärtsschritts.
+# Kosten, die bei der Wegplanung fürs Rückwärtsfahren berechnet werden
 reverse_penalty: 2.1
-# Zusatz, wenn links und rechts wechseln. 0 bestraft das nicht.
+# Zusatzkosten beim Richtungswechsel zwischen Vorwärts- und Rückwärtsfahrt
 change_penalty: 0.0
-# Eine Kurve kostet das Vielfache derselben Strecke geradeaus.
+# Kostenfaktor für Kurvenfahrten im Vergleich zur Geradeausfahrt
 non_straight_penalty: 1.20
-# Graue Zellen neben Hindernissen kosten mehr als freier Asphalt.
+# Kostenfaktor für Zellen mit hohen Costmap-Kosten (Nähe zu Hindernissen)
 cost_penalty: 2.0
-# Kleiner Abzug auf jeden Schritt, damit graue Zellen schwerer wiegen.
+# Kleiner Abschlag auf frühere Pfadkosten, damit teure Zonen stärker vermieden werden
 retrospective_penalty: 0.025
-# Meter. So weit sind die Bogenlängen zum Ziel vorausgerechnet.
+# Größe in m der vorberechneten Bogen-Tabelle für die Ziel-Heuristik
 lookup_table_size: 20.0
-# true hebt die Hindernis-Schätzung für dasselbe Ziel auf.
+# Speichert die Hindernis-Heuristik zwischen Planungen bei gleichem Ziel (true/false)
 cache_obstacle_heuristic: false
-# true glättet den Pfad, bevor FollowPath ihn fährt.
+# Glättet den gefundenen Pfad nachträglich (true/false)
 smooth_path: true
 `;
 if (pluginParamsError(SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
@@ -285,7 +311,7 @@ export const WIGGLE = MANEUVER_PLUGIN_SOURCE;
 
 export const POSE_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <!-- Nav2 lädt diesen Baum für navigate_to_pose. -->
+    <!-- Behavior Tree für einzelne Zielposen (navigate_to_pose). -->
     <PipelineSequence name="NavigateWithReplanning">
       <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
       <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
@@ -300,7 +326,7 @@ export const POSE_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
 
 export const THROUGH_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <!-- navigate_through_poses. Ein Pfad, dann FollowPath. Kein Timer, der neu plant. -->
+    <!-- Behavior Tree für eine Wegpunkt-Liste (navigate_through_poses): plant einmalig einen Pfad durch alle Posen. -->
     <PipelineSequence name="NavigateThroughPoses">
       <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
       <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
@@ -322,7 +348,7 @@ from nav2_msgs.action import FollowWaypoints
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
+# Rechtsklick auf die Karte kopiert (x, y, theta). theta ist die Ausrichtung des Roboters in rad.
 EAST = 0.0
 NORTH = math.pi / 2
 WEST = math.pi
@@ -404,7 +430,7 @@ from nav2_msgs.action import NavigateThroughPoses
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-# Rechtsklick kopiert (x, y, theta). theta ist die Blickrichtung des Autos, in Bogenmaß.
+# Rechtsklick auf die Karte kopiert (x, y, theta). theta ist die Ausrichtung des Roboters in rad.
 EAST = 0.0
 NORTH = math.pi / 2
 WEST = math.pi
