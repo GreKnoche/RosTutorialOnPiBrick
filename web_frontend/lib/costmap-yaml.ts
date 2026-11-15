@@ -74,14 +74,17 @@ export const COSTMAP_MISSION = cityCostmap(
     .replace("inflation_radius: 0.12", "inflation_radius: 0.6"),
 );
 
-/** Planner-plugin mission: city obstacles, no footprint padding, narrow inflation. */
-export const PLUGIN_GLOBAL_CITY = cityCostmap(
-  GLOBAL_COSTMAP.replace("robot_radius: 0.09", "robot_radius: 0.0").replace("inflation_radius: 0.12", "inflation_radius: 0.05"),
-);
+function pluginCostmapPatch(section: string): string {
+  return section
+    .replace("resolution: 0.05", "resolution: 0.03")
+    .replace("robot_radius: 0.09", "robot_radius: 0.05")
+    .replace("cost_scaling_factor: 2.5", "cost_scaling_factor: 0.1")
+    .replace("inflation_radius: 0.12", "inflation_radius: 0.05");
+}
 
-export const PLUGIN_LOCAL_CITY = cityCostmap(
-  LOCAL_COSTMAP.replace("robot_radius: 0.09", "robot_radius: 0.0").replace("inflation_radius: 0.12", "inflation_radius: 0.05"),
-);
+/** Planner-plugin mission: fine grid, city obstacles, narrow inflation. */
+export const PLUGIN_GLOBAL_CITY = cityCostmap(pluginCostmapPatch(GLOBAL_COSTMAP));
+export const PLUGIN_LOCAL_CITY = cityCostmap(pluginCostmapPatch(LOCAL_COSTMAP));
 
 if (!LOCAL_CITY.includes("nav2_costmap_2d::ObstacleLayer") || !GLOBAL_CITY.includes("nav2_costmap_2d::ObstacleLayer")) {
   throw new Error("Costmap-Vorlage hat keine Hindernisschicht.");
@@ -175,7 +178,9 @@ if (
 if (
   costmapError(PLUGIN_GLOBAL_CITY, "global_costmap") ||
   costmapError(PLUGIN_LOCAL_CITY, "local_costmap") ||
-  !PLUGIN_GLOBAL_CITY.includes("robot_radius: 0.0") ||
+  !PLUGIN_GLOBAL_CITY.includes("resolution: 0.03") ||
+  !PLUGIN_GLOBAL_CITY.includes("robot_radius: 0.05") ||
+  !PLUGIN_GLOBAL_CITY.includes("cost_scaling_factor: 0.1") ||
   !PLUGIN_GLOBAL_CITY.includes("inflation_radius: 0.05")
 ) {
   throw new Error("Plugin-Costmap hat nicht die eigene Vorlage.");

@@ -8,8 +8,8 @@ import {
   PLUGIN_LOCAL_CITY,
   PLUGIN_SMAC,
   PLUGIN_SMAC2D,
+  PLUGIN_THETA,
   PROGRESS,
-  THETA,
   THROUGH_SOURCE,
   THROUGH_XML,
 } from "./defaults";
@@ -38,7 +38,7 @@ const plugin: Nav2Station = {
   showProgress: false,
   cityObstacles: true,
   explain:
-    "Wähl die Klasse am Knoten. Der Name **GridBased** bleibt, den ruft der Baum auf. Die Melonen zählen einmal pro Planner. **global_costmap** ist wie im Costmap-Kapitel bearbeitbar (City-Hindernisse, Start mit schmaler Inflation). Costmap-Toggle unter der Karte.\n\nStärken auf der Fahrstrecke:\n**NavFn** — hält Abstand, oft die Gangmitte; Pfad etwas länger, Ecken weich über das Potentialfeld.\n**Smac 2D** — kurze Rasterpfade (acht Nachbarn), hier ohne Nachglättung; gute Linie, Nase egal.\n**Theta*** — längste Geraden (Sichtlinie); stark in Korridoren und bei schrägen Zielen, weniger Zickzack.\n**Smac Hybrid** — fahrbarer Bogen mit Nase und Mindestradius (DUBIN vorwärts, REEDS_SHEPP auch rückwärts).\n**Smac Lattice** — feste Manöver aus der Datei; Nase und Wendungen wie am Fahrzeug, gut für enge, vorgeplante Kurven.\n\nZellplaner (NavFn, Smac 2D, Theta*) planen nur (x, y). Hybrid und Lattice halten theta.",
+    "Wähl die Klasse am Knoten **GridBased**. Jede Melonen-Runde einmal pro Planner. **global_costmap** bearbeitbar (Plugin-Start: 0,03 m Zellen, schmale Inflation). Costmap- und Path-Toggle unter der Karte. Vergleich ohne Nachglättung; Hybrid startet mit **REEDS_SHEPP**.\n\nKurz nach Macenski u. a., Nav2-Planner-Übersicht (2023): holonomisch = nur (x,y); kinematisch = (x,y,θ) mit Mindestradius.\n\n**NavFn**\n• Eigenschaft: Potentialfeld (Dijkstra), gradient descent.\n• Vorteil: sehr schnell und stabil; hält oft Abstand zur Mitte / zu teuren Zellen.\n• Nachteil: nur (x,y); Pfad typisch etwas länger als A*; keine Geraden „quer übers Feld“.\n• Hier sichtbar: weiche Linie durch die **Gangmitte** zur 2. Melone; vorsichtiger Start durch die **schrägen Kisten**.\n\n**Smac 2D**\n• Eigenschaft: kostenbewusstes A* auf dem Raster (8 Nachbarn), optional Smoother (hier aus).\n• Vorteil: kurze Rasterpfade; `tolerance` am Ziel; gleiche Strafe wie andere Smac-Planer.\n• Nachteil: nur (x,y); ohne Glättung **Zickzack** an Rasterkanten.\n• Hier sichtbar: Knick beim Übergang **Start → Gang** und an der **Ecke** vor der Schräge.\n\n**Theta***\n• Eigenschaft: A* plus **Sichtlinie** (Lazy Theta*-P, Bresenham); any-angle.\n• Vorteil: **lange Geraden**; in Benchmarks oft kürzeste holonomische Länge.\n• Nachteil: teure LoS-Prüfungen; **kein `tolerance`**; bricht ab, wenn Sichtlinie oder Zielzelle blockiert ist.\n• Hier sichtbar: möglichst **gerade Diagonale** von der Gang-Melone zur **Schräge-West** — scheitert, wenn die Costmap den Streifen schneidet.\n\n**Smac Hybrid**\n• Eigenschaft: Hybrid-A* mit Dubins/Reeds-Shepp-Bögen und cost-aware Heuristik.\n• Vorteil: **fahrbare** Pfade mit Nase und Mindestradius; weicht teuren Zellen aus.\n• Nachteil: braucht passende **Inflation/Footprint**; planbarer als Zellplaner, aber schwerer bei engen Through-Poses.\n• Hier sichtbar: **Bögen** zwischen Melonen und **Nose** bei Süd/Ost (θ in den Wegpunkten).\n\n**Lattice**\n• Eigenschaft: A* auf einem **Manöver-Gitter** (Primitives aus JSON), diskrete (x,y,θ)-Zustände.\n• Vorteil: beliebige Fahrzeugkinematik; ähnlich schnell/gut wie Hybrid in den Benchmarks.\n• Nachteil: an primitive Auflösung gekoppelt; Pfad wirkt **stückweise** aus Katalogkurven.\n• Hier sichtbar: **Umfahrt um den Block** (Süd, dann Ost) als Folge fest erlaubter Manöver.",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 52 },
     { id: "global_costmap", x: 50, y: 22 },
@@ -71,7 +71,7 @@ const plugin: Nav2Station = {
     planner: NAVFN,
     navfn: NAVFN_PARAMS,
     smac2d: PLUGIN_SMAC2D,
-    theta: THETA,
+    theta: PLUGIN_THETA,
     smac: PLUGIN_SMAC,
     lattice: PLUGIN_LATTICE,
     progress: PROGRESS,

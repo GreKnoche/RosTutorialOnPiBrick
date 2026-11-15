@@ -153,7 +153,7 @@ w_heuristic_cost: 1.0
 allow_unknown: true
 `;
 
-export const LATTICE = `# Klasse. Bleibt Smac Lattice, der Baum ruft weiter GridBased.
+export const LATTICE = `# Klasse. Bleibt Lattice (SmacPlannerLattice), der Baum ruft weiter GridBased.
 plugin: "nav2_smac_planner::SmacPlannerLattice"
 # Meter. So nah muss die gefundene Pose am Ziel liegen.
 tolerance: 0.25
@@ -257,13 +257,20 @@ if (pluginParamsError(SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
   throw new Error("Smac-Parameter");
 }
 
-/** Plugin-Vergleich: Smac-Glättung aus, damit der Path-Toggle die Suche zeigt. */
+/** Plugin-Vergleich: ohne Nachglättung, ähnliche Planungszeit, Theta* schräg-freundlich. */
+export const PLUGIN_THETA = THETA.replace("w_traversal_cost: 2.0", "w_traversal_cost: 0.0");
 export const PLUGIN_SMAC2D = SMAC2D.replace("  max_iterations: 1000", "  max_iterations: 0")
   .replace("  w_smooth: 0.3", "  w_smooth: 0.0")
-  .replace("  do_refinement: true", "  do_refinement: false");
-export const PLUGIN_SMAC = SMAC.replace("smooth_path: true", "smooth_path: false");
+  .replace("  do_refinement: true", "  do_refinement: false")
+  .replace("max_planning_time: 2.0", "max_planning_time: 5.0");
+export const PLUGIN_SMAC = SMAC.replace('motion_model_for_search: "DUBIN"', 'motion_model_for_search: "REEDS_SHEPP"')
+  .replace("max_planning_time: 3.5", "max_planning_time: 5.0")
+  .replace("smooth_path: true", "smooth_path: false");
 export const PLUGIN_LATTICE = LATTICE.replace("smooth_path: true", "smooth_path: false");
 
+if (pluginParamsError(PLUGIN_THETA, "nav2_theta_star_planner::ThetaStarPlanner")) {
+  throw new Error("Plugin-Theta-Parameter");
+}
 if (pluginParamsError(PLUGIN_SMAC2D, "nav2_smac_planner::SmacPlanner2D")) {
   throw new Error("Plugin-Smac2D-Parameter");
 }

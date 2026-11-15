@@ -116,7 +116,7 @@ const PLUGIN: NodeMission = {
   kind: "melons",
   spawn: PLUGIN_SPAWN,
   melons: [
-    [4.76, 5.1],
+    [4.95, 5.47], /*(4.95, 5.47, 0.01)*/
     [6.7, 5.554],
     [10.11, 6.0842],
     [11, 5.1942],
@@ -126,8 +126,8 @@ const PLUGIN: NodeMission = {
     { x: 6.1, y: 5.554 + 0.32, w: 0.28, h: 0.08 },
     { x: 6.7, y: 5.554 - 0.32, w: 0.28, h: 0.08 },
     { x: 7.9, y: 5.65, w: 0.4, h: 0.09, theta: PLUGIN_DIAG },
-    { x: 4.8, y: 4.7, w: 1.9, h: 0.3, theta: (Math.PI*5)/16 },
-    { x: 4.2, y: 4.7, w: 1.9, h: 0.3, theta: (Math.PI*5)/16 },
+    { x: 4.8, y: 4.7, w: 1.8, h: 0.3, theta: (Math.PI*5)/16 },
+    { x: 4.2, y: 4.7, w: 1.8, h: 0.3, theta: (Math.PI*5)/16 },
     { x: 9.28, y: PLUGIN_BLOCK_Y + 0.48, w: 0.36, h: 0.36 },
   ],
   checkpoints: [],

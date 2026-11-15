@@ -1,7 +1,7 @@
 //  .---------------------------------------------------------------------------.
 //  |  Köpfe ab, Rumpf bleibt. Unten an ### kleben.                             |
 //  |                                                                           |
-//  |  PathClear(const std::string & name, const BT::NodeConfiguration & config) |
+//  |  class PathClear : public BT::ConditionNode                               |
 //  |  static BT::PortsList providedPorts()                                     |
 //  |  BT::NodeStatus tick() override                                           |
 //  |  BT_REGISTER_NODES(factory)                                               |
@@ -21,12 +21,12 @@
 namespace path_clear_bt_node
 {
 
-class PathClear : public BT::ConditionNode
+/*##############################*/
+  //hier Klassendeklaration einfügen
+/*##############################*/
 {
 public:
-  /*##############################*/
-    //hier Funktionskopf einfügen
-  /*##############################*/
+  PathClear(const std::string & name, const BT::NodeConfiguration & config)
   : BT::ConditionNode(name, config),  // erbt von ConditionNode
     scan_topic_("scan"),
     min_range_(0.1),
@@ -59,11 +59,13 @@ public:
     if (!have_scan_) {
       return BT::NodeStatus::SUCCESS;
     }
-    // *** Kern: echter Abstand und zu nah → FAILURE (Hindernis) ***
-    if (std::isfinite(range_m_) && range_m_ < min_range_) {
-      return BT::NodeStatus::FAILURE;
-    }
-    // sonst frei voraus
+    // Kern: voraus zu nah → FAILURE (Hindernis), sonst frei → SUCCESS.
+    // range_m_   — Abstand geradeaus (setzt der LaserScan-Callback)
+    // min_range_ — Schwelle in m (Port/XML, oben per getInput)
+  /*##############################*/
+    // hier Abstand prüfen
+  /*##############################*/
+    // Tipp: std::isfinite(range_m_) && range_m_ < min_range_
     return BT::NodeStatus::SUCCESS;
   }
 

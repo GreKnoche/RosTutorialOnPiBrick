@@ -22,14 +22,14 @@ const MONITOR_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">
       <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
       <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
       <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}"/>
-      <!-- <Parallel success_count="1" failure_count="1"> -->
-        <!-- <KeepRunningUntilFailure> -->
-          <!-- <RateController hz="2.0"> -->
+      <!-- <Element1> -->
+        <!-- <Element2> -->
+          <!-- <Element3> -->
             <!-- <PathClear scan_topic="scan" min_range="0.2"/> -->
-          <!-- </RateController> -->
-        <!-- </KeepRunningUntilFailure> -->
+          <!-- </Element3> -->
+        <!-- </Element2> -->
         <FollowPath path="{path}" controller_id="{selected_controller}" error_code_id="{follow_path_error_code}"/>
-      <!-- </Parallel> -->
+      <!-- </Element1> -->
     </PipelineSequence>
   </BehaviorTree>
 </root>
@@ -115,13 +115,18 @@ const btMonitor: Nav2Station = {
   showProgress: false,
   cityObstacles: true,
   explain:
-    "Hier baust du einen eigenen Behavior-Knoten: **PathClear** liest `/scan` und lässt den Baum failen, wenn direkt voraus etwas zu nah steht.\n\n**1.** In `path_clear_bt_node.cpp` stehen oben die BT-Köpfe. Setze jeden an die passende **###**-Stelle.\n\n" +
-    "**PathClear(name, config)** — Konstruktor. Ruft `BT::ConditionNode(name, config)` auf: so erbt der Knoten vom Condition-Typ.\n" +
-    "**providedPorts()** — meldet die XML-Attribute (`scan_topic`, `min_range`). Ohne Port kein `getInput`.\n" +
-    "**tick() override** — jeder Baum-Tick. Liest `min_range`, vergleicht mit `range_m_`. Zu nah → **FAILURE**, frei → **SUCCESS**. Conditions liefern kein RUNNING.\n" +
-    "**BT_REGISTER_NODES(factory)** — registriert die Klasse unter dem Namen `\"PathClear\"`. Genau so heißt der Tag im XML.\n\n" +
-    "**2.** Im Baum die Kommentare ersetzen: **Parallel** um FollowPath und den Monitor, **KeepRunningUntilFailure** + **RateController** um PathClear.\n\n" +
-    "**Parallel** mit `failure_count=\"1\"` bricht ab, sobald ein Kind FAILURE liefert. `success_count=\"1\"`: FollowPath allein darf das Parallel beenden.\nOhne **KeepRunningUntilFailure** merkt sich Parallel das erste PathClear-SUCCESS und tickt den Monitor nie wieder — dann knallt es in die Wand.\n**RateController** begrenzt PathClear auf z.B. 5 Hz.",
+    "In dieser Lektion geht es darum deinen eigenen Behavior-Knotenzu bauen. Dafür sollst du das **path_clear_bt_node.cpp**-Datei anpassen, diese liest den 1D Laserscan aus und soll wenn ein Objekt zu nahe kommt Failure auslösen.\n\n"
+    +"**Deklaration und Funktionen eines eigenen BT Plugins**\n"
+    +"**class PathClear : public BT::ConditionNode** — Wenn wir einen neuen Knoten anlegen, brauchen wir zunächst den richtigen Parent-Node in unserem Fall ein ConditionNode.\n" +
+    "**providedPorts()** — gibt uns die Möglichkeit XML-Attribute (`scan_topic`, `min_range`) festzulegen. Ohne Port keine Parameter über `getInput`.\n" +
+    "**tick() override** — überprüft bei jedem Tick den Status der Node, bei ConditionNodes gibt es nur SUCCESS oder FAILURE, hier überschreiben wir die Tick funktion der übergeordneten Klasse.\n" +
+    "**BT_REGISTER_NODES(factory)** — die Funktion dient dazu, dass wir sie in der XML-Datei verwenden können und gefunden wird.\n\n"
+    +"**Neue Behavior Tree Nodes**\n"
+    +"**Paralell** ist ein Control-Node, welcher zwei oder mehr Knoten paralell ticken lassen kann, dabei kann konfiguriert werden, wann dieser success oder Failure meldet."
+    +"\n**KeepRunningUntilFailure** ist ein Decorator-Node der einen Node so lange tickt bis dieser Failure zurückgibt, wenn der Decorator selbst getickt wird, gibt dieser RUNNING zurück."
+    +"\n**RateController** ist ein ebenfalls ein Decorator-Node dieser begrenzt die Anzahl an Ticks in Hz und verhindert somit übermäßiges ticken.\n\n"
+    +"**Aufgabe:**\n"
+    +"**1.** Fülle die Lücken in der path_clear_bt_node.cpp und schreibe die Abbruchbedingung.\n"+"**2.** Schreibe den XML-Baum um, sodass PathClear und FollowPath gleichzeitig aufgerufen werden, begrenze dabei die PathClearNode auf 2Hz",
   nodes: [
     { id: "waypoint_lesson", x: 8, y: 50 },
     { id: "mission", x: 36, y: 50 },

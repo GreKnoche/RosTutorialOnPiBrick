@@ -16,10 +16,10 @@ import {
   writePluginPlanners,
 } from "@/lib/browser-draft";
 import { MISSION_ORDER, isMissionId, missionById, stationGraph, type MissionId } from "@/lib/nav2-lessons";
-import { PLANNER_CLASSES, absorbPlugin, plannerClass, plannerShort } from "@/lib/planner-yaml";
+import { PLANNER_CLASSES, absorbPlugin, plannerClass, plannerMark } from "@/lib/planner-yaml";
 
 function openPlanners(done: readonly string[]): string {
-  const open = PLANNER_CLASSES.filter((name) => !done.includes(name)).map((name) => plannerShort(name));
+  const open = PLANNER_CLASSES.filter((name) => !done.includes(name)).map((name) => plannerMark(name));
   return open.length === 0 ? "Alle Planner" : `Offen: ${open.join(", ")}`;
 }
 
@@ -191,7 +191,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                     <li>Wähl die Klasse am Knoten und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
                     {PLANNER_CLASSES.map((name) => (
                       <li key={name}>
-                        {plannerShort(name)}
+                        {plannerMark(name)}
                         {pluginDone.includes(name) ? " geschafft" : ""}
                       </li>
                     ))}

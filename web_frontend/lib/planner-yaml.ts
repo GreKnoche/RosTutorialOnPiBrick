@@ -74,8 +74,15 @@ const MARKS = {
   "nav2_smac_planner::SmacPlannerLattice": "lattice",
 } as const;
 
+/** Anzeige im Ring und als Editor-Titel (Kurzname, nicht ROS-Klassenname). */
+const DISPLAY: Partial<Record<(typeof CLASSES)[number], string>> = {
+  "nav2_smac_planner::SmacPlannerLattice": "Lattice",
+};
+
 /** Short name drawn on the planner node, for example theta*. */
 export function plannerMark(name: string): string {
+  const known = name as (typeof CLASSES)[number];
+  if (DISPLAY[known]) return DISPLAY[known];
   return MARKS[name as keyof typeof MARKS] ?? plannerShort(name);
 }
 
@@ -112,7 +119,7 @@ const PLANNER_NOTES = [
   ["nav2_smac_planner::SmacPlanner2D", "(x, y), acht Nachbarn"],
   ["nav2_theta_star_planner::ThetaStarPlanner", "(x, y), Sichtlinie"],
   ["nav2_smac_planner::SmacPlannerHybrid", "(x, y, theta), Mindestradius"],
-  ["nav2_smac_planner::SmacPlannerLattice", "(x, y, theta), Manöverdatei"],
+  ["nav2_smac_planner::SmacPlannerLattice", "(x, y, theta), Lattice / Manöverdatei"],
 ] as const;
 
 function render(list: string, plugin: string): string {
