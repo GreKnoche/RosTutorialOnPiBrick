@@ -3,7 +3,7 @@
 <package format="3">
   <name>path_clear_bt_node</name>
   <version>0.1.0</version>
-  <description>BT condition: SUCCESS when the forward lidar cone is clear.</description>
+  <description>BT condition: SUCCESS when the forward lidar beam is clear.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 

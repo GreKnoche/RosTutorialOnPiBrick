@@ -18,7 +18,7 @@ from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
 
 from city import CITY, Gate, foot_radius
-from city_geom import overlapping
+from city_geom import overlapping_obbs
 
 TICK_HZ = 20.0
 
@@ -204,7 +204,11 @@ class CanvasPlant:
                     continue
                 x, y = _finite(item.get("x")), _finite(item.get("y"))
                 w, h = _finite(item.get("w")), _finite(item.get("h"))
-                points.append((x, y, w, h) if w > 0.0 and h > 0.0 else (x, y))
+                yaw = _finite(item.get("theta"))
+                if w > 0.0 and h > 0.0:
+                    points.append((x, y, w, h, yaw) if abs(yaw) > 1e-12 else (x, y, w, h))
+                else:
+                    points.append((x, y))
         self.city.set_obstacles(points)
         self.count_walls = walls
         self.bumps = 0
@@ -417,8 +421,11 @@ class CanvasPlant:
         if self.city is None or not self.count_walls:
             self._wall_hits = set()
             return
-        rects = [house.bounds for house in self.city.clutter]
-        hits = overlapping(self.odom.pose.x, self.odom.pose.y, foot_radius(), rects)
+        boxes = [
+            (house.x + house.w * 0.5, house.y + house.h * 0.5, house.w, house.h, house.theta)
+            for house in self.city.clutter
+        ]
+        hits = overlapping_obbs(self.odom.pose.x, self.odom.pose.y, foot_radius(), boxes)
         self.bumps += len(hits - self._wall_hits)
         self._wall_hits = hits
 

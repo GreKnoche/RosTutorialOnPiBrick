@@ -35,6 +35,104 @@ def sample_rects(
     return points
 
 
+def sample_obb(
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    theta: float,
+    step: float = 0.04,
+) -> list[tuple[float, float]]:
+    """Grid points that fill a box rotated around its center."""
+    if step <= 0.0 or w <= 0.0 or h <= 0.0:
+        return []
+    cosine = math.cos(theta)
+    sine = math.sin(theta)
+    points: list[tuple[float, float]] = []
+    x = -w * 0.5
+    while x <= w * 0.5 + 1e-9:
+        y = -h * 0.5
+        while y <= h * 0.5 + 1e-9:
+            points.append((cx + x * cosine - y * sine, cy + x * sine + y * cosine))
+            y += step
+        x += step
+    return points
+
+
+def _to_local(px: float, py: float, cx: float, cy: float, theta: float) -> tuple[float, float]:
+    cosine = math.cos(-theta)
+    sine = math.sin(-theta)
+    dx = px - cx
+    dy = py - cy
+    return dx * cosine - dy * sine, dx * sine + dy * cosine
+
+
+def _to_world(lx: float, ly: float, cx: float, cy: float, theta: float) -> tuple[float, float]:
+    cosine = math.cos(theta)
+    sine = math.sin(theta)
+    return cx + lx * cosine - ly * sine, cy + lx * sine + ly * cosine
+
+
+def ray_obb(
+    ox: float,
+    oy: float,
+    dx: float,
+    dy: float,
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    theta: float,
+    reach: float,
+) -> float | None:
+    lx, ly = _to_local(ox, oy, cx, cy, theta)
+    ldx, ldy = _to_local(cx + dx, cy + dy, cx, cy, theta)
+    return ray_rect(lx, ly, ldx, ldy, (-w * 0.5, -h * 0.5, w * 0.5, h * 0.5), reach)
+
+
+def push_obb(
+    x: float,
+    y: float,
+    radius: float,
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    theta: float,
+) -> tuple[float, float]:
+    lx, ly = _to_local(x, y, cx, cy, theta)
+    nx, ny = _push_one(lx, ly, radius, (-w * 0.5, -h * 0.5, w * 0.5, h * 0.5))
+    return _to_world(nx, ny, cx, cy, theta)
+
+
+def push_obbs(
+    x: float,
+    y: float,
+    radius: float,
+    boxes: list[tuple[float, float, float, float, float]],
+) -> tuple[float, float]:
+    if radius <= 0.0 or not math.isfinite(x) or not math.isfinite(y):
+        return x, y
+    for _ in range(4):
+        for cx, cy, w, h, theta in boxes:
+            x, y = push_obb(x, y, radius, cx, cy, w, h, theta)
+    return x, y
+
+
+def overlapping_obbs(
+    x: float,
+    y: float,
+    radius: float,
+    boxes: list[tuple[float, float, float, float, float]],
+) -> set[int]:
+    hits: set[int] = set()
+    for index, (cx, cy, w, h, theta) in enumerate(boxes):
+        lx, ly = _to_local(x, y, cx, cy, theta)
+        if overlapping(lx, ly, radius, [(-w * 0.5, -h * 0.5, w * 0.5, h * 0.5)]):
+            hits.add(index)
+    return hits
+
+
 def foot_radius() -> float:
     """Half the body diagonal, so a corner does not sit inside a wall."""
     return 0.5 * math.hypot(BODY_LENGTH_M, BODY_WIDTH_M)

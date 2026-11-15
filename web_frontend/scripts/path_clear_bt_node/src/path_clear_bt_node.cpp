@@ -1,4 +1,11 @@
-// Klassenname und BT_REGISTER_NODES bleiben.
+//  .---------------------------------------------------------------------------.
+//  |  Köpfe ab, Rumpf bleibt. Unten an ### kleben.                             |
+//  |                                                                           |
+//  |  PathClear(const std::string & name, const BT::NodeConfiguration & config) |
+//  |  static BT::PortsList providedPorts()                                     |
+//  |  BT::NodeStatus tick() override                                           |
+//  |  BT_REGISTER_NODES(factory)                                               |
+//  '---------------------------------------------------------------------------'
 
 #include <algorithm>
 #include <cmath>
@@ -17,27 +24,52 @@ namespace path_clear_bt_node
 class PathClear : public BT::ConditionNode
 {
 public:
-  PathClear(const std::string & name, const BT::NodeConfiguration & config)
-  : BT::ConditionNode(name, config),
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
+  : BT::ConditionNode(name, config),  // erbt von ConditionNode
     scan_topic_("scan"),
-    min_range_(0.4),
-    ahead_m_(std::numeric_limits<double>::infinity()),
+    min_range_(0.1),
+    range_m_(std::numeric_limits<double>::infinity()),
     have_scan_(false)
   {
   }
 
-  static BT::PortsList providedPorts()
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
   {
     return {
       BT::InputPort<std::string>("scan_topic", "scan", "LaserScan topic"),
-      BT::InputPort<double>("min_range", 0.4, "Meter. Closer than this fails."),
-      // Alter Baum darf das Attribut noch setzen. Der Kegel wird nicht mehr gelesen.
-      BT::InputPort<double>("half_angle", 0.35, "Unused. Only the forward beam is read."),
+      BT::InputPort<double>("min_range", 0.1, "Meter. Closer than this fails."),
     };
   }
 
-  // Ein Strahl: Winkel 0, geradeaus.
-  static double straightAhead(const sensor_msgs::msg::LaserScan & scan)
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
+  {
+    if (!BT::isStatusActive(status())) {
+      initialize();
+    }
+    callback_group_executor_.spin_some();
+    getInput("min_range", min_range_);
+
+    // Kein Scan noch: frei lassen.
+    if (!have_scan_) {
+      return BT::NodeStatus::SUCCESS;
+    }
+    // *** Kern: echter Abstand und zu nah → FAILURE (Hindernis) ***
+    if (std::isfinite(range_m_) && range_m_ < min_range_) {
+      return BT::NodeStatus::FAILURE;
+    }
+    // sonst frei voraus
+    return BT::NodeStatus::SUCCESS;
+  }
+
+private:
+  // LaserScan hat ranges[] — Abstand geradeaus (Winkel 0).
+  static double findRange(const sensor_msgs::msg::LaserScan & scan)
   {
     if (scan.ranges.empty()) {
       return std::numeric_limits<double>::infinity();
@@ -52,32 +84,6 @@ public:
     return static_cast<double>(scan.ranges[static_cast<size_t>(index)]);
   }
 
-  // true = frei (SUCCESS). false = Hindernis (FAILURE).
-  static bool forwardClear(double range_m, double min_range)
-  {
-    if (!std::isfinite(range_m)) {
-      return true;
-    }
-    return range_m >= min_range;
-  }
-
-  BT::NodeStatus tick() override
-  {
-    if (!BT::isStatusActive(status())) {
-      initialize();
-    }
-    callback_group_executor_.spin_some();
-    if (!have_scan_) {
-      return BT::NodeStatus::SUCCESS;
-    }
-    getInput("min_range", min_range_);
-    if (forwardClear(ahead_m_, min_range_)) {
-      return BT::NodeStatus::SUCCESS;
-    }
-    return BT::NodeStatus::FAILURE;
-  }
-
-private:
   void initialize()
   {
     getInput("scan_topic", scan_topic_);
@@ -97,7 +103,7 @@ private:
       scan_topic_,
       rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::LaserScan::SharedPtr msg) {
-        ahead_m_ = straightAhead(*msg);
+        range_m_ = findRange(*msg);
         have_scan_ = true;
       },
       options);
@@ -110,13 +116,15 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   std::string scan_topic_;
   double min_range_;
-  double ahead_m_;
+  double range_m_;
   bool have_scan_;
 };
 
 }  // namespace path_clear_bt_node
 
-BT_REGISTER_NODES(factory)
+/*##############################*/
+  //hier Funktionskopf einfügen
+/*##############################*/
 {
   factory.registerNodeType<path_clear_bt_node::PathClear>("PathClear");
 }

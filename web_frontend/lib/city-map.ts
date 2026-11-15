@@ -1,5 +1,5 @@
 export type Point = { x: number; y: number };
-export type Rect = { x: number; y: number; w: number; h: number; color: string };
+export type Rect = { x: number; y: number; w: number; h: number; color: string; theta?: number };
 export type Seg = { x0: number; y0: number; x1: number; y1: number };
 export type Gate = Seg & { id: string };
 export type LapState = { text: string; done: boolean; grass: boolean; next: string };

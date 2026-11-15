@@ -121,7 +121,9 @@ function asLap(value: unknown): { text: string; done: boolean; grass: boolean; n
   };
 }
 
-function asBoxes(value: unknown): Array<{ x: number; y: number; w: number; h: number; color: string }> | undefined {
+function asBoxes(
+  value: unknown,
+): Array<{ x: number; y: number; w: number; h: number; color: string; theta?: number }> | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
@@ -129,7 +131,17 @@ function asBoxes(value: unknown): Array<{ x: number; y: number; w: number; h: nu
     if (typeof box.x !== "number" || typeof box.y !== "number" || typeof box.w !== "number" || typeof box.h !== "number") {
       return [];
     }
-    return [{ x: box.x, y: box.y, w: box.w, h: box.h, color: typeof box.color === "string" ? box.color : "#e87820" }];
+    const theta = typeof box.theta === "number" && Number.isFinite(box.theta) ? box.theta : undefined;
+    return [
+      {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        color: typeof box.color === "string" ? box.color : "#e87820",
+        theta,
+      },
+    ];
   });
 }
 

@@ -33,10 +33,27 @@ class House:
     h: float
     color: tuple[int, int, int]
     height: float = HOUSE_HEIGHT_M
+    theta: float = 0.0
 
     @property
     def bounds(self) -> tuple[float, float, float, float]:
-        return (self.x, self.y, self.x + self.w, self.y + self.h)
+        xs = [p[0] for p in self.corners]
+        ys = [p[1] for p in self.corners]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    @property
+    def corners(self) -> tuple[tuple[float, float], ...]:
+        cx = self.x + self.w * 0.5
+        cy = self.y + self.h * 0.5
+        cosine = math.cos(self.theta)
+        sine = math.sin(self.theta)
+        local = (
+            (-self.w * 0.5, -self.h * 0.5),
+            (self.w * 0.5, -self.h * 0.5),
+            (self.w * 0.5, self.h * 0.5),
+            (-self.w * 0.5, self.h * 0.5),
+        )
+        return tuple((cx + lx * cosine - ly * sine, cy + lx * sine + ly * cosine) for lx, ly in local)
 
 
 @dataclass(frozen=True)

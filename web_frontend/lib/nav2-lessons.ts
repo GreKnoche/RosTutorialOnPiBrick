@@ -6,7 +6,7 @@
 
 export type MissionKind = "melons" | "gates";
 
-export type MissionObstacle = { x: number; y: number; w?: number; h?: number };
+export type MissionObstacle = { x: number; y: number; w?: number; h?: number; theta?: number };
 
 export type MissionCheckpoint = {
   id: string;
@@ -100,24 +100,36 @@ const CONTROLLER: NodeMission = {
 };
 
 /**
- * plugin: no obstacles.
- * One melon in the middle of each side. The straight chord crosses the block,
- * so the planners have to turn the corner instead of sharing one line.
+ * plugin: one tour for all five classes. Houses still via /city_obstacles.
+ * Mid-road aisle (NavFn stays center), lawn diagonal (Theta* line of sight),
+ * then south and east of the east square so the chord still hits the block.
+ * No pocket and no reverse — that stays on mission planner.
  */
-/** South road, west of the melon, facing east. The melon sits on the old spawn. */
-const PLUGIN_SPAWN: SpawnPose = { x: 10.5, y: 5.194285714285714, theta: 0 };
+const PLUGIN_WEST_X = 10.11;
+const PLUGIN_BLOCK_Y = 6.084285714285714;
+/** Melone Gang → Schräge, parallel zur Sichtlinie. */
+const PLUGIN_DIAG = Math.atan2(PLUGIN_BLOCK_Y - 5.554, PLUGIN_WEST_X - 6.7);
+const PLUGIN_SPAWN: SpawnPose = { x: 3.53, y: 3.56, theta: 0 };
 const PLUGIN: NodeMission = {
   id: "plugin",
   title: "planner plugin",
   kind: "melons",
   spawn: PLUGIN_SPAWN,
   melons: [
-    [11, 5.194285714285714],
-    [11.89, 6.084285714285714],
-    [11, 6.974285714285714],
-    [10.11, 6.084285714285714],
+    [4.76, 5.1],
+    [6.7, 5.554],
+    [10.11, 6.0842],
+    [11, 5.1942],
+    [11.89, 6.0842],
   ],
-  obstacles: [],
+  obstacles: [
+    { x: 6.1, y: 5.554 + 0.32, w: 0.28, h: 0.08 },
+    { x: 6.7, y: 5.554 - 0.32, w: 0.28, h: 0.08 },
+    { x: 7.9, y: 5.65, w: 0.4, h: 0.09, theta: PLUGIN_DIAG },
+    { x: 4.8, y: 4.7, w: 1.9, h: 0.3, theta: (Math.PI*5)/16 },
+    { x: 4.2, y: 4.7, w: 1.9, h: 0.3, theta: (Math.PI*5)/16 },
+    { x: 9.28, y: PLUGIN_BLOCK_Y + 0.48, w: 0.36, h: 0.36 },
+  ],
   checkpoints: [],
 };
 

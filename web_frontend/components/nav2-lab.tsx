@@ -107,7 +107,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
         <CityLab
           kapitel={kapitel}
           missionKey={stationId ?? ""}
-          costmapToggle={stationId === "costmap" || done.costmap}
+          costmapToggle={stationId === "costmap" || stationId === "plugin" || done.costmap}
           pathToggle={
             stationId === "planner" ||
             stationId === "plugin" ||
@@ -184,9 +184,9 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
               >
                 {station?.id === "plugin" ? (
                   <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle die vier Melonen. Die Gerade dazwischen läuft durch den Block.</li>
-                    <li>NavFn, Smac2D und Theta* legen die Ecke verschieden.</li>
-                    <li>theta ist die Nase. Die Zellplaner ignorieren sie, Hybrid und Lattice halten sie.</li>
+                    <li>Sammle in der Reihenfolge Gang, Schräge, Südseite, Ostseite.</li>
+                    <li>NavFn bleibt in der Gangmitte, Theta* zieht die Schräge gerade, Smac2D ohne Nachglättung.</li>
+                    <li>Hybrid und Lattice fahren Bögen mit Nase. Die Zellplaner ignorieren theta.</li>
                     <li>Süd 0, Ost math.pi / 2, Nord math.pi, West -math.pi / 2.</li>
                     <li>Wähl die Klasse am Knoten und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
                     {PLANNER_CLASSES.map((name) => (
@@ -213,7 +213,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
                 ) : station?.id === "bt-monitor" ? (
                   <ul className="list-disc space-y-1 pl-4">
                     <li>Sammle die Melone. Danach fährt der Client weiter auf die Wand zu.</li>
-                    <li>In C++: forwardClear — endliche Strahlen im Vorwärtskegel unter min_range → false.</li>
+                    <li>In C++: die BT-Köpfe aus dem Rahmen an die ###-Stellen setzen.</li>
                     <li>Im Baum: Parallel um FollowPath und KeepRunningUntilFailure(RateController(PathClear)).</li>
                     <li>Bestanden, wenn der Monitor greift und du die Wand nicht berührst (Zähler 0).</li>
                   </ul>

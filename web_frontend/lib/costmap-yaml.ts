@@ -74,6 +74,15 @@ export const COSTMAP_MISSION = cityCostmap(
     .replace("inflation_radius: 0.12", "inflation_radius: 0.6"),
 );
 
+/** Planner-plugin mission: city obstacles, no footprint padding, narrow inflation. */
+export const PLUGIN_GLOBAL_CITY = cityCostmap(
+  GLOBAL_COSTMAP.replace("robot_radius: 0.09", "robot_radius: 0.0").replace("inflation_radius: 0.12", "inflation_radius: 0.05"),
+);
+
+export const PLUGIN_LOCAL_CITY = cityCostmap(
+  LOCAL_COSTMAP.replace("robot_radius: 0.09", "robot_radius: 0.0").replace("inflation_radius: 0.12", "inflation_radius: 0.05"),
+);
+
 if (!LOCAL_CITY.includes("nav2_costmap_2d::ObstacleLayer") || !GLOBAL_CITY.includes("nav2_costmap_2d::ObstacleLayer")) {
   throw new Error("Costmap-Vorlage hat keine Hindernisschicht.");
 }
@@ -127,8 +136,14 @@ export function costmapError(section: string, root: CostmapRoot): string | null 
   return null;
 }
 
+/** German decimal commas on a bare number (`1,0`) are strings in YAML. Nav2 wants a double. */
+function decimalDots(section: string): string {
+  return section.replace(/^(\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*)(-?\d+),(\d+)(\s*(?:#.*)?)$/gm, "$1$2.$3$4");
+}
+
 /** Replace one top-level costmap. The rest of nav2_params.yaml stays. */
 export function mergeCostmap(params: string, section: string, root: CostmapRoot): string | null {
+  section = decimalDots(section);
   if (costmapError(section, root)) return null;
   const lines = tidy(params).split("\n");
   const start = lines.findIndex((line) => line === `${root}:`);
@@ -155,4 +170,13 @@ if (
   GLOBAL_CITY.includes("resolution: 0.15")
 ) {
   throw new Error("Costmap-Mission hat nicht die eigene Vorlage.");
+}
+
+if (
+  costmapError(PLUGIN_GLOBAL_CITY, "global_costmap") ||
+  costmapError(PLUGIN_LOCAL_CITY, "local_costmap") ||
+  !PLUGIN_GLOBAL_CITY.includes("robot_radius: 0.0") ||
+  !PLUGIN_GLOBAL_CITY.includes("inflation_radius: 0.05")
+) {
+  throw new Error("Plugin-Costmap hat nicht die eigene Vorlage.");
 }

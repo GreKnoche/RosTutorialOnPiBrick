@@ -3,7 +3,15 @@ import { followerSection } from "@/lib/follower-yaml";
 import { MANEUVER_PLUGIN_SOURCE } from "@/lib/maneuver-plugin";
 import { pluginParamsError, pluginSection } from "@/lib/planner-yaml";
 
-export { GLOBAL_CITY, GLOBAL_COSTMAP, LOCAL_CITY, LOCAL_COSTMAP, SHOW_LOCAL_COSTMAP } from "@/lib/costmap-yaml";
+export {
+  GLOBAL_CITY,
+  GLOBAL_COSTMAP,
+  LOCAL_CITY,
+  LOCAL_COSTMAP,
+  PLUGIN_GLOBAL_CITY,
+  PLUGIN_LOCAL_CITY,
+  SHOW_LOCAL_COSTMAP,
+} from "@/lib/costmap-yaml";
 
 const PARAMS = `controller_server:
   ros__parameters:
@@ -248,6 +256,24 @@ smooth_path: true
 if (pluginParamsError(SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
   throw new Error("Smac-Parameter");
 }
+
+/** Plugin-Vergleich: Smac-Glättung aus, damit der Path-Toggle die Suche zeigt. */
+export const PLUGIN_SMAC2D = SMAC2D.replace("  max_iterations: 1000", "  max_iterations: 0")
+  .replace("  w_smooth: 0.3", "  w_smooth: 0.0")
+  .replace("  do_refinement: true", "  do_refinement: false");
+export const PLUGIN_SMAC = SMAC.replace("smooth_path: true", "smooth_path: false");
+export const PLUGIN_LATTICE = LATTICE.replace("smooth_path: true", "smooth_path: false");
+
+if (pluginParamsError(PLUGIN_SMAC2D, "nav2_smac_planner::SmacPlanner2D")) {
+  throw new Error("Plugin-Smac2D-Parameter");
+}
+if (pluginParamsError(PLUGIN_SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
+  throw new Error("Plugin-Smac-Parameter");
+}
+if (pluginParamsError(PLUGIN_LATTICE, "nav2_smac_planner::SmacPlannerLattice")) {
+  throw new Error("Plugin-Lattice-Parameter");
+}
+
 export const WIGGLE = MANEUVER_PLUGIN_SOURCE;
 
 export const POSE_XML = `<root BTCPP_format="4" main_tree_to_execute="MainTree">

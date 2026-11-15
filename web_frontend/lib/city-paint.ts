@@ -220,6 +220,18 @@ function drawMelon(ctx: CanvasRenderingContext2D, x: number, y: number, ppm: num
 
 type Screen = { x: number; y: number; ppm: number };
 
+function obbCorners(cx: number, cy: number, w: number, h: number, theta: number): Array<[number, number]> {
+  const cosine = Math.cos(theta);
+  const sine = Math.sin(theta);
+  const local: Array<[number, number]> = [
+    [-w * 0.5, -h * 0.5],
+    [w * 0.5, -h * 0.5],
+    [w * 0.5, h * 0.5],
+    [-w * 0.5, h * 0.5],
+  ];
+  return local.map(([lx, ly]) => [cx + lx * cosine - ly * sine, cy + lx * sine + ly * cosine] as [number, number]);
+}
+
 const worldCache: { key: string; canvas: HTMLCanvasElement | null } = { key: "", canvas: null };
 
 function worldKey(
@@ -232,7 +244,9 @@ function worldKey(
   probe: CityProbe | null,
   runner: Rect | null,
 ) {
-  const boxes = clutter.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}:${box.color}`).join(",");
+  const boxes = clutter
+    .map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}:${box.w.toFixed(2)}:${(box.theta ?? 0).toFixed(3)}:${box.color}`)
+    .join(",");
   const runnerKey = runner ? `${runner.x.toFixed(2)}:${runner.y.toFixed(2)}` : "";
   const probeKey = probe
     ? `${probe.kapitel}:${probe.scene}:${probe.layer}:${probe.cells.length}:${probe.path.length}:${probe.particles.length}`
@@ -310,17 +324,33 @@ function paintWorld(
         ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#ffe060" }))
         : [];
     const blocks = [...city.houses, ...clutter, ...cones];
+    const axisBlocks = blocks.filter((house) => house.theta === undefined || Math.abs(house.theta) < 1e-6);
     for (const house of blocks) {
-      const a = to(house.x, house.y + house.h);
-      const b = to(house.x + house.w, house.y);
+      const yaw = house.theta ?? 0;
       ctx.fillStyle = house.color;
-      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      if (Math.abs(yaw) > 1e-6) {
+        const cx = house.x + house.w * 0.5;
+        const cy = house.y + house.h * 0.5;
+        const corners = obbCorners(cx, cy, house.w, house.h, yaw);
+        ctx.beginPath();
+        corners.forEach((point, index) => {
+          const screen = to(point[0], point[1]);
+          if (index === 0) ctx.moveTo(screen.x, screen.y);
+          else ctx.lineTo(screen.x, screen.y);
+        });
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        const a = to(house.x, house.y + house.h);
+        const b = to(house.x + house.w, house.y);
+        ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      }
     }
     ctx.strokeStyle = "rgba(255,247,237,0.35)";
     ctx.lineWidth = Math.max(1, ppm * 0.01);
     ctx.beginPath();
-    for (const house of blocks) {
-      const others = blocks.filter((other) => other !== house && other.color === house.color);
+    for (const house of axisBlocks) {
+      const others = axisBlocks.filter((other) => other !== house && other.color === house.color);
       for (const edge of outerEdges(house, others)) {
         const a = to(edge[0], edge[1]);
         const b = to(edge[2], edge[3]);

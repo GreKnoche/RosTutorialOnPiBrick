@@ -1,6 +1,13 @@
-/** Starter for the PathClear BT condition. Students fill forwardClear(). */
+/** PathClear BT condition starter. Students paste the BT heads onto the ### spots. */
 
-export const PATH_CLEAR_PLUGIN_SOURCE = String.raw`// Klassenname und BT_REGISTER_NODES bleiben.
+export const PATH_CLEAR_PLUGIN_SOURCE = String.raw`//  .---------------------------------------------------------------------------.
+//  |  Köpfe ab, Rumpf bleibt. Unten an ### kleben.                             |
+//  |                                                                           |
+//  |  PathClear(const std::string & name, const BT::NodeConfiguration & config) |
+//  |  static BT::PortsList providedPorts()                                     |
+//  |  BT::NodeStatus tick() override                                           |
+//  |  BT_REGISTER_NODES(factory)                                               |
+//  '---------------------------------------------------------------------------'
 
 #include <algorithm>
 #include <cmath>
@@ -19,61 +26,70 @@ namespace path_clear_bt_node
 class PathClear : public BT::ConditionNode
 {
 public:
-  PathClear(const std::string & name, const BT::NodeConfiguration & config)
-  : BT::ConditionNode(name, config),
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
+  : BT::ConditionNode(name, config),  // erbt von ConditionNode
     scan_topic_("scan"),
-    min_range_(0.4),
-    half_angle_(0.35),
+    min_range_(0.1),
+    range_m_(std::numeric_limits<double>::infinity()),
     have_scan_(false)
   {
   }
 
-  static BT::PortsList providedPorts()
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
   {
     return {
       BT::InputPort<std::string>("scan_topic", "scan", "LaserScan topic"),
-      BT::InputPort<double>("min_range", 0.4, "Meter. Closer than this fails."),
-      BT::InputPort<double>("half_angle", 0.35, "Radian. Forward cone half-width."),
+      BT::InputPort<double>("min_range", 0.1, "Meter. Closer than this fails."),
     };
   }
 
-  // true = free ahead (SUCCESS). false = obstacle on the nose (FAILURE).
-  bool forwardClear(
-    const sensor_msgs::msg::LaserScan & scan,
-    double min_range,
-    double half_angle)
-  {
-    // TODO: Strahlen in ±half_angle prüfen.
-    // Wenn ein endlicher range-Wert < min_range ist → return false.
-    (void)scan;
-    (void)min_range;
-    (void)half_angle;
-    return true;
-  }
-
-  BT::NodeStatus tick() override
+  /*##############################*/
+    //hier Funktionskopf einfügen
+  /*##############################*/
   {
     if (!BT::isStatusActive(status())) {
       initialize();
     }
     callback_group_executor_.spin_some();
-    if (!have_scan_ || !last_scan_) {
-      return BT::NodeStatus::SUCCESS;
-    }
     getInput("min_range", min_range_);
-    getInput("half_angle", half_angle_);
-    if (forwardClear(*last_scan_, min_range_, half_angle_)) {
+
+    // Kein Scan noch: frei lassen.
+    if (!have_scan_) {
       return BT::NodeStatus::SUCCESS;
     }
-    return BT::NodeStatus::FAILURE;
+    // *** Kern: echter Abstand und zu nah → FAILURE (Hindernis) ***
+    if (std::isfinite(range_m_) && range_m_ < min_range_) {
+      return BT::NodeStatus::FAILURE;
+    }
+    // sonst frei voraus
+    return BT::NodeStatus::SUCCESS;
   }
 
 private:
+  // LaserScan hat ranges[] — Abstand geradeaus (Winkel 0).
+  static double findRange(const sensor_msgs::msg::LaserScan & scan)
+  {
+    if (scan.ranges.empty()) {
+      return std::numeric_limits<double>::infinity();
+    }
+    const double increment = static_cast<double>(scan.angle_increment);
+    if (!std::isfinite(increment) || std::fabs(increment) < 1e-9) {
+      return static_cast<double>(scan.ranges[scan.ranges.size() / 2]);
+    }
+    const double raw = (0.0 - static_cast<double>(scan.angle_min)) / increment;
+    const long last = static_cast<long>(scan.ranges.size()) - 1;
+    const long index = std::clamp(std::lround(raw), 0L, last);
+    return static_cast<double>(scan.ranges[static_cast<size_t>(index)]);
+  }
+
   void initialize()
   {
     getInput("scan_topic", scan_topic_);
     getInput("min_range", min_range_);
-    getInput("half_angle", half_angle_);
     if (scan_sub_) {
       return;
     }
@@ -89,7 +105,7 @@ private:
       scan_topic_,
       rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::LaserScan::SharedPtr msg) {
-        last_scan_ = msg;
+        range_m_ = findRange(*msg);
         have_scan_ = true;
       },
       options);
@@ -100,16 +116,17 @@ private:
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::executors::SingleThreadedExecutor callback_group_executor_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
-  sensor_msgs::msg::LaserScan::SharedPtr last_scan_;
   std::string scan_topic_;
   double min_range_;
-  double half_angle_;
+  double range_m_;
   bool have_scan_;
 };
 
 }  // namespace path_clear_bt_node
 
-BT_REGISTER_NODES(factory)
+/*##############################*/
+  //hier Funktionskopf einfügen
+/*##############################*/
 {
   factory.registerNodeType<path_clear_bt_node::PathClear>("PathClear");
 }

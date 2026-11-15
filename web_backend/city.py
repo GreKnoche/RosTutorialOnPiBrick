@@ -1,7 +1,8 @@
 """One city for the extra lab: roads, houses, lidar, and a forward camera.
 
-Houses are axis-aligned boxes. The same rectangles stop the chassis, return
-from the lidar, and show up in the camera. Lane paint is only paint.
+Houses are axis-aligned boxes. Mission clutter may set theta and sit at an
+angle. The same shapes stop the chassis, return from the lidar, fill the
+costmap, and show up in the camera. Lane paint is only paint.
 
 The map itself does not change. Cones, the arch, the dock, and the runner
 live on the scene.
@@ -31,7 +32,10 @@ from city_geom import (
     SCAN_MIN,
     foot_radius,
     push_circle,
+    push_obbs,
+    ray_obb,
     ray_rect,
+    sample_obb,
     sample_rects,
 )
 from city_map import (
@@ -205,12 +209,15 @@ class City:
 
     def obstacle_samples(self) -> list[tuple[float, float]]:
         """Houses and the live clutter, filled so a 5 cm costmap cell is hit."""
-        return sample_rects(self.collision_rects())
+        points: list[tuple[float, float]] = []
+        for cx, cy, w, h, yaw in self.live.collision_obbs():
+            points.extend(sample_obb(cx, cy, w, h, yaw))
+        return points
 
     def resolve(self, pose: object, radius: float) -> None:
         x = float(getattr(pose, "x"))
         y = float(getattr(pose, "y"))
-        nx, ny = push_circle(x, y, radius, self.live.collision_rects())
+        nx, ny = push_obbs(x, y, radius, self.live.collision_obbs())
         setattr(pose, "x", nx)
         setattr(pose, "y", ny)
 
@@ -222,8 +229,8 @@ class City:
             dist = None
             dx = math.cos(world)
             dy = math.sin(world)
-            for rect in self.live.scan_rects():
-                hit = ray_rect(x, y, dx, dy, rect, RANGE_MAX_M)
+            for cx, cy, w, h, yaw in self.live.collision_obbs(True):
+                hit = ray_obb(x, y, dx, dy, cx, cy, w, h, yaw, RANGE_MAX_M)
                 if hit is None:
                     continue
                 if dist is None or hit < dist:
@@ -303,7 +310,14 @@ class City:
             return "#{:02x}{:02x}{:02x}".format(*color)
 
         return [
-            {"x": house.x, "y": house.y, "w": house.w, "h": house.h, "color": color_hex(house.color)}
+            {
+                "x": house.x,
+                "y": house.y,
+                "w": house.w,
+                "h": house.h,
+                "theta": house.theta,
+                "color": color_hex(house.color),
+            }
             for house in self.live.clutter
         ]
 

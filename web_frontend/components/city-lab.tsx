@@ -336,6 +336,7 @@ export function CityLab({
   const needMonitorStopRef = useRef(needMonitorStop);
   needMonitorStopRef.current = needMonitorStop;
   const trapRef = useRef(false);
+  const trapArmedRef = useRef(false);
   const backedRef = useRef(false);
   const monitorMovedRef = useRef(false);
   const monitorStillRef = useRef(0);
@@ -525,7 +526,7 @@ export function CityLab({
         motionRef.current = { linear: sample.linear, angular: sample.angular };
         sampleGhostRef.current(sample);
         if (sample.ranges) rangesRef.current = sample.ranges;
-        if (sample.clutter) clutterRef.current = sample.clutter;
+        if (sample.clutter !== undefined) clutterRef.current = sample.clutter;
         if (sample.costmap !== undefined) costmapRef.current = sample.costmap;
         if (sample.path !== undefined) pathRef.current = sample.path;
         if (typeof sample.bumps === "number") {
@@ -644,7 +645,10 @@ export function CityLab({
       const here = poseRef.current;
       if (runningCourse?.later?.length && runningCourse.trigger && !trapRef.current) {
         const line = runningCourse.trigger;
-        if (here.x > line.x && here.y >= line.yMin && here.y <= line.yMax) {
+        const past = here.x > line.x && here.y >= line.yMin && here.y <= line.yMax;
+        if (!past) {
+          trapArmedRef.current = true;
+        } else if (trapArmedRef.current) {
           trapRef.current = true;
           linkRef.current?.send({
             type: "mission",
@@ -797,16 +801,12 @@ export function CityLab({
 
   const courseKey = JSON.stringify(course ?? null);
   const courseWasOn = useRef(false);
-  useEffect(() => {
+  const restoreCourse = () => {
     trapRef.current = false;
-    backedRef.current = false;
-    monitorMovedRef.current = false;
-    monitorStillRef.current = 0;
-    monitorDoneRef.current = false;
-    if (!rosUp) return;
-    if (!courseRef.current && !courseWasOn.current) return;
-    courseWasOn.current = courseRef.current !== null;
+    trapArmedRef.current = false;
     const running = courseRef.current;
+    if (!running && !courseWasOn.current) return;
+    courseWasOn.current = running !== null;
     linkRef.current?.send({
       type: "mission",
       client: sessionRef.current,
@@ -814,6 +814,15 @@ export function CityLab({
       checkpoints: running?.checkpoints ?? null,
       walls: wallsRef.current,
     });
+  };
+
+  useEffect(() => {
+    backedRef.current = false;
+    monitorMovedRef.current = false;
+    monitorStillRef.current = 0;
+    monitorDoneRef.current = false;
+    if (!rosUp) return;
+    restoreCourse();
   }, [courseKey, rosUp, round]);
 
   const roundSeen = useRef(round);
@@ -882,7 +891,6 @@ export function CityLab({
 
   const reset = () => {
     memoryRef.current = emptyMemory();
-    trapRef.current = false;
     backedRef.current = false;
     monitorMovedRef.current = false;
     monitorStillRef.current = 0;
@@ -897,16 +905,7 @@ export function CityLab({
         ? { x: origin.x, y: origin.y, theta: origin.theta ?? 0 }
         : (cityRef.current?.start ?? { x: 1.576, y: 5.554, theta: 0 }));
     placeAt(home);
-    const running = courseRef.current;
-    if (running) {
-      linkRef.current?.send({
-        type: "mission",
-        client: sessionRef.current,
-        obstacles: running.obstacles,
-        checkpoints: running.checkpoints,
-        walls: wallsRef.current,
-      });
-    }
+    restoreCourse();
   };
 
   const cssPpm = () => {

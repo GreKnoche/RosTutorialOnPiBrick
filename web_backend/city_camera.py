@@ -369,8 +369,7 @@ def _house_faces(
     house: House,
     houses: tuple[House, ...],
 ) -> list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]]:
-    x0, y0, x1, y1 = house.bounds
-    corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
+    corners = house.corners
     walls = ((0, 1, 0.86), (1, 2, 0.74), (2, 3, 0.95), (3, 0, 0.68))
     faces: list[tuple[float, list[tuple[float, float]], tuple[int, int, int]]] = []
     for a, b, shade in walls:

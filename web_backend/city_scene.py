@@ -83,6 +83,14 @@ class CityScene:
             x, y = block[0], block[1]
             w = block[2] if len(block) > 2 else CONE_SIZE
             h = block[3] if len(block) > 3 else CONE_SIZE
-            houses.append(House(f"kegel-{index}", x - w / 2.0, y - h / 2.0, w, h, CONE_COLOR, CONE_HEIGHT))
+            theta = block[4] if len(block) > 4 else 0.0
+            houses.append(House(f"kegel-{index}", x - w / 2.0, y - h / 2.0, w, h, CONE_COLOR, CONE_HEIGHT, theta))
         self.clutter = houses
         self._rects = [house.bounds for house in (*self.chart.houses, *self.clutter)]
+
+    def collision_obbs(self, with_runner: bool = False) -> list[tuple[float, float, float, float, float]]:
+        houses = [*self.chart.houses, *self.clutter]
+        if with_runner and self.runner_on:
+            x, y, _theta = self.runner_pose()
+            houses.append(House("laeufer", x - 0.08, y - 0.09, 0.16, 0.18, (0, 0, 0), 0.55))
+        return [(house.x + house.w * 0.5, house.y + house.h * 0.5, house.w, house.h, house.theta) for house in houses]
