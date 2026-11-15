@@ -138,9 +138,9 @@ export function TrackRace() {
           : ((index + 1) * h) / (tracks.length + 1);
         const roadX = 8;
         const roadW = Math.max(80, w - 16);
-        const nose = BODY_L / 2;
-        const start = roadX + roadW - 20 - nose;
-        const finish = roadX + 32 + nose;
+        const ausrichtung = BODY_L / 2;
+        const start = roadX + roadW - 20 - ausrichtung;
+        const finish = roadX + 32 + ausrichtung;
         const span = Math.max(48, start - finish);
         const winner = pick === track.id;
         const cap = winner ? span : span * 0.42;

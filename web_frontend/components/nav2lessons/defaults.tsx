@@ -121,7 +121,7 @@ max_planning_time: 2.0
 terminal_checking_interval: 5000
 # Umweg durch teure Zellen kostet das Vielfache der Luftlinie.
 cost_travel_multiplier: 2.0
-# false lässt die Nase am Ziel, wie die Suche sie fand.
+# false lässt die Ausrichtung am Ziel, wie die Suche sie fand.
 use_final_approach_orientation: false
 # Glättung des Pfads nach der Suche.
 smoother:
@@ -161,7 +161,7 @@ tolerance: 0.25
 allow_unknown: true
 # Die Suche bricht nach so vielen Knoten ab.
 max_iterations: 1000000
-# Extra-Knoten nahe am Ziel, damit die Nase noch passt.
+# Extra-Knoten nahe am Ziel, damit die Ausrichtung noch passt.
 max_on_approach_iterations: 1000
 # Sekunden, danach gibt die Suche auf.
 max_planning_time: 5.0
@@ -220,13 +220,13 @@ downsampling_factor: 1
 allow_unknown: true
 # Die Suche bricht nach so vielen Knoten ab.
 max_iterations: 1000000
-# Extra-Knoten nahe am Ziel, damit die Nase noch passt.
+# Extra-Knoten nahe am Ziel, damit die Ausrichtung noch passt.
 max_on_approach_iterations: 1000
 # Sekunden, danach gibt die Suche auf.
 max_planning_time: 3.5
 # DUBIN fährt nur vorwärts. REEDS_SHEPP darf rückwärts.
 motion_model_for_search: "DUBIN"
-# Die Nase kennt nur so viele feste Richtungen.
+# Die Ausrichtung kennt nur so viele feste Richtungen.
 angle_quantization_bins: 64
 # Etwa jeden dritten Knoten ein direkter Bogen zum Ziel.
 analytic_expansion_ratio: 3.5

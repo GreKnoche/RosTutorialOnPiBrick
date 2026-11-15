@@ -297,7 +297,7 @@ export function CityLab({
   showCostmapRef.current = showCostmap;
   const costmapToggleRef = useRef(costmapToggle);
   costmapToggleRef.current = costmapToggle;
-  const [showPath, setShowPath] = useState(false);
+  const [showPath, setShowPath] = useState(pathToggle);
   const showPathRef = useRef(false);
   showPathRef.current = showPath;
   const pathToggleRef = useRef(pathToggle);
@@ -306,7 +306,7 @@ export function CityLab({
     if (!costmapToggle) setShowCostmap(false);
   }, [costmapToggle]);
   useEffect(() => {
-    if (!pathToggle) setShowPath(false);
+    setShowPath(pathToggle);
   }, [pathToggle]);
   const cameraRef = useRef(false);
   const probeRef = useRef<CityProbe | null>(null);
@@ -1071,7 +1071,7 @@ export function CityLab({
             phase === "up" ? "bg-emerald-500" : phase === "connecting" ? "bg-amber-400" : "bg-red-500"
           }`}
         />
-        {gates && lap ? (
+        {gates && lap && (raceNote || lap.text) ? (
           <p
             className={`absolute bottom-14 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full px-3 py-1 text-center text-xs font-semibold ${
               raceNote
@@ -1099,7 +1099,7 @@ export function CityLab({
               </p>
             ) : null}
             {melonNote ? (
-              <p className="max-w-full rounded-xl bg-[#1c1404]/80 px-3 py-1 text-xs leading-4 font-semibold text-[#f4efe4]">
+              <p className="max-w-full whitespace-pre-line rounded-xl bg-[#1c1404]/80 px-3 py-1 text-xs leading-4 font-semibold text-[#f4efe4]">
                 {melonNote}
               </p>
             ) : null}

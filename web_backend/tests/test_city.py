@@ -285,7 +285,8 @@ def test_the_lap_crosses_the_gates_in_order_and_grass_ends_it() -> None:
 
     lap = Lap(CITY.gates, CITY.on_asphalt)
     lap.reset(CITY.start_x, CITY.start_y, True)
-    assert lap.status()["text"] == "Überfahre die Startlinie."
+    assert lap.status()["text"] == ""
+    assert lap.status()["next"] == "start"
     ids = [gate.id for gate in CITY.gates]
     assert ids == ["start", "quer", "ost", "kehre", "stamm", "ziel"]
     for gate in CITY.gates:
@@ -341,8 +342,8 @@ def test_the_finish_line_crosses_the_street_and_the_car_waits_in_front() -> None
     assert CITY.start_x < mid_x
     assert math.isclose(CITY.start_y, mid_y, abs_tol=0.02)
     assert CITY.start_theta == 0.0
-    nose_x = CITY.start_x + BODY_LENGTH_M / 2.0
-    assert nose_x < min(px for px, _py in points) + 0.02
+    ausrichtung_x = CITY.start_x + BODY_LENGTH_M / 2.0
+    assert ausrichtung_x < min(px for px, _py in points) + 0.02
     block = CITY.house("block")
     assert math.isclose(block.w, block.h)
     middle_x = block.x + block.w / 2.0

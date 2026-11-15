@@ -7,25 +7,6 @@ from collections.abc import Callable
 
 from city import Gate
 
-_PROMPTS = {
-    "start": "Überfahre die Startlinie.",
-    "schikane": "Schikane, erste Lücke, oben-unten.",
-    "schikane-2": "Schikane, zweite Lücke, oben-unten.",
-    "mitte": "Weiter auf der Hauptstrecke.",
-    "tasche": "Halt in der Sackgasse. Nase nach Norden.",
-    "quer": "Checkpoint auf der Querstraße, oben-unten.",
-    "ecke": "Enge Ecke.",
-    "reihe": "Kegelreihe, links-rechts.",
-    "ost": "Checkpoint auf der Oststraße, links-rechts.",
-    "kehre": "Checkpoint in der Kehre, oben-unten.",
-    "halten": "Halt in der Kehre. Nase nach Westen.",
-    "stamm": "Checkpoint auf dem Rückweg, links-rechts.",
-    "wende": "Halt. Nase nach Osten.",
-    "rueck": "Zurück über die Linie, nach Osten.",
-    "ziel": "Zurück über die Ziellinie.",
-}
-
-
 def _wrap(angle: float) -> float:
     return (angle + math.pi) % (2.0 * math.pi) - math.pi
 
@@ -142,5 +123,4 @@ class Lap:
         if self.done:
             return {"text": "Runde geschafft.", "done": True, "grass": False, "next": ""}
         gate = self.gates[self.index]
-        text = _PROMPTS.get(gate.id, gate.id)
-        return {"text": text, "done": False, "grass": False, "next": gate.id}
+        return {"text": "", "done": False, "grass": False, "next": gate.id}

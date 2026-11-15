@@ -19,7 +19,14 @@ import {
   pluginParamsError,
   type PlannerParamField,
 } from "@/lib/planner-yaml";
+import { GlossaryDetail } from "@/components/glossary-spoiler";
 import { NAV_NODES } from "@/lib/nav2-lessons";
+import { hasNav2GlossaryMarkers, NAV2_GLOSSARY } from "@/lib/nav2-glossary";
+import {
+  hasPlannerBenchmarkMarker,
+  PLANNER_BENCHMARK_MARKER,
+  PlannerBenchmarkTable,
+} from "@/components/nav2lessons/planner-benchmark-table";
 
 const NAMES = new Map(NAV_NODES.map((node) => [node.id, node.name]));
 
@@ -43,6 +50,56 @@ function explainNodes(text: string): ReactNode[] {
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
   return parts;
+}
+
+const EXPLAIN_MARKER = /\[glossary:([a-z0-9-]+)\]|\[planner-benchmark\]/g;
+
+function pushExplainText(blocks: ReactNode[], key: number, chunk: string): number {
+  if (!chunk.trim()) return key;
+  blocks.push(
+    <p key={`t-${key}`} className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
+      {explainNodes(chunk)}
+    </p>,
+  );
+  return key + 1;
+}
+
+function renderExplain(text: string): ReactNode[] {
+  if (!hasNav2GlossaryMarkers(text) && !hasPlannerBenchmarkMarker(text)) {
+    return [
+      <p key="plain" className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
+        {explainNodes(text)}
+      </p>,
+    ];
+  }
+
+  const blocks: ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+  EXPLAIN_MARKER.lastIndex = 0;
+  let match = EXPLAIN_MARKER.exec(text);
+  while (match) {
+    key = pushExplainText(blocks, key, text.slice(cursor, match.index).trimEnd());
+    if (match[0] === PLANNER_BENCHMARK_MARKER) {
+      blocks.push(<PlannerBenchmarkTable key={`b-${key}`} />);
+    } else {
+      const entry = NAV2_GLOSSARY[match[1]];
+      if (entry) {
+        blocks.push(<GlossaryDetail key={`g-${key}`} entry={entry} />);
+      } else {
+        blocks.push(
+          <p key={`g-miss-${key}`} className="text-sm text-destructive">
+            Unbekannter Glossar-Eintrag: {match[1]}
+          </p>,
+        );
+      }
+    }
+    key += 1;
+    cursor = match.index + match[0].length;
+    match = EXPLAIN_MARKER.exec(text);
+  }
+  key = pushExplainText(blocks, key, text.slice(cursor).trimStart());
+  return blocks;
 }
 
 function GoalCheckerEditor({
@@ -287,7 +344,7 @@ export function NavGraph({
         </button>
         {explainOpen ? (
           <>
-            <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">{explainNodes(graph.explain)}</p>
+            <div className="flex flex-col gap-3">{renderExplain(graph.explain)}</div>
             {graph.id === "bt-struktur" ? <BtTickAnimation mode="struktur" /> : null}
             {graph.id === "bt-monitor" ? <BtTickAnimation mode="monitor" /> : null}
           </>

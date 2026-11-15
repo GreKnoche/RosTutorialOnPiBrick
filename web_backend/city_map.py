@@ -68,7 +68,7 @@ class Segment:
 class Gate:
     """A line the car has to drive across. Start and finish share one segment.
 
-    A halt gate counts only when the car stops on the line, nose within
+    A halt gate counts only when the car stops on the line, Ausrichtung within
     about 0.6 rad of yaw.
     """
 
@@ -242,7 +242,7 @@ def _finish_line(
     """Checker band from ``a`` to ``b``, and a spawn just in front of its middle.
 
     The band is centered on the segment. The spawn faces across it, one gap
-    clear of the near edge, so the nose sits in the middle of the street.
+    clear of the near edge, so the Ausrichtung sits in the middle of the street.
     """
     ax, ay = a
     bx, by = b

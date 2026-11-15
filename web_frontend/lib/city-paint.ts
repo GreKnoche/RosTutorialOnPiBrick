@@ -419,7 +419,7 @@ type ChassisPaint = {
   body: string;
   line: string;
   wheel: string;
-  nose: string;
+  ausrichtung: string;
   width: (glyph: number) => number;
   outline: boolean;
 };
@@ -455,7 +455,7 @@ function drawChassis(
     ctx.strokeRect(-wheel, -widthBody / 2 - wheel * 0.7, wheel * 2, wheel * 0.65);
     ctx.strokeRect(-wheel, widthBody / 2, wheel * 2, wheel * 0.65);
   }
-  ctx.fillStyle = paint.nose;
+  ctx.fillStyle = paint.ausrichtung;
   ctx.beginPath();
   ctx.moveTo(length / 2 + length * 0.18, 0);
   ctx.lineTo(length / 2 - length * 0.22, -widthBody * 0.28);
@@ -531,7 +531,7 @@ export function draw(
       body: "rgba(255,255,255,0.35)",
       line: "#8ecfff",
       wheel: "rgba(255,255,255,0.22)",
-      nose: "rgba(255,255,255,0.28)",
+      ausrichtung: "rgba(255,255,255,0.28)",
       width: (glyph) => Math.max(0.6, glyph * 0.014),
       outline: true,
     });
@@ -540,7 +540,7 @@ export function draw(
     body: TRACK_CAR.nav2,
     line: "#fff7ed",
     wheel: "#111318",
-    nose: "#fff7ed",
+    ausrichtung: "#fff7ed",
     width: (glyph) => Math.max(0.5, glyph * 0.012),
     outline: false,
   });

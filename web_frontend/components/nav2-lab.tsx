@@ -18,9 +18,8 @@ import {
 import { MISSION_ORDER, isMissionId, missionById, stationGraph, type MissionId } from "@/lib/nav2-lessons";
 import { PLANNER_CLASSES, absorbPlugin, plannerClass, plannerMark } from "@/lib/planner-yaml";
 
-function openPlanners(done: readonly string[]): string {
-  const open = PLANNER_CLASSES.filter((name) => !done.includes(name)).map((name) => plannerMark(name));
-  return open.length === 0 ? "Alle Planner" : `Offen: ${open.join(", ")}`;
+function plannerChecks(done: readonly string[]): string {
+  return PLANNER_CLASSES.map((name) => `${plannerMark(name)}${done.includes(name) ? " ✓" : ""}`).join("\n");
 }
 
 export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
@@ -29,7 +28,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
   const done = progress.done;
   const runningId = progress.runningId;
   const started = runningId !== null;
-  const [hint, setHint] = useState(false);
   const [picked, setPicked] = useState<MissionId | null>(null);
   const [round, setRound] = useState(0);
   const [driveBusy, setDriveBusy] = useState(false);
@@ -76,7 +74,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
         onSelect={(id) => {
           if (id === stationId && !started) return;
           setPicked(id);
-          setHint(false);
           if (started) writeNav2Progress({ runningId: null, done });
           setSpawnBoot((value) => value + 1);
           setRound((value) => value + 1);
@@ -85,7 +82,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           setPicked(id);
           writeNav2Progress({ runningId: id, done });
           setRunKey((value) => value + 1);
-          setHint(true);
           setSpawnBoot((value) => value + 1);
           retry(id);
         }}
@@ -95,7 +91,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
             return;
           }
           setPicked(id);
-          setHint(false);
           if (id === "plugin") writePluginPlanners([]);
           writeNav2Progress({
             runningId: runningId === id ? null : runningId,
@@ -124,13 +119,7 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           round={round}
           melons={kind === "melons"}
           melonSpots={station?.melons}
-          melonNote={
-            station?.id !== "plugin"
-              ? null
-              : done.plugin
-                ? "Alle Planner"
-                : openPlanners(pluginDone)
-          }
+          melonNote={station?.id === "plugin" ? plannerChecks(done.plugin ? [...PLANNER_CLASSES] : pluginDone) : null}
           gates={kind === "gates"}
           ghost={kind === "gates" && station?.ghost !== false}
           course={course}
@@ -156,7 +145,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
               return;
             }
             writePluginPlanners(names);
-            setHint(true);
           }}
           onGatesCleared={() => {
             if (kind === "gates" && station && isMissionId(station.id)) {
@@ -175,82 +163,6 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           playReady={graph !== null}
           runKey={runKey}
           timing={started}
-          notice={
-            started && hint && station?.kind ? (
-              <button
-                type="button"
-                onClick={() => setHint(false)}
-                className="absolute top-1/2 right-3 z-20 w-64 max-h-[calc(100%-5.5rem)] -translate-y-1/2 overflow-y-auto rounded-2xl bg-[#1c1404]/92 px-4 py-3 text-left text-sm text-[#f4efe4] shadow-lg"
-              >
-                {station?.id === "plugin" ? (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle in der Reihenfolge Gang, Schräge, Südseite, Ostseite.</li>
-                    <li>NavFn bleibt in der Gangmitte, Theta* zieht die Schräge gerade, Smac2D ohne Nachglättung.</li>
-                    <li>Hybrid und Lattice fahren Bögen mit Nase. Die Zellplaner ignorieren theta.</li>
-                    <li>Süd 0, Ost math.pi / 2, Nord math.pi, West -math.pi / 2.</li>
-                    <li>Wähl die Klasse am Knoten und sammle sie erneut. Bestanden, wenn jeder Planner einmal gesammelt hat.</li>
-                    {PLANNER_CLASSES.map((name) => (
-                      <li key={name}>
-                        {plannerMark(name)}
-                        {pluginDone.includes(name) ? " geschafft" : ""}
-                      </li>
-                    ))}
-                  </ul>
-                ) : station?.id === "planner" ? (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Rechts in die Oststraße, Halt in der Sackgasse, Nase nach Norden.</li>
-                    <li>Radius 0,40 schafft die Ecke. Die Nase nach Norden nur mit REEDS_SHEPP.</li>
-                    <li>Radius 0,80 findet die Einfahrt nicht. DUBIN bleibt stehen.</li>
-                    <li>Gras macht die Strecke ungültig.</li>
-                  </ul>
-                ) : station?.id === "bt-struktur" ? (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle die Melonen.</li>
-                    <li>Nach der ersten Strecke steht ein U auf der Straße.</li>
-                    <li>Im Baum: Element1 und Element2 ersetzen; BackUp ist schon als Beispiel da.</li>
-                    <li>Das Zeitfenster im Progress Checker ist länger als eine Drehung auf der Stelle und kürzer als das Stehen im U.</li>
-                  </ul>
-                ) : station?.id === "bt-monitor" ? (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle die Melone. Danach fährt der Client weiter auf die Wand zu.</li>
-                    <li>In C++: die BT-Köpfe aus dem Rahmen an die ###-Stellen setzen.</li>
-                    <li>Im Baum: Parallel um FollowPath und KeepRunningUntilFailure(RateController(PathClear)).</li>
-                    <li>Bestanden, wenn der Monitor greift und du die Wand nicht berührst (Zähler 0).</li>
-                  </ul>
-                ) : station?.id === "costmap" ? (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Sammle die Melone, ohne eine Wand zu berühren.</li>
-                    <li>Der Zähler muss auf 0 stehen. Sonst zählt der Versuch nicht.</li>
-                    <li>Rechtsklick auf die Karte kopiert die Koordinaten ins Clipboard.</li>
-                    <li>Die Liste wird ein Pfad. An den Zwischenpunkten gibt es kein Manöver.</li>
-                  </ul>
-                ) : station?.kind === "melons" ? (
-                  graph?.client === "through" ? (
-                    <ul className="list-disc space-y-1 pl-4">
-                      <li>Sammle alle Melonen ein.</li>
-                      <li>Rechtsklick auf die Karte kopiert die Koordinaten ins Clipboard.</li>
-                      <li>Die Liste wird ein Pfad. An den Zwischenpunkten gibt es kein Manöver.</li>
-                    </ul>
-                  ) : (
-                    <ul className="list-disc space-y-1 pl-4">
-                      <li>Sammle alle Melonen ein.</li>
-                      <li>Rechtsklick auf die Karte kopiert die Koordinaten ins Clipboard.</li>
-                      <li>follow_waypoints bekommt die Liste. maneuver() fährt an jedem Punkt dein Manöver.</li>
-                    </ul>
-                  )
-                ) : (
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li>Überfahre die Linien in der angezeigten Reihenfolge.</li>
-                    <li>Die Schikane, die enge Ecke und die Kegelreihe stehen im Weg.</li>
-                    <li>In der Kehre anhalten, Nase nach Westen. Auf dem Rückweg anhalten, Nase nach Osten, dann die Linie zurück.</li>
-                    <li>Gras macht die Runde ungültig.</li>
-                    <li>Die Runde zählt, wenn du schneller oder gleich schnell bist wie der Geist.</li>
-                    <li>FollowPath steht im controller_server.</li>
-                  </ul>
-                )}
-              </button>
-            ) : null
-          }
         />
         {graph ? (
           <NavGraph graph={graph} playRef={driveRef} onPlayBusy={setDriveBusy} />

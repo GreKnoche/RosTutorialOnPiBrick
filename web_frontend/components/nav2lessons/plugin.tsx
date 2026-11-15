@@ -38,7 +38,39 @@ const plugin: Nav2Station = {
   showProgress: false,
   cityObstacles: true,
   explain:
-    "Wähl die Klasse am Knoten **GridBased**. Jede Melonen-Runde einmal pro Planner. **global_costmap** bearbeitbar (Plugin-Start: 0,03 m Zellen, schmale Inflation). Costmap- und Path-Toggle unter der Karte. Vergleich ohne Nachglättung; Hybrid startet mit **REEDS_SHEPP**.\n\nKurz nach Macenski u. a., Nav2-Planner-Übersicht (2023): holonomisch = nur (x,y); kinematisch = (x,y,θ) mit Mindestradius.\n\n**NavFn**\n• Eigenschaft: Potentialfeld (Dijkstra), gradient descent.\n• Vorteil: sehr schnell und stabil; hält oft Abstand zur Mitte / zu teuren Zellen.\n• Nachteil: nur (x,y); Pfad typisch etwas länger als A*; keine Geraden „quer übers Feld“.\n• Hier sichtbar: weiche Linie durch die **Gangmitte** zur 2. Melone; vorsichtiger Start durch die **schrägen Kisten**.\n\n**Smac 2D**\n• Eigenschaft: kostenbewusstes A* auf dem Raster (8 Nachbarn), optional Smoother (hier aus).\n• Vorteil: kurze Rasterpfade; `tolerance` am Ziel; gleiche Strafe wie andere Smac-Planer.\n• Nachteil: nur (x,y); ohne Glättung **Zickzack** an Rasterkanten.\n• Hier sichtbar: Knick beim Übergang **Start → Gang** und an der **Ecke** vor der Schräge.\n\n**Theta***\n• Eigenschaft: A* plus **Sichtlinie** (Lazy Theta*-P, Bresenham); any-angle.\n• Vorteil: **lange Geraden**; in Benchmarks oft kürzeste holonomische Länge.\n• Nachteil: teure LoS-Prüfungen; **kein `tolerance`**; bricht ab, wenn Sichtlinie oder Zielzelle blockiert ist.\n• Hier sichtbar: möglichst **gerade Diagonale** von der Gang-Melone zur **Schräge-West** — scheitert, wenn die Costmap den Streifen schneidet.\n\n**Smac Hybrid**\n• Eigenschaft: Hybrid-A* mit Dubins/Reeds-Shepp-Bögen und cost-aware Heuristik.\n• Vorteil: **fahrbare** Pfade mit Nase und Mindestradius; weicht teuren Zellen aus.\n• Nachteil: braucht passende **Inflation/Footprint**; planbarer als Zellplaner, aber schwerer bei engen Through-Poses.\n• Hier sichtbar: **Bögen** zwischen Melonen und **Nose** bei Süd/Ost (θ in den Wegpunkten).\n\n**Lattice**\n• Eigenschaft: A* auf einem **Manöver-Gitter** (Primitives aus JSON), diskrete (x,y,θ)-Zustände.\n• Vorteil: beliebige Fahrzeugkinematik; ähnlich schnell/gut wie Hybrid in den Benchmarks.\n• Nachteil: an primitive Auflösung gekoppelt; Pfad wirkt **stückweise** aus Katalogkurven.\n• Hier sichtbar: **Umfahrt um den Block** (Süd, dann Ost) als Folge fest erlaubter Manöver.",
+    "[glossary:holonom-kinematik]"
+    +"In dieser Lektion soll es um den **Vergleich von Plannern** gehen. Die darunterliegende Tabelle vergleicht die Planungsalgorithmen auf ihre verschiedene Kriterien wie Rechenzeit, Pfadlänge, kinematische Fahrbarkeit und deren Kompatibilität mit unterschiedlichen Antriebsarten"
+    +"[planner-benchmark]\n\n"
+    +""
+    +"**NavFn**\n"
+    +"**Eigenschaft:** Klassischer Dijkstra-basierter Suchalgorithmus.\n"
+    +"**Vorteil:** Sehr schnell und stabil, ein guter Allrounder für holonome Roboter.\n"
+    +"**Nachteil**: Nur (x,y) ohne Berücksichtigung von Ausrichtung oder Wenderadius.\n"
+    +"**Hier sichtbar**: Weiche Linie, wählt aber den **Umweg außen herum**, da die schräge, enge Gasse durch den Raster-Effekt (Diskretisierung) für den Gitter-Planer blockiert oder rechnerisch teurer wirkt.\n\n"
+    +""
+    +"**Smac 2D**\n"
+    +"**Eigenschaft:** Kosteneffizienter A*-Algorithmus auf der Costmap.\n"
+    +"**Vorteil:** Schneller, kostenoptimierter Rasterplaner für kreisförmige Roboter, der durch seine Verwandtschaft zur Smac-Familie ein konsistentes Verhalten in gemischten Flotten ermöglicht.\n"
+    +"**Nachteil**: Nur (x,y), ohne Glättung entsteht ein **Zickzack** an Rasterkanten.\n"
+    +"**Hier sichtbar**: Treppenverhalten über die gesamte Planung.\n\n"
+    +""
+    +"**Theta***\n"
+    +"**Eigenschaft:** A* der den Visibility-Graph nutzt.\n"
+    +"**Vorteil:** **Stark in langen, geraden Korridoren**, erzeugt oft die kürzesten holonomen Pfade.\n"
+    +"**Nachteil:** Rechenintensive Visibility-Checks und Planungsabbruch, sobald die direkte Sichtlinie blockiert ist.\n"
+    +"**Hier sichtbar**: Gerade Diagonale in der Enge zu Beginn.\n\n"
+    +""
+    +"**Smac Hybrid**\n"
+    +"**Eigenschaft:** Kinematischer Hybrid-A* mit analytischen Dubins- und Reeds-Shepp-Bögen.\n"
+    +"**Vorteil:** Berücksichtigt Mindestwendekreis und Ausrichtung(θ), ideal für Fahrzeuge mit Ackermann-Lenkung.\n"
+    +"**Nachteil:** Exponentieller Rechenaufwand durch mehrdimensionale Zustandssuche (x, y, θ) und längere Rechenzeiten bei komplexen Manövern.\n"
+    +"**Hier sichtbar:** Kinematisch glatte **Bögen** im Parcours und präzise **Ausrichtung(θ)** beim Umfahren der Hindernisse.\n\n"
+    +""
+    +"**Smac Lattice**\n"
+    +"**Eigenschaft:** A*-Suche mit vordefinierten Fahr-Manövern (Motion Primitives).\n"
+    +"**Vorteil:** **Ideal für komplexe Roboter-Geometrien**, da vorgeprüfte Mini-Fahrwege kombiniert werden und so der Rechenaufwand zur Laufzeit sinkt.\n"
+    +"**Nachteil:** Starrheit durch die feste Manöver-Bibliothek (unpassende Primitiven blockieren die Planung).\n"
+    +"**Hier sichtbar:** **Glatte Kurven** trotz fehlendem Smoother, aber **Zickzack-Kurs** in der engen, schrägen Gasse wegen fester Manöver-Schritte.\n\n",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 52 },
     { id: "global_costmap", x: 50, y: 22 },

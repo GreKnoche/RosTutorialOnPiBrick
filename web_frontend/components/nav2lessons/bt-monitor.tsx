@@ -119,7 +119,7 @@ const btMonitor: Nav2Station = {
     +"**Deklaration und Funktionen eines eigenen BT Plugins**\n"
     +"**class PathClear : public BT::ConditionNode** — Wenn wir einen neuen Knoten anlegen, brauchen wir zunächst den richtigen Parent-Node in unserem Fall ein ConditionNode.\n" +
     "**providedPorts()** — gibt uns die Möglichkeit XML-Attribute (`scan_topic`, `min_range`) festzulegen. Ohne Port keine Parameter über `getInput`.\n" +
-    "**tick() override** — überprüft bei jedem Tick den Status der Node, bei ConditionNodes gibt es nur SUCCESS oder FAILURE, hier überschreiben wir die Tick funktion der übergeordneten Klasse.\n" +
+    "**tick() override** — überprüft bei jedem Tick den Status der Node. Bei ConditionNodes gibt es nur SUCCESS oder FAILURE, hier überschreiben wir die Tick-Funktion der übergeordneten Klasse.\n" +
     "**BT_REGISTER_NODES(factory)** — die Funktion dient dazu, dass wir sie in der XML-Datei verwenden können und gefunden wird.\n\n"
     +"**Neue Behavior Tree Nodes**\n"
     +"**Paralell** ist ein Control-Node, welcher zwei oder mehr Knoten paralell ticken lassen kann, dabei kann konfiguriert werden, wann dieser success oder Failure meldet."

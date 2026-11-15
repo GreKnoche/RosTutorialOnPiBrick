@@ -25,8 +25,7 @@ public:
   // ms       Dauer in Millisekunden
   void maneuver()
   {
-    drive(0.12, 0.8, 400);
-    drive(0.12, -0.8, 400);
+    drive(0.0, 1.0, 6280);
     // Etwa eine volle Drehung auf der Stelle: drive(0.0, 1.0, 6280);
   }
 

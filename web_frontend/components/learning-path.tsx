@@ -48,9 +48,9 @@ function measurePose(list: HTMLElement, road: HTMLElement, node: HTMLElement, do
   const roadX = roadBox.left + roadBox.width / 2 - listBox.left;
   if (!dock) return { x: roadX, y, heading: 90 };
   const left = index % 2 === 0;
-  const nose = 24;
+  const stub = 24;
   return {
-    x: left ? nodeBox.right - listBox.left + nose : nodeBox.left - listBox.left - nose,
+    x: left ? nodeBox.right - listBox.left + stub : nodeBox.left - listBox.left - stub,
     y,
     heading: left ? 180 : 0,
   };
