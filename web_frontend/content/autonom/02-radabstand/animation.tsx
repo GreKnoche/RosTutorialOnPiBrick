@@ -121,7 +121,7 @@ export function RadabstandAnimation({ title }: { title: string }) {
               Linkes Rad hält (sₗ = 0)
             </text>
             <text
-              x={LEFT_X + 270}
+              x={LEFT_X + 285}
               y="320"
               textAnchor="middle"
               fill="#fff7ed"
@@ -162,6 +162,16 @@ export function RadabstandAnimation({ title }: { title: string }) {
               fontFamily="ui-monospace, monospace"
             >
               sᵣ = L · π/2(90°)
+            </text>
+            <text
+              x={LEFT_X + 110}
+              y="220"
+              textAnchor="middle"
+              fill="#fff7ed"
+              fontSize="16"
+              fontFamily="ui-sans-serif, system-ui"
+            >
+              Δθ=90°
             </text>
           </g>
         </svg>

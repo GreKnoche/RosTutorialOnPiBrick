@@ -272,18 +272,6 @@ export function RadabstandLab({
           </p>
         )}
       </LessonStudio>
-
-      {level === "beginner" ? (
-        <CopySection copy={copy} id="arc-calc">
-          <ScratchPad
-            numerator="L · π / 2"
-            ariaLabel="Radabstand in Zentimeter"
-            value={helperL}
-            onChange={setHelperL}
-            compute={(length) => (length * Math.PI) / 2}
-          />
-        </CopySection>
-      ) : null}
     </>
   );
 }

@@ -8,13 +8,13 @@ export const copy = {
       "id": "separation-calc",
       "eyebrow": "Rechnung",
       "title": "Bogen aus dem Radabstand",
-      "body": "Der Radabstand $L$ wird exakt zwischen den **Reifenmitten** gemessen.\n\nFür den Drehwinkel $\\Delta\\theta$ (in Bogenmaß) gilt grundlegend:\n\n* **Geradeaus:** Fahren beide Räder gleich weit ($s_r = s_l$), ist die Differenz null.\n* **Drehung:** Einzig die **Wegdifferenz** ($s_r - s_l$) bestimmt den Drehwinkel ($\\Delta\\theta = \\frac{s_r - s_l}{L}$).\n\nWenn du jetzt auf der Stelle drehen willst, musst du einfach den erechneten Fahrtweg nehmen und durch zwei teilen. Dabei fährt dann ein Rad die Strecke nach vorne und ein Rad die Strecke nach hinten.\nIm Twin oder Brick kannst du all das direkt ausprobieren."
+      "body": "Der Radabstand $L$ wird exakt zwischen den **Reifenmitten** gemessen.\nFür den Drehwinkel $\\Delta\\theta$ (in Bogenmaß) gilt grundlegend:\n* **Geradeaus:** Fahren beide Räder gleich weit ($s_r = s_l$), ist die Differenz null.\n* **Drehung:** Einzig die **Wegdifferenz** ($s_r - s_l$) bestimmt den Drehwinkel ($\\Delta\\theta = \\frac{s_r - s_l}{L}$).\n\nWenn du dich auf der Stelle drehen möchtest, nimmst du einfach den berechneten Fahrtweg und teilst ihn durch zwei: Ein Rad fährt die halbe Strecke nach vorne, das andere nach hinten. Im Twin oder Brick kannst du das direkt ausprobieren."
     },
     "turn-calibration": {
       "id": "turn-calibration",
       "eyebrow": "Kalibrierung",
       "title": "Von der Rechnung zur 90°-Drehung",
-      "body": "Der gemessene Radabstand ist ein theoretischer Wert. Reifen, Last und eine Messung, die nicht genau in der Mitte der Aufstandspunkte sitzt, verschieben $L$ am echten Roboter. 90° ist der passende Test: kurz genug für den Tisch, groß genug, dass ein Fehler sichtbar wird. Später legst du Maßband und Winkelmesser auf den Boden. Zuerst übst du denselben Test hier im Twin – auf drei Wege zur selben 90°-Drehung."
+      "body": "Auf dem Papier ist $L$ eine feste Zahl, aber in der Realität verändern Last und Reifen das Maß. Bevor das Maßband am echten Roboter ansetzt, lässt sich das Prinzip hier im Twin durchspielen — auf drei Wegen zur exakt selben Drehung."
     },
     "protractor-drive": {
       "id": "protractor-drive",
@@ -41,33 +41,33 @@ export const copy = {
       {
         "id": "pivot",
         "title": "Ein Rad auf 0",
-        "hint": "Drehe 90°. Ein Rad hält, das andere fährt die ganze Differenz.",
-        "task": "Drehe 90°. Ein Rad hält, das andere fährt die ganze Differenz."
+        "hint": "Drehe den Twin um 90°. Ein Rad steht, das andere fährt.",
+        "task": "Drehe den Twin um 90°. Ein Rad steht, das andere fährt."
       },
       {
         "id": "same",
         "title": "Gleiche Richtung",
-        "hint": "Drehe 90°. Beide in dieselbe Richtung, mit unterschiedlicher Strecke.",
-        "task": "Drehe 90°. Beide in dieselbe Richtung, mit unterschiedlicher Strecke."
+        "hint": "Drehe den Twin um 90°. Beide Räder drehen in die gleiche Richtung.",
+        "task": "Drehe den Twin um 90°. Beide Räder drehen in die gleiche Richtung."
       },
       {
         "id": "opposite",
         "title": "Entgegengesetzt",
-        "hint": "Drehe 90°. Ein Rad vorwärts, das andere rückwärts. Die Pose bleibt bei etwa 0,0.",
-        "task": "Drehe 90°. Ein Rad vorwärts, das andere rückwärts. Die Pose bleibt bei etwa 0,0."
+        "hint": "Drehe den Twin um 90°. Ein Rad fährt vorwärts, das andere rückwärts. Die Position bleibt bei etwa 0,0.",
+        "task": "Drehe den Twin um 90°. Ein Rad vorwärts, das andere rückwärts. Die Position bleibt bei etwa 0,0."
       }
     ]
   },
   "texts": {
-    "idle": "Stelle Radabstand und die beiden Radwege ein. Die Differenz bestimmt, ob du 90° triffst.",
-    "short": "Noch zu wenig gedreht. Verändere Radabstand oder die Radwege.",
-    "long": "Noch zu weit gedreht. Verändere Radabstand oder die Radwege.",
-    "hit": "Getroffen — Mission „{title}“.",
-    "wrong": "90° stimmen, aber das ist nicht Mission „{title}“.",
-    "pose": "90° stimmen, aber die Pose ist nicht bei etwa 0,0.",
-    "none": "90° stimmen, aber die Radwege passen zu keiner der drei Missionen.",
-    "arc-result": "Das ist die Wegdifferenz sᵣ − sₗ für 90°. Wenn das linke Rad hält, setzt du sie vollständig rechts ein. Drehen beide, teilst du dieselbe Differenz auf die beiden Slider.",
-    "zero-note": "0 bedeutet: das Rad hält. Negative Werte fahren rückwärts."
+    "idle": "Stelle den Radabstand und beide Radstrecken ein. Allein ihre Differenz bestimmen den Winkel.",
+    "short": "Noch zu wenig gedreht. Vergrößere die Differenz der Radstrecken oder verkleinere L.",
+    "long": "Zu weit gedreht. Verkleinere die Differenz der Radstrecken oder vergrößere L.",
+    "hit": "Exakt 90° — Mission „{title}“ erfüllt.",
+    "wrong": "Der Winkel von 90° stimmt, passt aber noch nicht zu Mission „{title}“.",
+    "pose": "Die 90° stimmen, aber der Roboter hat sich dabei zu weit vom Ursprung (0, 0) wegbewegt.",
+    "none": "Die 90° stimmen, aber diese Kombination passt zu keiner der drei Missionen.",
+    "arc-result": "Das ist die nötige Wegdifferenz sᵣ − sₗ für 90°. Hält das linke Rad, übernimmst du den vollen Wert rechts. Drehen beide, teilst du genau diese Differenz auf beide Slider auf.",
+    "zero-note": "0 bedeutet Stillstand. Negative Werte lassen das Rad rückwärts rollen."
   },
   "labor": null
 } satisfies LessonCopy;

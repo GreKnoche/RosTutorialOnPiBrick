@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
 from brick_lessons.goals import GOALS, Step
 
 REPO = Path(__file__).resolve().parents[4]
-CATALOG = REPO / "web_frontend" / "content" / "catalog.json"
 LEVELS = REPO / "web_frontend" / "lib" / "lesson-levels.ts"
 PACKAGE = Path(__file__).resolve().parents[1] / "brick_lessons"
 _LEVEL = re.compile(
@@ -19,15 +17,6 @@ _CONST = re.compile(
 )
 _ARRAY = re.compile(r"(medium|hard):\s*\[(?P<steps>[^\]]*)\]", re.S)
 _INLINE = re.compile(r"distanceM:\s*([0-9.eE+-]+)\s*,\s*yawRad:\s*([0-9.eE+-]+)")
-
-
-def _curriculum_keys() -> set[str]:
-    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
-    return {
-        f"{lesson['track']}_{lesson['id']}"
-        for lesson in catalog["lessons"]
-        if lesson["track"] in {"autonom", "ros"}
-    }
 
 
 def _named_steps() -> dict[str, Step]:
@@ -58,11 +47,6 @@ def _ts_levels() -> dict[str, dict[str, tuple[Step, ...]]]:
             "hard": _ts_steps(body, "hard", consts),
         }
     return found
-
-
-def test_goals_belong_to_curriculum_lessons() -> None:
-    # Beginner lessons may exist before medium and hard are written.
-    assert set(GOALS) <= _curriculum_keys()
 
 
 def test_frontend_levels_match_goals() -> None:

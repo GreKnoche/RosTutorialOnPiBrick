@@ -22,7 +22,7 @@
       "slug": "radumfang",
       "title": "Vom Rad zur Strecke – Radumfang verstehen",
       "status": "stub",
-      "summary": "Der Radumfang entsteht aus dem Durchmesser, und ohne Rutschen ergibt die Zahl der Umdrehungen die richtige Strecke.",
+      "summary": "",
       "track": "autonom",
       "lab": "none"
     },
@@ -31,7 +31,7 @@
       "slug": "radabstand",
       "title": "Von zwei Rädern zur Drehung – Radabstand verstehen",
       "status": "stub",
-      "summary": "Der Radabstand liegt zwischen den Aufstandspunkten, und ohne Rutschen ergibt die Wegdifferenz geteilt durch den Abstand den Drehwinkel.",
+      "summary": "",
       "track": "autonom",
       "lab": "none",
       "taughtTerms": ["Bogenmaß"]
@@ -41,7 +41,7 @@
       "slug": "odometrie",
       "title": "Odometrie – Wo glaubt der Roboter zu sein?",
       "status": "stub",
-      "summary": "Feste Punkte mit Umdrehungen anfahren: im Code setzt du Umfang, Abstand und wie oft links und rechts drehen.",
+      "summary": "",
       "track": "autonom",
       "lab": "none",
       "taughtTerms": ["Odometrie"]
@@ -64,15 +64,6 @@
       "track": "autonom",
       "lab": "none",
       "taughtTerms": ["Gyroskop"]
-    },
-    {
-      "id": "06",
-      "slug": "zielregelung",
-      "title": "Zielregelung – Mit der geschätzten Pose ein Ziel anfahren",
-      "status": "stub",
-      "summary": "Aus aktueller Pose, Ziel und Richtungsfehler fortlaufend passende Fahrbefehle erzeugen.",
-      "track": "autonom",
-      "lab": "none"
     },
     {
       "id": "07",
