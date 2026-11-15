@@ -1,20 +1,21 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { parseLessonCopy, serializeLessonCopy } from "../lib/lesson-copy.ts";
+import { parseLessonCopy, parseLessonModule, serializeLessonCopy } from "../lib/lesson-copy.ts";
 
 const files = [
-  "content/autonom/01-radumfang.md",
-  "content/autonom/02-radabstand.md",
-  "content/autonom/03-odometrie.md",
-  "content/autonom/04-kalibrierung-drift.md",
-  "content/autonom/05-gyroskop.md",
-  "content/ros/07-dienste-aktionen.md",
+  "content/autonom/01-radumfang/copy.ts",
+  "content/autonom/02-radabstand/copy.ts",
+  "content/autonom/03-odometrie/copy.ts",
+  "content/autonom/04-kalibrierung-drift/copy.ts",
+  "content/autonom/05-gyroskop/copy.ts",
+  "content/ros/07-dienste-aktionen/copy.ts",
 ];
 
 for (const file of files) {
   const source = readFileSync(path.join(import.meta.dirname, "..", file), "utf8");
-  const parsed = parseLessonCopy(source);
+  const parsed = parseLessonModule(source);
+  assert.ok(parsed, file);
   const again = parseLessonCopy(serializeLessonCopy(parsed));
   assert.deepEqual(again, parsed, file);
   assert.equal(parsed.labor, null, file);

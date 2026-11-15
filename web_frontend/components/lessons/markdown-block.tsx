@@ -1,6 +1,9 @@
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
+import remarkBreaks from "remark-breaks";
+import remarkMath from "remark-math";
 import { cn } from "@/lib/utils";
 
 export function MarkdownBlock({
@@ -32,8 +35,12 @@ export function MarkdownBlock({
   };
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <ReactMarkdown rehypePlugins={[rehypeRaw]} components={components}>
+    <div className={cn("markdown-content flex flex-col gap-2", className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkMath, remarkBreaks]}
+        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        components={components}
+      >
         {source}
       </ReactMarkdown>
     </div>

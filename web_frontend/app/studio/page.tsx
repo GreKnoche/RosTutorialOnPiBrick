@@ -18,8 +18,8 @@ export default function StudioPage() {
       <div>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Lektions-Studio</h1>
         <p className="mt-2 max-w-2xl text-sm leading-7">
-          Neue Lektionen für Autonom und ROS entstehen hier in derselben Markdown-Struktur. Ein
-          Baustein hängt den roten Twin an, ohne ein eigenes Lab.
+          Neue Lektionen für Autonom und ROS entstehen hier. Der Text liegt danach unter
+          content im Ordner der Lektion. Ein Baustein hängt den roten Twin an, ohne ein eigenes Lab.
         </p>
       </div>
       {tracks.map((track) => {

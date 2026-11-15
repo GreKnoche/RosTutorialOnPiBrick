@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ReplayFigure } from "@/components/replay-figure";
-import { DriftField } from "@/components/lessons/04_kalibrierung/field";
+import { DriftField } from "./field";
 import {
   GROUNDS,
   mulberry32,

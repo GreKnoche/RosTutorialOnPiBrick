@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 
 const geistSans = Geist({

@@ -35,10 +35,9 @@ export function storedLesson(lesson: Lesson): Lesson {
   return stored;
 }
 
-export function lessonMarkdownPath(track: string, id: string, slug: string) {
-  const root = path.resolve(process.cwd(), "content", track);
-  const name = `${id}-${slug}.md`;
-  const file = path.resolve(root, name);
-  if (file !== path.join(root, name)) return null;
+export function lessonCopyPath(track: string, id: string, slug: string) {
+  const root = path.resolve(process.cwd(), "content", track, `${id}-${slug}`);
+  const file = path.resolve(root, "copy.ts");
+  if (file !== path.join(root, "copy.ts")) return null;
   return file;
 }

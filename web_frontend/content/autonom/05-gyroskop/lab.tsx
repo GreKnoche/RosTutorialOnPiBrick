@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopySection } from "@/components/lessons/copy-section";
-import { HeadingPlot } from "@/components/lessons/05_gyroskop/field";
+import { HeadingPlot } from "./field";
 import { MarkdownBlock } from "@/components/lessons/markdown-block";
 import { LessonSection } from "@/components/lesson-section";
 import { MissionBoard } from "@/components/mission-board";

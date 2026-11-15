@@ -111,24 +111,24 @@ export function RadabstandAnimation({ title }: { title: string }) {
 
           <g className="sep-start-label">
             <text
-              x={LEFT_X}
-              y="58"
+              x={LEFT_X-120}
+              y="320"
               textAnchor="middle"
               fill="#fff7ed"
               fontSize="16"
               fontFamily="ui-sans-serif, system-ui"
             >
-              links hält
+              Linkes Rad hält (sₗ = 0)
             </text>
             <text
-              x={LEFT_X + SEPARATION}
-              y="58"
+              x={LEFT_X + 270}
+              y="320"
               textAnchor="middle"
               fill="#fff7ed"
               fontSize="16"
               fontFamily="ui-sans-serif, system-ui"
             >
-              rechts rollt
+              Rechtes Rad fährt sᵣ = ?
             </text>
             <line
               x1={LEFT_X}
@@ -148,20 +148,20 @@ export function RadabstandAnimation({ title }: { title: string }) {
               fontSize="16"
               fontFamily="ui-monospace, monospace"
             >
-              L
+              L = Radabstand
             </text>
           </g>
 
           <g className="sep-result-label">
             <text
               x={LEFT_X + SEPARATION / 2}
-              y="108"
+              y="77"
               textAnchor="middle"
               fill="#fef3c7"
               fontSize="20"
               fontFamily="ui-monospace, monospace"
             >
-              Bogen = L · Δθ
+              sᵣ = L · π/2(90°)
             </text>
           </g>
         </svg>
@@ -169,11 +169,8 @@ export function RadabstandAnimation({ title }: { title: string }) {
 
       <div className="grid gap-2 px-4 py-3 text-sm leading-6 sm:grid-cols-[1fr_auto] sm:items-center">
         <p>
-          Von oben: Das linke Rad bleibt stehen (s<sub>l</sub> = 0), das rechte rollt
-          (s<sub>r</sub> = Bogen). Ohne Rutschen ist dieser Bogen genau L · Δθ. Drehen beide Räder,
-          gilt dieselbe Formel: Nur die Differenz teilt sich dann auf beide Wege auf.
+          Die Animation ist eine Draufsicht auf die Achse eines Roboters mit Differentialantrieb. Wenn wir wie im Beispiel exakt 90 Grad fahren wollen, wenden wir die Formel aus der Animation an: sᵣ = L · π/2. Bei einem vorgegebenen Radabstand von L = 10 cm rechnet sich das als sᵣ = 10 cm · π/2 ≈ 15,71 cm.
         </p>
-        <p className="font-mono text-xs text-muted-foreground">Δθ = (s<sub>r</sub> − s<sub>l</sub>) / L</p>
       </div>
 
       <style jsx global>{`

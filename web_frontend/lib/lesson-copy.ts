@@ -123,6 +123,22 @@ export function parseLessonCopy(source: string): LessonCopy {
   return copy;
 }
 
+const MODULE_HEADER = 'import type { LessonCopy } from "@/lib/lesson-copy";\n\nexport const copy = ';
+const MODULE_FOOTER = " satisfies LessonCopy;\n";
+
+export function serializeLessonModule(copy: LessonCopy): string {
+  return `${MODULE_HEADER}${JSON.stringify(copy, null, 2)}${MODULE_FOOTER}`;
+}
+
+export function parseLessonModule(source: string): LessonCopy | null {
+  if (!source.startsWith(MODULE_HEADER) || !source.endsWith(MODULE_FOOTER)) return null;
+  try {
+    return JSON.parse(source.slice(MODULE_HEADER.length, -MODULE_FOOTER.length)) as LessonCopy;
+  } catch {
+    return null;
+  }
+}
+
 export function serializeLessonCopy(copy: LessonCopy): string {
   const parts: string[] = [];
   if (copy.intro.trim()) parts.push(`## intro\n\n${copy.intro.trim()}`);

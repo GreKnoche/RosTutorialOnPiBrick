@@ -49,8 +49,7 @@ const planner: Nav2Station = {
   cityObstacles: true,
   planners: ["nav2_smac_planner::SmacPlannerHybrid"],
   explain:
-    "[glossary:dubins-reeds-shepp-boegen]"
-    + "Radius 0,40 schafft die Ecke, die Ausrichtung nach Norden nur mit REEDS_SHEPP. Radius 0,80 und DUBIN bleiben stehen.",
+    "Radius 0,40 schafft die Ecke, die Ausrichtung nach Norden nur mit REEDS_SHEPP. Radius 0,80 und DUBIN bleiben stehen.",
   nodes: [
     { id: "waypoint_lesson", x: 10, y: 62 },
     { id: "planner", x: 46, y: 62 },

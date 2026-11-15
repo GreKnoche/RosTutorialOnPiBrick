@@ -1,6 +1,7 @@
-import { existsSync, writeFileSync } from "node:fs";
-import { lessonMarkdownPath, nextLessonId, readCatalog, storedLesson, writeCatalog } from "@/lib/catalog-file";
-import { serializeLessonCopy, parseLessonCopy, type LessonCopy } from "@/lib/lesson-copy";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { lessonCopyPath, nextLessonId, readCatalog, storedLesson, writeCatalog } from "@/lib/catalog-file";
+import { parseLessonCopy, serializeLessonCopy, serializeLessonModule, type LessonCopy } from "@/lib/lesson-copy";
 import type { LessonDraftMeta } from "@/lib/lesson-draft";
 import type { Lesson } from "@/lib/types";
 
@@ -20,12 +21,13 @@ export function createLesson(input: {
   }
   const id = nextLessonId(catalog, input.track);
   if (!id) throw new LessonStoreError("Für diesen Track gibt es keine freie Nummer mehr.");
-  const file = lessonMarkdownPath(input.track, id, input.slug);
+  const file = lessonCopyPath(input.track, id, input.slug);
   if (!file) throw new LessonStoreError("Ungültiger Pfad.");
-  if (existsSync(file)) throw new LessonStoreError("Die Markdown-Datei gibt es schon.");
-  const source = serializeLessonCopy(
+  if (existsSync(file)) throw new LessonStoreError("Die Lektion gibt es schon.");
+  const source = serializeLessonModule(
     parseLessonCopy("## intro\n\nHier steht der Absatz unter der Überschrift.\n"),
   );
+  mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, source, "utf8");
   const lesson = storedLesson({
     id,
@@ -54,10 +56,12 @@ export function saveLesson(meta: LessonDraftMeta, copy: LessonCopy): { lesson: L
     (lesson) => lesson.track === meta.track && lesson.id === meta.id && lesson.slug === meta.slug,
   );
   if (index < 0) throw new LessonStoreError("Lektion nicht gefunden.");
-  const file = lessonMarkdownPath(meta.track, meta.id, meta.slug);
+  const file = lessonCopyPath(meta.track, meta.id, meta.slug);
   if (!file) throw new LessonStoreError("Ungültiger Pfad.");
-  const source = serializeLessonCopy(copy);
+  const normalized = parseLessonCopy(serializeLessonCopy(copy));
+  const source = serializeLessonModule(normalized);
   if (source.length > MAX_SOURCE) throw new LessonStoreError("Der Lektionstext ist zu lang.");
+  mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, source, "utf8");
   const lesson = storedLesson({
     id: meta.id,
@@ -71,5 +75,5 @@ export function saveLesson(meta: LessonDraftMeta, copy: LessonCopy): { lesson: L
   });
   catalog.lessons[index] = lesson;
   writeCatalog(catalog);
-  return { lesson, copy: parseLessonCopy(source) };
+  return { lesson, copy: normalized };
 }

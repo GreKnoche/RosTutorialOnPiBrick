@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopySection } from "@/components/lessons/copy-section";
 import { MarkdownBlock } from "@/components/lessons/markdown-block";
-import { DriftField } from "@/components/lessons/04_kalibrierung/field";
+import { DriftField } from "./field";
 import { LessonSection } from "@/components/lesson-section";
 import { MissionBoard } from "@/components/mission-board";
 import { MissionBanner, MissionStamp } from "@/components/mission-success";
