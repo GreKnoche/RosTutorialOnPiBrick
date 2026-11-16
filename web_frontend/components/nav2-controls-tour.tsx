@@ -79,7 +79,7 @@ const GUIDES: Guide[] = [
   {
     id: "toggles",
     title: "Schalter",
-    body: "Ein Klick schaltet an, der nächste aus. Blau heißt an: Lidar-Strahlen, Auto vergrößert, Kamerabild. Costmap und Pfad kommen in späteren Kapiteln dazu.",
+    body: "Ein Klick schaltet an, der nächste aus. Blau heißt an: Lidar-Strahlen, Auto vergrößert, Kamerabild und Pfad. Die Costmap kommt ab dem Kapitel Costmap dazu.",
     side: "top",
     align: "center",
   },

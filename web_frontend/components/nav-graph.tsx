@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { WaypointNode } from "@/components/waypoint-node";
 import { BtTickAnimation } from "@/components/bt-tick-animation";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
-import type { Nav2Station } from "@/components/nav2lessons";
+import type { GraphNodeId, Nav2Station } from "@/components/nav2lessons";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
 import { absorbFollowPath, absorbGoal, absorbProgress, followPathError, goalError, progressError } from "@/lib/controller-yaml";
 import { costmapError, type CostmapRoot } from "@/lib/costmap-yaml";
@@ -203,15 +203,21 @@ const NODE_FILL: Record<string, string> = {
   global_costmap: "bg-[#cbb57a]",
 };
 
-function nodeTone(id: string, state: "on" | "focus" | "idle") {
+function nodeTone(id: string, state: "on" | "edit" | "idle") {
   const fill = NODE_FILL[id] ?? "bg-[#f8e7b0]";
   const ring =
     state === "on"
       ? "ring-2 ring-[#a67c12] ring-offset-2 ring-offset-background"
-      : state === "focus"
-        ? "ring-2 ring-[#2f6b4f] ring-offset-2 ring-offset-background"
+      : state === "edit"
+        ? "ring-2 ring-[#fb923c] ring-offset-2 ring-offset-background"
         : "ring-1 ring-white/80";
   return `${fill} ${ring} text-[#3c3214] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_3px_0_rgba(60,50,20,0.16)]`;
+}
+
+function graphNodeState(id: GraphNodeId, current: GraphNodeId, edit: ReadonlySet<GraphNodeId>): "on" | "edit" | "idle" {
+  if (id === current) return "on";
+  if (edit.has(id)) return "edit";
+  return "idle";
 }
 
 export function NavGraph({
@@ -225,6 +231,7 @@ export function NavGraph({
 }) {
   const missionId = graph.id;
   const focusNode = graph.focus;
+  const editNodes = new Set(graph.edit);
   const placed = graph.nodes.map((node) => ({ ...node, name: NAMES.get(node.id) ?? node.id }));
   const [pickedNode, setPickedNode] = useState<string | null>(null);
   const [pickedFocus, setPickedFocus] = useState(focusNode);
@@ -413,7 +420,7 @@ export function NavGraph({
               }}
               className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 text-center ${
                 node.id === "planner" ? "w-32 rounded-md px-2 py-1" : "w-28 rounded-full px-2.5 py-1.5"
-              } ${nodeTone(node.id, node.id === current?.id ? "on" : node.id === focusNode ? "focus" : "idle")}`}
+              } ${nodeTone(node.id, graphNodeState(node.id, current.id, editNodes))}`}
               style={{ left: `${node.x}%`, top: `${node.y}%` }}
             >
               {node.id === "planner" ? (

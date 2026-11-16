@@ -398,18 +398,32 @@ function drawGates(
 ) {
   const order = gates.map((gate) => gate.id);
   const active = lap ? order.indexOf(lap.next) : -1;
+  let number = 0;
   for (const gate of gates) {
     if (gate.id === "start" || gate.id === "ziel") continue;
+    number += 1;
     const at = order.indexOf(gate.id);
     const passed = lap?.done || (active >= 0 && at < active);
-    ctx.strokeStyle = lap?.grass ? "#e15a4a" : at === active ? "#ffffff" : "#9fd4ff";
-    ctx.lineWidth = Math.max(3, ppm * (at === active ? 0.06 : 0.04));
+    ctx.strokeStyle = lap?.grass ? "#e15a4a" : at === active ? "#ffffff" : passed ? "#7dcea0" : "#9fd4ff";
+    ctx.lineWidth = Math.max(5, ppm * (at === active ? 0.1 : 0.075));
     const a = to(gate.x0, gate.y0);
     const b = to(gate.x1, gate.y1);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
+    const label = String(number);
+    const size = Math.round(Math.max(13, ppm * 0.16));
+    ctx.save();
+    ctx.font = `700 ${size}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = Math.max(3, size * 0.22);
+    ctx.strokeStyle = "rgba(17,19,24,0.9)";
+    ctx.strokeText(label, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    ctx.fillStyle = "#f4efe4";
+    ctx.fillText(label, (a.x + b.x) / 2, (a.y + b.y) / 2);
+    ctx.restore();
   }
 }
 

@@ -272,14 +272,34 @@ export function writeLessonText(missionId: string, field: Nav2TextField, source:
   storeBook(next);
 }
 
+/**
+ * Plugin costmaps saved before the Smac Hybrid fix still inflate by 0.05 m.
+ * That is smaller than the footprint, so Hybrid logs an error and skips the fast collision check.
+ */
+function liftPluginInflation(stored: string, fallback: string | undefined): string {
+  if (!fallback?.includes("inflation_radius: 0.08")) return stored;
+  if (!stored.includes("resolution: 0.03") || !stored.includes("robot_radius: 0.05")) return stored;
+  if (!stored.includes("inflation_radius: 0.05")) return stored;
+  return stored.replaceAll("inflation_radius: 0.05", "inflation_radius: 0.08");
+}
+
 /** Write this station's own start text into any field it does not have yet. */
 export function fillStationDefaults(missionId: string, defaults: Partial<Record<Nav2TextField, string>>) {
   const book = readBook();
   const lesson: LessonRecord = { ...(book[missionId] ?? {}) };
   let changed = false;
   for (const field of TEXT_FIELDS) {
-    if (lesson[field] !== undefined) continue;
-    const clean = usableText(defaults[field] ?? null);
+    const fallback = defaults[field];
+    const current = lesson[field];
+    if (current !== undefined) {
+      if (field !== "localCostmap" && field !== "globalCostmap") continue;
+      const lifted = liftPluginInflation(current, fallback);
+      if (lifted === current) continue;
+      lesson[field] = lifted;
+      changed = true;
+      continue;
+    }
+    const clean = usableText(fallback ?? null);
     if (clean === null) continue;
     lesson[field] = clean;
     changed = true;

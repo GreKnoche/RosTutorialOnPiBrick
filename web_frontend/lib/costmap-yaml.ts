@@ -93,7 +93,7 @@ function pluginCostmapPatch(section: string): string {
     .replace("resolution: 0.05", "resolution: 0.03")
     .replace("robot_radius: 0.09", "robot_radius: 0.05")
     .replace("cost_scaling_factor: 2.5", "cost_scaling_factor: 0.1")
-    .replace("inflation_radius: 0.12", "inflation_radius: 0.05");
+    .replace("inflation_radius: 0.12", "inflation_radius: 0.08");
 }
 
 /** Planner-plugin mission: fine grid, city obstacles, narrow inflation. */
@@ -195,7 +195,7 @@ if (
   !PLUGIN_GLOBAL_CITY.includes("resolution: 0.03") ||
   !PLUGIN_GLOBAL_CITY.includes("robot_radius: 0.05") ||
   !PLUGIN_GLOBAL_CITY.includes("cost_scaling_factor: 0.1") ||
-  !PLUGIN_GLOBAL_CITY.includes("inflation_radius: 0.05")
+  !PLUGIN_GLOBAL_CITY.includes("inflation_radius: 0.08")
 ) {
   throw new Error("Plugin-Costmap hat nicht die eigene Vorlage.");
 }

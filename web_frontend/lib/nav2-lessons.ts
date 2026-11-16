@@ -103,7 +103,7 @@ const CONTROLLER: NodeMission = {
  * plugin: one tour for all five classes. Houses still via /city_obstacles.
  * Mid-road aisle (NavFn stays center), lawn diagonal (Theta* line of sight),
  * then south and east of the east square so the chord still hits the block.
- * No pocket and no reverse — that stays on mission planner. Parking is einparken.
+ * No pocket and no reverse — that stays on mission planner.
  */
 const PLUGIN_WEST_X = 10.11;
 const PLUGIN_BLOCK_Y = 6.084285714285714;
@@ -119,6 +119,7 @@ const PLUGIN: NodeMission = {
     [4.95, 5.47], /*(4.95, 5.47, 0.01)*/
     [6.7, 5.554],
     [11, 5.4],
+    [10.86, 4.97], /*(10.86, 4.97, 0.92)*/
     [11.7, 6.0842],
   ],
   obstacles: [
@@ -167,12 +168,13 @@ const COSTMAP: NodeMission = {
 };
 
 /**
- * planner: spawned at the start.
- * Right turn off the mid road into the east street, then a dead end.
- * The inner box clears a 0.40 m arc and cuts a 0.80 m arc. The wall closes
- * the street; a U-turn of radius 0.40 needs 0.80 m and the street is 0.72 m.
+ * planner: turn at the crossing, nose north, then reverse into the west side of
+ * the gap. The north box clears a 0.40 m arc and cuts a 0.80 m arc. The street
+ * is 0.72 m wide, so a U-turn of radius 0.40 does not fit. The wall keeps a
+ * forward path from entering the gap from the south. The halt line is only the
+ * west side of the gap, so a stop on the east lane does not count.
  */
-const POCKET_GOAL_Y = 4.22;
+const PARK_Y = 4.767;
 const PLANNER: NodeMission = {
   id: "planner",
   title: "Smac Hybrid",
@@ -187,41 +189,10 @@ const PLANNER: NodeMission = {
   checkpoints: [
     { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
     {
-      id: "tasche",
-      x0: ROAD_EAST - HALF,
-      y0: POCKET_GOAL_Y,
-      x1: ROAD_EAST + HALF,
-      y1: POCKET_GOAL_Y,
-      halt: true,
-      yaw: Math.PI / 2,
-    },
-  ],
-};
-
-/**
- * einparken: the two boxes are the parked cars. The gap between them is the bay.
- * North box south edge is 5.134, south box north edge is 4.4, so the stop sits
- * in the middle. Nose north, back toward the crossing. The street is too narrow
- * to turn around, so the car reverses in.
- */
-const PARK_Y = 4.767;
-const EINPARKEN: NodeMission = {
-  id: "einparken",
-  title: "Einparken",
-  kind: "gates",
-  spawn: HOME,
-  ghost: false,
-  obstacles: [
-    { x: 8.357, y: 5.234, w: 0.2, h: 0.2 },
-    { x: 8.5, y: 4.3, w: 0.4, h: 0.2 },
-  ],
-  checkpoints: [
-    { id: "start", x0: 1.76, y0: 5.914, x1: 1.76, y1: 5.194 },
-    {
-      id: "park",
-      x0: ROAD_EAST - HALF,
+      id: "luecke",
+      x0: 8.42,
       y0: PARK_Y,
-      x1: ROAD_EAST + HALF,
+      x1: 8.54,
       y1: PARK_Y,
       halt: true,
       yaw: Math.PI / 2,
@@ -312,7 +283,7 @@ export const NAV_NODES: NavNode[] = [
     x: 22,
     y: 58,
     show: "plugin",
-    missions: [PLUGIN, PLANNER, EINPARKEN],
+    missions: [PLUGIN, PLANNER],
   },
   {
     id: "local_costmap",
@@ -349,7 +320,7 @@ export const NAV_NODES: NavNode[] = [
 ];
 
 /** Road order. Start is the driveway, not a mission of a node. */
-export const MISSION_ORDER = ["folgen", "controller", "costmap", "planner", "einparken", "plugin", "bt-struktur", "bt-monitor"] as const;
+export const MISSION_ORDER = ["folgen", "controller", "costmap", "planner", "plugin", "bt-struktur", "bt-monitor"] as const;
 
 export type MissionId = (typeof MISSION_ORDER)[number];
 

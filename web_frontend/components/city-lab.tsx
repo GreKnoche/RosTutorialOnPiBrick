@@ -523,7 +523,10 @@ export function CityLab({
         const nextLap = sample.lap ?? null;
         lapRef.current = nextLap;
         setLap((previous) =>
-          previous?.text === nextLap?.text && previous?.done === nextLap?.done && previous?.grass === nextLap?.grass
+          previous?.text === nextLap?.text &&
+          previous?.done === nextLap?.done &&
+          previous?.grass === nextLap?.grass &&
+          previous?.next === nextLap?.next
             ? previous
             : nextLap,
         );

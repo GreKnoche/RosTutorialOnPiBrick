@@ -112,7 +112,8 @@ function asState(data: Record<string, unknown>): TwinState | null {
 function asLap(value: unknown): { text: string; done: boolean; grass: boolean; next: string } | null {
   if (!value || typeof value !== "object") return null;
   const lap = value as Record<string, unknown>;
-  if (typeof lap.text !== "string" || !lap.text) return null;
+  // An open lap has an empty text. Only done and grass fill it in.
+  if (typeof lap.text !== "string") return null;
   return {
     text: lap.text,
     done: lap.done === true,

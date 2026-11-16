@@ -169,14 +169,16 @@ export const THETA = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für 
 plugin: "nav2_theta_star_planner::ThetaStarPlanner"
 # Suchnachbarschaft auf dem Raster: 4 (nur orthogonal) oder 8 (inkl. Diagonalen)
 how_many_corners: 8
-# Gewicht für die euklidische Pfadlänge (kürzeste Strecke)
+# Gewicht für die euklidische Pfadlänge. Liegt der Wert unter 1, nutzt die Heuristik denselben Wert
 w_euc_cost: 1.0
 # Gewicht für die Costmap-Kosten entlang des Pfads (Abstand zu Hindernissen)
 w_traversal_cost: 2.0
-# Gewicht der geschätzten Reststrecke bis zum Ziel in der A*-Suche
-w_heuristic_cost: 1.0
 # Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
+# Intervall (in Suchschritten), in dem auf Abbruch geprüft wird
+terminal_checking_interval: 5000
+# Übernimmt am Ziel die Ausrichtung des letzten Pfadsegments statt der Ziel-Orientierung (true/false)
+use_final_approach_orientation: false
 `;
 
 export const LATTICE = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)

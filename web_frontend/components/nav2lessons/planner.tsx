@@ -22,7 +22,7 @@ const POCKET_THROUGH = THROUGH_SOURCE.replace(
   `POINTS = [
     (8.277, 5.554, 0.0),
     (8.677, 5.954, math.pi / 2),
-    (8.677, 4.22, math.pi / 2),
+    (11.79, 6.0842, NORTH),
 ]`,
 );
 
@@ -32,24 +32,25 @@ if (
   POCKET_THROUGH === THROUGH_SOURCE ||
   !POCKET_THROUGH.includes("(8.277, 5.554, 0.0)") ||
   !POCKET_THROUGH.includes("(8.677, 5.954, math.pi / 2)") ||
-  !POCKET_THROUGH.includes("(8.677, 4.22, math.pi / 2)")
+  !POCKET_THROUGH.includes("(11.79, 6.0842, NORTH)")
 ) {
-  throw new Error("Sackgassen-Ziel fehlt");
+  throw new Error("Parklücken-Ziel fehlt");
 }
 if (!POCKET_PATH.includes("allow_reversing: true") || POCKET_PATH.includes("use_rotate_to_heading: true")) {
-  throw new Error("FollowPath der Sackgasse ist unverändert");
+  throw new Error("FollowPath der Parklücke ist unverändert");
 }
 
 const planner: Nav2Station = {
   id: "planner",
   focus: "planner",
+  edit: ["planner"],
   client: "through",
   tree: "through",
   showProgress: true,
   cityObstacles: true,
   planners: ["nav2_smac_planner::SmacPlannerHybrid"],
   explain:
-    "Radius 0,40 schafft die Ecke, die Ausrichtung nach Norden nur mit REEDS_SHEPP. Radius 0,80 und DUBIN bleiben stehen.",
+    "Erst an der Kreuzung drehen, dann rückwärts in die Lücke. Radius 0,40 schafft die Ecke, die Nase nach Norden nur mit REEDS_SHEPP. Radius 0,80 und DUBIN bleiben stehen.",
   nodes: [
     { id: "waypoint_lesson", x: 10, y: 62 },
     { id: "planner", x: 46, y: 62 },

@@ -226,6 +226,7 @@ export function LearningPath({
   startId,
   onStart,
   onSelect,
+  onSelectStart,
   onSetDone,
   done = EMPTY_DONE,
   runningId = null,
@@ -241,6 +242,7 @@ export function LearningPath({
   startId?: string;
   onStart?: (id: string) => void;
   onSelect?: (id: string) => void;
+  onSelectStart?: () => void;
   onSetDone?: (id: string, done: boolean) => void;
   done?: Partial<Record<string, boolean>>;
   runningId?: string | null;
@@ -361,6 +363,11 @@ export function LearningPath({
           const href = playableId ? hrefOf?.(playableId) : undefined;
           const side = index % 2 === 0 ? "left" : "right";
           const open = () => {
+            if (passed) {
+              setOpenId(null);
+              onSelectStart?.();
+              return;
+            }
             if (!playableId) return;
             if (isDone || live || armed) {
               onStart?.(playableId);
@@ -389,6 +396,7 @@ export function LearningPath({
                     item={item}
                     done={isDone}
                     passed={passed}
+                    startSelectable={passed && Boolean(onSelectStart)}
                     live={live}
                     held={held}
                     armed={armed}
@@ -418,6 +426,7 @@ export function LearningPath({
                     item={item}
                     done={isDone}
                     passed={passed}
+                    startSelectable={passed && Boolean(onSelectStart)}
                     live={live}
                     held={held}
                     armed={armed}
@@ -499,6 +508,7 @@ function NodeButton({
   item,
   done,
   passed,
+  startSelectable = false,
   live,
   held,
   armed,
@@ -512,6 +522,7 @@ function NodeButton({
   item: PathStep;
   done: boolean;
   passed: boolean;
+  startSelectable?: boolean;
   live: boolean;
   held: boolean;
   armed: boolean;
@@ -525,7 +536,7 @@ function NodeButton({
   const caption = nodeCaption(item);
   const nodeStyle: CSSProperties = {};
   if (held && !live) {
-    nodeStyle.boxShadow = `0 0 0 2px var(--background), 0 0 0 4px ${colors.fill}`;
+    nodeStyle.boxShadow = `0 0 0 2px var(--background), 0 0 0 4px ${passed ? "#2f6b4f" : colors.fill}`;
   }
   if (!passed && live) {
     nodeStyle.background = colors.shade;
@@ -538,7 +549,9 @@ function NodeButton({
   }
   const nodeClass = `relative z-10 flex size-12 items-center justify-center rounded-full ${
     passed
-      ? "border-2 border-dashed border-[#2f6b4f] bg-transparent text-[#2f6b4f]"
+      ? startSelectable
+        ? "cursor-pointer border-b-4 border-b-[#1e4634] bg-[#2f6b4f] text-white hover:bg-[#275941]"
+        : "border-2 border-dashed border-[#2f6b4f] bg-transparent text-[#2f6b4f]"
       : live
         ? "border-b-4"
         : done
@@ -546,7 +559,9 @@ function NodeButton({
           : "border-b-4"
   }`;
   const ariaLabel = passed
-    ? `${caption}, geschafft`
+    ? startSelectable
+      ? `${caption}, Einleitung`
+      : `${caption}, geschafft`
     : done && !live
       ? `${caption}, nochmal starten`
       : held && !live
@@ -571,7 +586,7 @@ function NodeButton({
         <button
           ref={nodeRef}
           type="button"
-          disabled={passed}
+          disabled={passed && !startSelectable}
           autoComplete="off"
           aria-current={live || held ? "step" : undefined}
           aria-expanded={!passed && !live ? armed : undefined}

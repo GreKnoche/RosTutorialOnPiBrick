@@ -9,6 +9,7 @@ const EMPTY_DONE: Partial<Nav2Done> = {};
 export function MissionPath({
   onStart,
   onSelect,
+  onSelectStart,
   onSetDone,
   done = EMPTY_DONE,
   runningId = null,
@@ -16,6 +17,7 @@ export function MissionPath({
 }: {
   onStart?: (id: MissionId) => void;
   onSelect?: (id: MissionId) => void;
+  onSelectStart?: () => void;
   onSetDone?: (id: MissionId, done: boolean) => void;
   done?: Partial<Nav2Done>;
   runningId?: string | null;
@@ -34,6 +36,7 @@ export function MissionPath({
       onSelect={(id) => {
         if (isMissionId(id)) onSelect?.(id);
       }}
+      onSelectStart={onSelectStart}
       onSetDone={(id, next) => {
         if (isMissionId(id)) onSetDone?.(id, next);
       }}

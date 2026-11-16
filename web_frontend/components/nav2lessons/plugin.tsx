@@ -21,11 +21,11 @@ const PLUGIN_THROUGH = THROUGH_SOURCE.replace(
 ]`,
   `POINTS = [
     # (1.4, 5.59, 0.0),
-    (4.7, 5.1,(math.pi*5)/16),
+    (4.94, 5.4,(math.pi*5)/16),
     (6.7, 5.554,EAST),
     (10.11, 6.0842,EAST),
-    (11, 5.1942,EAST),
-    (11.89, 6.0842,NORTH),
+    (11.0, 5.03,EAST),
+    (11.79, 6.0842,NORTH),
 ]`,
 );
 
@@ -33,6 +33,7 @@ const PLUGIN_THROUGH = THROUGH_SOURCE.replace(
 const plugin: Nav2Station = {
   id: "plugin",
   focus: "planner",
+  edit: ["planner"],
   client: "through",
   tree: "through",
   showProgress: false,

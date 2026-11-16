@@ -18,6 +18,7 @@ import type { Nav2Station } from "./types";
 const costmap: Nav2Station = {
   id: "costmap",
   focus: "global_costmap",
+  edit: ["global_costmap"],
   client: "through",
   tree: "through",
   showProgress: true,

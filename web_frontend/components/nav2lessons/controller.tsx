@@ -4,6 +4,7 @@ import type { Nav2Station } from "./types";
 const controller: Nav2Station = {
   id: "controller",
   focus: "controller",
+  edit: ["controller"],
   client: "through",
   tree: "through",
   showProgress: false,
