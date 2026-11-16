@@ -43,7 +43,7 @@ if (!POCKET_PATH.includes("allow_reversing: true") || POCKET_PATH.includes("use_
 const planner: Nav2Station = {
   id: "planner",
   focus: "planner",
-  edit: ["planner"],
+  edit: ["waypoint_lesson", "planner"],
   client: "through",
   tree: "through",
   showProgress: true,

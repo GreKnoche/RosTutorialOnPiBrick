@@ -110,7 +110,7 @@ if (MONITOR_PATH === FOLLOW_PATH || !MONITOR_PATH.includes("desired_linear_vel: 
 const btMonitor: Nav2Station = {
   id: "bt-monitor",
   focus: "path_clear",
-  edit: ["path_clear", "mission"],
+  edit: ["waypoint_lesson", "path_clear", "mission"],
   client: "through",
   tree: "through",
   showProgress: false,

@@ -63,7 +63,7 @@ if (
 const btStruktur: Nav2Station = {
   id: "bt-struktur",
   focus: "mission",
-  edit: ["mission"],
+  edit: ["waypoint_lesson", "mission"],
   client: "through",
   tree: "through",
   showProgress: true,

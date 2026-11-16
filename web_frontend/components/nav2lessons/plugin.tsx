@@ -33,7 +33,7 @@ const PLUGIN_THROUGH = THROUGH_SOURCE.replace(
 const plugin: Nav2Station = {
   id: "plugin",
   focus: "planner",
-  edit: ["planner"],
+  edit: ["waypoint_lesson", "planner"],
   client: "through",
   tree: "through",
   showProgress: false,

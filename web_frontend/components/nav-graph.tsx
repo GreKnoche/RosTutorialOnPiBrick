@@ -209,7 +209,7 @@ function nodeTone(id: string, state: "on" | "edit" | "idle") {
     state === "on"
       ? "ring-2 ring-[#a67c12] ring-offset-2 ring-offset-background"
       : state === "edit"
-        ? "ring-2 ring-[#fb923c] ring-offset-2 ring-offset-background"
+        ? "ring-4 ring-[#fb923c] ring-offset-2 ring-offset-background"
         : "ring-1 ring-white/80";
   return `${fill} ${ring} text-[#3c3214] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_3px_0_rgba(60,50,20,0.16)]`;
 }
