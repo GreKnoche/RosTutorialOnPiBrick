@@ -24,6 +24,14 @@ export function lessonsForTrack(track: TrackId, source: Curriculum = curriculum)
   return source.lessons.filter((lesson) => lesson.track === track);
 }
 
+export function lessonsVisibleForTrack(
+  track: TrackId,
+  source: Curriculum = curriculum,
+  admin = false,
+): Lesson[] {
+  return lessonsForTrack(track, source).filter((lesson) => admin || !lesson.adminOnly);
+}
+
 export function curriculumOutline(
   source: Curriculum = curriculum,
 ): { track: TrackMeta; lessons: Lesson[] }[] {
@@ -36,13 +44,14 @@ export function curriculumOutline(
 export function lessonNeighbors(
   lesson: Lesson,
   source: Curriculum = curriculum,
+  admin = false,
 ): {
   prev?: Lesson;
   next?: Lesson;
   index: number;
   total: number;
 } {
-  const lessons = lessonsForTrack(lesson.track, source);
+  const lessons = lessonsVisibleForTrack(lesson.track, source, admin);
   const index = lessons.findIndex((item) => item.id === lesson.id);
   return {
     prev: index > 0 ? lessons[index - 1] : undefined,

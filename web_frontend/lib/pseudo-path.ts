@@ -155,8 +155,19 @@ export function parseWheelProgram(source: string): WheelProgram {
       }
       continue;
     }
+    const fahrt = parseFahrtCm(trimmed);
+    if (fahrt) {
+      if (circumferenceCm === null || circumferenceCm <= 0) {
+        return fail("Zeile " + lineNo + ": Setze zuerst den Radumfang in cm.", circumferenceCm, separationCm);
+      }
+      segments.push({
+        leftRev: fahrt.leftCm / circumferenceCm,
+        rightRev: fahrt.rightCm / circumferenceCm,
+      });
+      continue;
+    }
     return fail(
-      "Zeile " + lineNo + ": Unbekanntes Wort. Nutze Radumfang, Radabstand, links oder rechts.",
+      "Zeile " + lineNo + ": Unbekanntes Wort. Nutze Radumfang, Radabstand, fahrt(…) oder links/rechts in Umdrehungen.",
       circumferenceCm,
       separationCm,
     );
@@ -273,4 +284,13 @@ function parseNum(token: string | undefined): number | null {
   if (token === undefined) return null;
   const value = Number(token.replace(",", "."));
   return Number.isFinite(value) ? value : null;
+}
+
+function parseFahrtCm(line: string): PathCm | null {
+  const match = line.match(/^fahrt\s*\(\s*(-?\d+(?:[.,]\d+)?)\s*,\s*(-?\d+(?:[.,]\d+)?)\s*\)\s*$/i);
+  if (!match) return null;
+  const leftCm = parseNum(match[1]);
+  const rightCm = parseNum(match[2]);
+  if (leftCm === null || rightCm === null) return null;
+  return { leftCm, rightCm };
 }

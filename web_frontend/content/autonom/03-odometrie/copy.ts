@@ -1,26 +1,26 @@
 import type { LessonCopy } from "@/lib/lesson-copy";
 
 export const copy = {
-  "intro": "Die Punkte liegen schon in der Fläche. Im Code setzt du zuerst Radumfang und Radabstand, dann die Umdrehungen jedes Rads. Gleiche Umdrehungen halten gerade, ungleiche drehen — für 90° mit einem stehenden Rad ist n = (L · π / 2) / U. Die Pose zeigt, wo der Twin zu sein glaubt.",
-  "animationTitle": "Gleiche Räder, ungleiche Räder",
+  "intro": "In den ersten beiden Kapiteln hast du bestimmt, wie aus Radumfang und Radabstand einzelne Strecken und Drehwinkel entstehen. In der Odometrie setzt du beides zu einer fortlaufenden Posenschätzung zusammen: Über mehrere Teilfahrten hinweg rechnet der Roboter mit, an welcher Position `(x, y)` und in welcher Richtung `θ` er zu sein glaubt.\n\nIm Labor liegen die Zielscheiben fest auf der Fläche. Du gibst im Pseudocode `Radumfang` und `Radabstand` vor und steuerst den Digital Twin über aufeinanderfolgende `fahrt(links, rechts)`-Befehle in Zentimetern – mit `U = 24 cm` und `L = 48/π cm` entspricht eine 90°-Drehung genau `24 cm` Wegdifferenz.",
+  "animationTitle": "Wie aus Radwegen eine Pose entsteht",
   "sections": {
     "odometry-formula": {
       "id": "odometry-formula",
-      "eyebrow": "Rechnung",
-      "title": "Räder steuern die Pose",
-      "body": "Die Scheiben eines Labs liegen fest in der Fläche. Im Code setzt du zuerst Umfang und Radabstand, dann wie viele Umdrehungen jedes Rad macht. Gleiche Umdrehungen halten gerade. Ungleiche drehen: Die Wegdifferenz geteilt durch L ist der Winkel. Eine Umdrehung am Boden ist der Umfang, darum wird n mit U zur Strecke."
+      "eyebrow": "Posenschätzung",
+      "title": "Von einzelnen Segmenten zur Bahn",
+      "body": "Jedes `fahrt(links, rechts)`-Segment verschiebt und dreht die geschätzte Pose weiter: Der Mittelweg beider Räder gibt die zurückgelegte Strecke, die Wegdifferenz dreht die Fahrtrichtung. Weil jeder Schritt auf der vorherigen Pose aufbaut, ergeben viele kleine Befehle einen zusammenhängenden Pfad."
     },
     "odometry-path": {
       "id": "odometry-path",
       "eyebrow": "Twin am Pfad",
-      "title": "Feste Punkte, Umdrehungen im Code",
+      "title": "Feste Zielpunkte, Radwege im Pseudocode",
       "body": ""
     },
     "angle": {
       "id": "angle",
-      "eyebrow": "Winkel",
+      "eyebrow": "Orientierung & Winkel",
       "title": "",
-      "body": "Am Start schaust du nach +x. An jeder Scheibe ist die Fahrtrichtung die Richtung, aus der du gekommen bist. Der Winkel ist die Drehung bis zur nächsten Scheibe. Positiv ist links. Hält ein Rad, ist n = L · |Δθ| / U."
+      "body": "Am Start blickt der Roboter entlang `+x`. Nach jeder Scheibe behält er seine Ankunftsrichtung bei; die Liste zeigt die nötige Drehung bis zum nächsten Zielpunkt (positiv nach links)."
     }
   },
   "sectionOrder": [
@@ -34,40 +34,40 @@ export const copy = {
       {
         "id": "left",
         "title": "Punkt links",
-        "hint": "Fahre zur Scheibe links vom Start. Links ist die positive y-Richtung.",
-        "task": "Fahre zur Scheibe links vom Start. Links ist die positive y-Richtung."
+        "hint": "Steuere den Roboter zur Scheibe links vom Startpunkt – entlang der positiven y-Achse.",
+        "task": "Steuere den Roboter zur Scheibe links vom Startpunkt – entlang der positiven y-Achse."
       },
       {
         "id": "return",
         "title": "Geradeaus und umkehren",
-        "hint": "Fahre geradeaus zur vorderen Scheibe, drehe dich um und hole die Scheibe dahinter.",
-        "task": "Fahre geradeaus zur vorderen Scheibe, drehe dich um und hole die Scheibe dahinter."
+        "hint": "Fahre zunächst geradeaus zur vorderen Scheibe, drehe um 180° und erreiche anschließend die Scheibe hinter dem Start.",
+        "task": "Fahre zunächst geradeaus zur vorderen Scheibe, drehe um 180° und erreiche anschließend die Scheibe hinter dem Start."
       },
       {
         "id": "square",
         "title": "Quadrat",
-        "hint": "Fahre die vier Ecken in der Reihenfolge 1 bis 4. Die letzte liegt wieder am Start.",
-        "task": "Fahre die vier Ecken in der Reihenfolge 1 bis 4. Die letzte liegt wieder am Start."
+        "hint": "Fahre alle vier Eckpunkte nacheinander in der Reihenfolge 1 bis 4 ab, bis du am letzten Punkt wieder am Start ankommst.",
+        "task": "Fahre alle vier Eckpunkte nacheinander in der Reihenfolge 1 bis 4 ab, bis du am letzten Punkt wieder am Start ankommst."
       },
       {
         "id": "star",
         "title": "Pentagramm",
-        "hint": "Fahre die fünf Scheiben in der Sternreihenfolge 1 bis 5.",
-        "task": "Fahre die fünf Scheiben in der Sternreihenfolge 1 bis 5."
+        "hint": "Verbinde alle fünf Scheiben nacheinander in der vorgegebenen Sternreihenfolge von 1 bis 5.",
+        "task": "Verbinde alle fünf Scheiben nacheinander in der vorgegebenen Sternreihenfolge von 1 bis 5."
       }
     ]
   },
   "texts": {
-    "idle": "Setze Radumfang und Radabstand, dann links und rechts in Umdrehungen.",
-    "missed": "Die Fahrt ist durch, aber die Scheiben sind noch nicht in der Reihenfolge getroffen.",
-    "missing-measures": "Setze Radumfang und Radabstand, dann siehst du die Umdrehungen für 90°.",
-    "turn-revs": "Für 90° mit einem stehenden Rad ist n = (L · π / 2) / U = {revs} Umdrehungen.",
+    "idle": "Lege Radumfang und Radabstand fest und plane die Fahrt anschließend mit fahrt(links, rechts) in Zentimetern.",
+    "missed": "Die Fahrt ist beendet, aber die Zielscheiben wurden noch nicht in der richtigen Reihenfolge getroffen.",
+    "missing-measures": "Setze zuerst Radumfang und Radabstand, damit die Werte für eine 90°-Drehung berechnet werden können.",
+    "turn-revs": "90°-Wegdifferenz bei aktuellem Maß: {cm} cm ({revs} Umdrehungen).",
     "pseudocode": "Pseudocode",
     "straight": "geradeaus",
-    "turn-left": "links",
-    "turn-right": "rechts",
-    "pivot-left": "links hält, rechts {revs}",
-    "pivot-right": "rechts hält, links {revs}"
+    "turn-left": "links drehen",
+    "turn-right": "rechts drehen",
+    "pivot-left": "links hält, rechts {cm} cm ({revs} Umdr.)",
+    "pivot-right": "rechts hält, links {cm} cm ({revs} Umdr.)"
   },
   "labor": null
 } satisfies LessonCopy;

@@ -49,7 +49,8 @@
       "title": "Kalibrierung und Drift – Warum stimmt die Pose nicht?",
       "summary": "Systematische Parameterfehler von zufälligem Schlupf unterscheiden und durch Testfahrten sichtbar machen.",
       "track": "autonom",
-      "lab": "none"
+      "lab": "none",
+      "adminOnly": true
     },
     {
       "id": "05",
@@ -58,7 +59,8 @@
       "summary": "Du vergleichst Odometrie und Gyro und findest den passenden Wechsel zwischen beiden Richtungen.",
       "track": "autonom",
       "lab": "none",
-      "taughtTerms": ["Gyroskop"]
+      "taughtTerms": ["Gyroskop"],
+      "adminOnly": true
     },
     {
       "id": "07",

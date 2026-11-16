@@ -12,6 +12,7 @@ import {
   writePluginPlanners,
 } from "@/lib/browser-draft";
 import { lessonHref, type Lesson } from "@/lib/curriculum";
+import { useDebugAdmin } from "@/lib/debug-admin";
 import { PATH_STEPS, isMissionId } from "@/lib/nav2-lessons";
 import { lessonProgressKey, markLessonComplete, unmarkLessonComplete } from "@/lib/progress";
 
@@ -25,10 +26,12 @@ export function AllTracksPath({
   rosLessons: Lesson[];
 }) {
   const completed = useCompletedKeys();
+  const admin = useDebugAdmin();
   const nav2Progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
   const [picked, setPicked] = useState<string | null>(null);
 
   const nav2Steps = PATH_STEPS.filter((step) => step.id !== "start");
+  const visibleAutonomLessons = autonomLessons.filter((lesson) => admin || !lesson.adminOnly);
 
   const entries: Array<{
     step: PathStep;
@@ -36,7 +39,7 @@ export function AllTracksPath({
     done: boolean;
     setDone: (next: boolean) => void;
   }> = [
-    ...autonomLessons.map((lesson) => ({
+    ...visibleAutonomLessons.map((lesson) => ({
       step: {
         id: `autonom:${lesson.id}`,
         title: pathLabel(lesson.slug),

@@ -17,24 +17,25 @@ import {
   orderedGoalFlags,
   parseWheelProgram,
   segmentsToCm,
+  turnDiffCm,
   turnRevs,
 } from "@/lib/pseudo-path";
 import type { Pose2D } from "@/lib/ev3-core";
 
-const DEFAULT_U = 17.4;
-const DEFAULT_L = 11.8;
+/** U = 24 cm: 90°-Bogen am laufenden Rad = L·π/2 = U → genau 1 Umdrehung bei L = 48/π cm. */
+const DEFAULT_U = 24;
+const DEFAULT_L = 48 / Math.PI;
 
-const DEFAULT_PROGRAM = `# Maße aus Lektion 1 und 2
-Radumfang 17.4
-Radabstand 11.8
+const DEFAULT_PROGRAM = `# Radumfang 24 cm, Radabstand 48/π cm (≈ 15,28 cm)
+Radumfang 24
+Radabstand 15.279
 
-# geradeaus, gleiche Umdrehungen
-links 1.38
-rechts 1.38
+# +90° auf der Stelle: Differenz s_r - s_l = 24 cm (-12 cm links, +12 cm rechts)
+# (Mit stehendem linken Rad wäre es fahrt(0, 24) – dann wandert der Mittelpunkt mit.)
+fahrt(-12, 12)
 
-# drehen, ein Rad hält
-# links 0
-# rechts 1.07`;
+# 24 cm geradeaus zur Scheibe
+fahrt(24, 24)`;
 
 const ORIGIN: Pose2D = { x: 0, y: 0, theta: 0 };
 
@@ -80,11 +81,15 @@ export function OdometrieLab({
   return (
     <>
       <CopySection copy={copy} id="odometry-formula">
-        <p className="font-mono text-lg text-heading">s = n · U</p>
         <p className="font-mono text-lg text-heading">
-          Δθ = (s<sub>r</sub> − s<sub>l</sub>) / L
+          Δs = (s<sub>l</sub> + s<sub>r</sub>) / 2
         </p>
-        <p className="font-mono text-lg text-heading">90°, ein Rad hält: n = (L · π / 2) / U</p>
+        <p className="font-mono text-lg text-heading">
+          x<sub>neu</sub> = x + Δs · cos(θ + Δθ / 2), &nbsp; y<sub>neu</sub> = y + Δs · sin(θ + Δθ / 2)
+        </p>
+        <p className="font-mono text-lg text-heading">
+          θ<sub>neu</sub> = θ + Δθ
+        </p>
       </CopySection>
 
       <LessonStudio
@@ -209,6 +214,7 @@ export function OdometrieLab({
               {program.separationCm === null || program.circumferenceCm === null
                 ? copy.texts["missing-measures"]
                 : fillCopy(copy.texts["turn-revs"], {
+                    cm: formatDe(turnDiffCm(program.separationCm), 1),
                     revs: formatDe(turnRevs(program.separationCm, program.circumferenceCm), 2),
                   })}
             </p>
@@ -237,9 +243,10 @@ function pivotNote(
   if (!withRevs || separationCm === null || circumferenceCm === null || circumferenceCm <= 0) {
     return left ? copy.texts["turn-left"] : copy.texts["turn-right"];
   }
-  const revs = formatDe(
-    (separationCm * Math.abs((degrees * Math.PI) / 180)) / circumferenceCm,
-    2,
-  );
-  return fillCopy(left ? copy.texts["pivot-left"] : copy.texts["pivot-right"], { revs });
+  const arcCm = separationCm * Math.abs((degrees * Math.PI) / 180);
+  const revs = formatDe(arcCm / circumferenceCm, 2);
+  return fillCopy(left ? copy.texts["pivot-left"] : copy.texts["pivot-right"], {
+    cm: formatDe(arcCm, 1),
+    revs,
+  });
 }

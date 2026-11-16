@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LearningPath, type PathColors, type PathStep } from "@/components/learning-path";
 import { useCompletedKeys } from "@/components/lesson-progress";
 import { lessonHref, type Lesson } from "@/lib/curriculum";
+import { useDebugAdmin } from "@/lib/debug-admin";
 import { lessonProgressKey, markLessonComplete, unmarkLessonComplete } from "@/lib/progress";
 import { TRACK_CAR } from "@/lib/track-car";
 import type { TrackId } from "@/lib/types";
@@ -50,21 +51,23 @@ export function TrackPath({
   currentId?: string;
 }) {
   const completed = useCompletedKeys();
+  const admin = useDebugAdmin();
   const [picked, setPicked] = useState<string | null>(null);
   const track = lessons[0]?.track;
+  const visibleLessons = lessons.filter((lesson) => admin || !lesson.adminOnly);
   const steps: PathStep[] = [
     START_STEP,
-    ...lessons.map((lesson) => ({
+    ...visibleLessons.map((lesson) => ({
       id: lesson.id,
       title: pathLabel(lesson.slug),
       name: lesson.title,
     })),
   ];
   const done = Object.fromEntries(
-    lessons.map((lesson) => [lesson.id, completed.includes(lessonProgressKey(lesson.track, lesson.id))]),
+    visibleLessons.map((lesson) => [lesson.id, completed.includes(lessonProgressKey(lesson.track, lesson.id))]),
   );
   const hrefOf = (id: string) => {
-    const lesson = lessons.find((item) => item.id === id);
+    const lesson = visibleLessons.find((item) => item.id === id);
     return lesson ? lessonHref(lesson) : undefined;
   };
 
@@ -81,7 +84,7 @@ export function TrackPath({
       armHeld={!currentId}
       onSelect={currentId ? undefined : setPicked}
       onSetDone={(id, next) => {
-        const lesson = lessons.find((item) => item.id === id);
+        const lesson = visibleLessons.find((item) => item.id === id);
         if (!lesson) return;
         if (next) markLessonComplete(lesson.track, lesson.id);
         else unmarkLessonComplete(lesson.track, lesson.id);

@@ -17,6 +17,8 @@ export type Lesson = {
   track: TrackId;
   lab: LabKind;
   taughtTerms?: string[];
+  /** Nur sichtbar und erreichbar nach Admin-Anmeldung im Kopfbereich. */
+  adminOnly?: boolean;
 };
 
 export type Curriculum = {

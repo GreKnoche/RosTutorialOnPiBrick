@@ -644,7 +644,7 @@ export function RobotLab({
           : turn
             ? "Eigene Canvas. Die Räder fahren die eingestellten Wege; dieselbe Fahrt geht parallel an ROS."
             : path
-              ? "Eigene Canvas. Links und rechts sind Umdrehungen; dieselbe Fahrt geht parallel an ROS."
+              ? "Eigene Canvas. Jedes Segment fährt die eingestellten Radwege in Zentimetern; dieselbe Fahrt geht parallel an ROS."
           : lab === "teleop"
             ? "Mit W A S D oder den Pfeiltasten fahren. R setzt zurück. Dieselbe Fahrt geht parallel an ROS."
             : lab === "goal"
