@@ -1,4 +1,4 @@
-import type { LabKind, LessonStatus } from "@/lib/types";
+import type { LabKind } from "@/lib/types";
 import {
   clampLabor,
   isSectionId,
@@ -10,7 +10,6 @@ import {
   type MissionCopy,
 } from "@/lib/lesson-copy";
 
-const STATUSES = new Set<LessonStatus>(["ready", "stub"]);
 const LABS = new Set<LabKind>(["none", "teleop", "goal"]);
 const KINDS = new Set<LaborKind>(["gerade", "drehung", "pfad", "teleop", "ziel"]);
 const KEY_LINE = /^[A-Za-z0-9_-]+$/;
@@ -22,7 +21,6 @@ export type LessonDraftMeta = {
   slug: string;
   title: string;
   summary: string;
-  status: LessonStatus;
   lab: LabKind;
   taughtTerms: string[];
 };
@@ -55,8 +53,6 @@ export function validateDraft(input: unknown): DraftResult<{ meta: LessonDraftMe
   if (!created.ok) return created;
   const id = cleanLine(record.id, 2);
   if (!id || !/^\d{2}$/.test(id)) return fail("Die Nummer muss zweistellig sein.");
-  const status = record.status;
-  if (!isStatus(status)) return fail("Der Status ist ungültig.");
   const lab = record.lab;
   if (!isLab(lab)) return fail("Die Twin-Art ist ungültig.");
   const terms = validateTerms(record.taughtTerms);
@@ -66,7 +62,7 @@ export function validateDraft(input: unknown): DraftResult<{ meta: LessonDraftMe
   return {
     ok: true,
     value: {
-      meta: { ...created.value, id, status, lab, taughtTerms: terms.value },
+      meta: { ...created.value, id, lab, taughtTerms: terms.value },
       copy: copy.value,
     },
   };
@@ -219,10 +215,6 @@ function cleanText(value: unknown, max: number): string | null {
   const text = value.replace(/\r\n/g, "\n").trim();
   if (text.length > max) return null;
   return text;
-}
-
-function isStatus(value: unknown): value is LessonStatus {
-  return typeof value === "string" && STATUSES.has(value as LessonStatus);
 }
 
 function isLab(value: unknown): value is LabKind {

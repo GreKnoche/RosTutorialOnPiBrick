@@ -26,7 +26,6 @@ export function storedLesson(lesson: Lesson): Lesson {
     id: lesson.id,
     slug: lesson.slug,
     title: lesson.title,
-    status: lesson.status,
     summary: lesson.summary,
     track: lesson.track,
     lab: lesson.lab,

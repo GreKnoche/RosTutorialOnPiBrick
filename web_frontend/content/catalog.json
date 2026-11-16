@@ -21,7 +21,6 @@
       "id": "01",
       "slug": "radumfang",
       "title": "Vom Rad zur Strecke – Radumfang verstehen",
-      "status": "stub",
       "summary": "",
       "track": "autonom",
       "lab": "none"
@@ -30,7 +29,6 @@
       "id": "02",
       "slug": "radabstand",
       "title": "Von zwei Rädern zur Drehung – Radabstand verstehen",
-      "status": "stub",
       "summary": "",
       "track": "autonom",
       "lab": "none",
@@ -40,7 +38,6 @@
       "id": "03",
       "slug": "odometrie",
       "title": "Odometrie – Wo glaubt der Roboter zu sein?",
-      "status": "stub",
       "summary": "",
       "track": "autonom",
       "lab": "none",
@@ -50,7 +47,6 @@
       "id": "04",
       "slug": "kalibrierung-drift",
       "title": "Kalibrierung und Drift – Warum stimmt die Pose nicht?",
-      "status": "stub",
       "summary": "Systematische Parameterfehler von zufälligem Schlupf unterscheiden und durch Testfahrten sichtbar machen.",
       "track": "autonom",
       "lab": "none"
@@ -59,7 +55,6 @@
       "id": "05",
       "slug": "gyroskop",
       "title": "Gyroskop – Orientierung zusätzlich beobachten",
-      "status": "stub",
       "summary": "Du vergleichst Odometrie und Gyro und findest den passenden Wechsel zwischen beiden Richtungen.",
       "track": "autonom",
       "lab": "none",
@@ -69,7 +64,6 @@
       "id": "07",
       "slug": "ultraschall",
       "title": "Ultraschall – Hindernisse in Fahrtrichtung erkennen",
-      "status": "stub",
       "summary": "Reichweite, Blickrichtung und Grenzen einer einfachen Abstandsmessung untersuchen.",
       "track": "autonom",
       "lab": "none"
@@ -78,7 +72,6 @@
       "id": "08",
       "slug": "schaetzen-regeln-reagieren",
       "title": "Abschluss – Schätzen, Regeln, Reagieren",
-      "status": "stub",
       "summary": "Odometrie, Gyroskop, Zielregelung und Ultraschall zu einer einfachen Autonomie-Schleife verbinden.",
       "track": "autonom",
       "lab": "none"
@@ -87,7 +80,6 @@
       "id": "00",
       "slug": "knoten",
       "title": "Knoten, Pakete und Arbeitsbereiche",
-      "status": "stub",
       "summary": "Den Aufbau eines ROS-2-Systems und die Aufgaben seiner Knoten kennenlernen.",
       "track": "ros",
       "lab": "none"
@@ -96,7 +88,6 @@
       "id": "01",
       "slug": "topics",
       "title": "Topics, Nachrichten und Dienstgüte",
-      "status": "stub",
       "summary": "Sensordaten und Fahrbefehle veröffentlichen, empfangen und zuverlässig übertragen.",
       "track": "ros",
       "lab": "teleop"
@@ -105,7 +96,6 @@
       "id": "02",
       "slug": "parameter",
       "title": "Parameter und Konfiguration",
-      "status": "stub",
       "summary": "Radmaße, Grenzwerte und weitere Einstellungen außerhalb des Programmcodes verwalten.",
       "track": "ros",
       "lab": "none"
@@ -114,7 +104,6 @@
       "id": "03",
       "slug": "launch",
       "title": "Systeme mit Launch-Dateien starten",
-      "status": "stub",
       "summary": "Mehrere Knoten gemeinsam und mit passenden Parametern starten.",
       "track": "ros",
       "lab": "none"
@@ -123,7 +112,6 @@
       "id": "04",
       "slug": "urdf-tf",
       "title": "Roboterbeschreibung mit URDF und TF",
-      "status": "stub",
       "summary": "Fahrgestell und Sensoren beschreiben und ihre Koordinatensysteme veröffentlichen.",
       "track": "ros",
       "lab": "none"
@@ -132,7 +120,6 @@
       "id": "05",
       "slug": "schnittstelle",
       "title": "Roboterschnittstelle mit /cmd_vel, /odom und /tf",
-      "status": "stub",
       "summary": "Fahrbefehle, Odometrie und Koordinatensysteme zu einer stabilen Schnittstelle verbinden.",
       "track": "ros",
       "lab": "teleop"
@@ -141,7 +128,6 @@
       "id": "06",
       "slug": "hardware-simulation",
       "title": "Hardware und Simulation austauschbar anbinden",
-      "status": "stub",
       "summary": "Dieselben ROS-Schnittstellen mit dem Raspberry Pi und mit Gazebo verwenden.",
       "track": "ros",
       "lab": "teleop"
@@ -150,7 +136,6 @@
       "id": "07",
       "slug": "dienste-aktionen",
       "title": "Dienste, Aktionen und Lebenszyklus",
-      "status": "ready",
       "summary": "Einmalige Anfragen, Aufgaben mit Rückmeldung und Knoten, die erst nach einem Zustandswechsel arbeiten.",
       "track": "ros",
       "lab": "none",

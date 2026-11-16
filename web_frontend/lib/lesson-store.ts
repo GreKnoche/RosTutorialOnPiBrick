@@ -34,7 +34,6 @@ export function createLesson(input: {
     slug: input.slug,
     title: input.title,
     summary: input.summary,
-    status: "stub",
     track: input.track,
     lab: "none",
   });
@@ -68,7 +67,6 @@ export function saveLesson(meta: LessonDraftMeta, copy: LessonCopy): { lesson: L
     slug: meta.slug,
     title: meta.title,
     summary: meta.summary,
-    status: meta.status,
     track: meta.track,
     lab: meta.lab,
     taughtTerms: meta.taughtTerms,

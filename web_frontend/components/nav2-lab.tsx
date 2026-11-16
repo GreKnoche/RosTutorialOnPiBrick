@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CityLab } from "@/components/city-lab";
 import { MissionPath } from "@/components/mission-path";
 import { NavGraph } from "@/components/nav-graph";
+import { Nav2ControlsTour, nav2TourPending, rememberNav2Tour } from "@/components/nav2-controls-tour";
 import {
   fillStationDefaults,
   readLessonText,
@@ -22,17 +23,26 @@ function plannerChecks(done: readonly string[]): string {
   return PLANNER_CLASSES.map((name) => `${plannerMark(name)}${done.includes(name) ? " ✓" : ""}`).join("\n");
 }
 
-export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
+export function Nav2Lab({
+  kapitel,
+  initialMission = null,
+}: {
+  kapitel: string | null;
+  initialMission?: MissionId | null;
+}) {
   const progress = useSyncExternalStore(subscribeDrafts, readNav2Progress, serverNav2Progress);
   const pluginDone = useSyncExternalStore(subscribeDrafts, readPluginPlanners, serverPluginPlanners);
   const done = progress.done;
   const runningId = progress.runningId;
   const started = runningId !== null;
-  const [picked, setPicked] = useState<MissionId | null>(null);
+  const [picked, setPicked] = useState<MissionId | null>(initialMission);
   const [round, setRound] = useState(0);
   const [driveBusy, setDriveBusy] = useState(false);
   const [spawnBoot, setSpawnBoot] = useState(0);
   const [runKey, setRunKey] = useState(0);
+  const [tourOpen, setTourOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const tourChecked = useRef(false);
   const driveRef = useRef<() => void>(() => {});
   const lastDoneId = [...MISSION_ORDER].reverse().find((id) => done[id]) ?? null;
   const stationId = runningId ?? picked ?? lastDoneId;
@@ -52,6 +62,17 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
     if (!graph) return;
     fillStationDefaults(graph.id, graph.defaults);
   }, [graph]);
+  useEffect(() => {
+    if (tourChecked.current) return;
+    tourChecked.current = true;
+    if (!nav2TourPending()) return;
+    setTourOpen(true);
+    if (!picked && !runningId && !lastDoneId) setPicked(MISSION_ORDER[0]);
+  }, [picked, runningId, lastDoneId]);
+  const closeTour = () => {
+    rememberNav2Tour();
+    setTourOpen(false);
+  };
   const finishRun = (completedId?: MissionId) => {
     const id = completedId ?? stationId;
     if (id) setPicked(id);
@@ -66,7 +87,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
     if (target?.kind) setRound((value) => value + 1);
   };
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+    <div ref={rootRef} className="relative">
+    <div className="grid items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]" inert={tourOpen ? true : undefined}>
       <MissionPath
         done={done}
         runningId={runningId}
@@ -105,11 +127,13 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           costmapToggle={stationId === "costmap" || stationId === "plugin" || done.costmap}
           pathToggle={
             stationId === "planner" ||
+            stationId === "einparken" ||
             stationId === "plugin" ||
             stationId === "bt-struktur" ||
             stationId === "bt-monitor" ||
             stationId === "costmap" ||
             done.planner ||
+            done.einparken ||
             done.plugin ||
             done["bt-struktur"] ||
             done["bt-monitor"] ||
@@ -168,6 +192,8 @@ export function Nav2Lab({ kapitel }: { kapitel: string | null }) {
           <NavGraph graph={graph} playRef={driveRef} onPlayBusy={setDriveBusy} />
         ) : null}
       </div>
+    </div>
+    {tourOpen ? <Nav2ControlsTour rootRef={rootRef} onClose={closeTour} /> : null}
     </div>
   );
 }

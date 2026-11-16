@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { GlossarySpoiler } from "@/components/glossary-spoiler";
 import { TrackPath } from "@/components/track-path";
@@ -44,10 +43,7 @@ export function LessonPage({
         <TrackPath lessons={lessons} currentId={lesson.id} />
         <div className="flex min-w-0 flex-col gap-6">
           <section className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
-              {lesson.status === "ready" ? <Badge variant="default">verfügbar</Badge> : null}
-            </div>
+            <span className="font-mono text-xs text-muted-foreground">{lesson.id}</span>
             <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
               {lesson.title}
             </h1>

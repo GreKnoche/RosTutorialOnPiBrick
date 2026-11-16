@@ -1,4 +1,3 @@
-export type LessonStatus = "ready" | "stub";
 export type LabKind = "teleop" | "goal" | "none";
 export type TrackId = "autonom" | "ros" | "nav2";
 
@@ -14,7 +13,6 @@ export type Lesson = {
   id: string;
   slug: string;
   title: string;
-  status: LessonStatus;
   summary: string;
   track: TrackId;
   lab: LabKind;

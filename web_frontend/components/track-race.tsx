@@ -12,13 +12,6 @@ const BODY_L = 68;
 const BODY_W = 44;
 const tracks = curriculumOutline().map((item) => item.track);
 
-const BLURBS: Record<TrackId, string> = {
-  autonom:
-    "Fahrzeugmodell, Räder und Kinematik, dazu Sensorik und die ersten eigenen Fahrmanöver, noch vor ROS 2.",
-  ros: "Knoten, Topics, Parameter und die Roboterbeschreibung, mit der der EV3 an das System angebunden wird.",
-  nav2: "Nav2 steuert die Fahrt über einen Verhaltensbaum.",
-};
-
 function drawAsphalt(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
   const roadH = 58;
   const top = y - roadH / 2;
@@ -243,7 +236,6 @@ export function TrackRace() {
               <PathIcon id={track.id} />
               {track.title}
             </span>
-            <span className="mt-2 block text-base text-muted-foreground">{BLURBS[track.id]}</span>
           </button>
         ))}
         <Link

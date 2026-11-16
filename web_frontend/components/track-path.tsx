@@ -10,7 +10,7 @@ import type { TrackId } from "@/lib/types";
 
 const START_STEP: PathStep = { id: "start", title: "Start" };
 
-const TRACK_PATH_COLORS: Record<TrackId, PathColors> = {
+export const TRACK_PATH_COLORS: Record<TrackId, PathColors> = {
   autonom: {
     fill: TRACK_CAR.autonom,
     shade: "#9a1420",
@@ -37,7 +37,7 @@ const TRACK_PATH_COLORS: Record<TrackId, PathColors> = {
   },
 };
 
-function pathLabel(slug: string) {
+export function pathLabel(slug: string) {
   const spaced = slug.replaceAll("-", " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

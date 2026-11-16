@@ -12,7 +12,7 @@ import {
   type LessonSectionCopy,
   type MissionCopy,
 } from "@/lib/lesson-copy";
-import type { LabKind, Lesson, LessonStatus } from "@/lib/types";
+import type { LabKind, Lesson } from "@/lib/types";
 
 const field =
   "w-full rounded-md bg-background px-2 py-1.5 text-sm ring-1 ring-foreground/15";
@@ -29,7 +29,6 @@ export function LessonEditor({
   const router = useRouter();
   const [title, setTitle] = useState(lesson.title);
   const [summary, setSummary] = useState(lesson.summary);
-  const [status, setStatus] = useState<LessonStatus>(lesson.status);
   const [lab, setLab] = useState<LabKind>(lesson.lab);
   const [termsText, setTermsText] = useState((lesson.taughtTerms ?? []).join(", "));
   const [copy, setCopy] = useState(initialCopy);
@@ -48,7 +47,6 @@ export function LessonEditor({
         slug: lesson.slug,
         title,
         summary,
-        status,
         lab,
         taughtTerms: termsText
           .split(",")
@@ -70,7 +68,6 @@ export function LessonEditor({
     }
     setTitle(payload.lesson.title);
     setSummary(payload.lesson.summary);
-    setStatus(payload.lesson.status);
     setLab(payload.lesson.lab);
     setTermsText((payload.lesson.taughtTerms ?? []).join(", "));
     setCopy(payload.copy);
@@ -118,31 +115,18 @@ export function LessonEditor({
           <span>Kurztext</span>
           <textarea className={field} rows={3} value={summary} onChange={(event) => setSummary(event.target.value)} />
         </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm">
-            <span>Status</span>
-            <select
-              className={field}
-              value={status}
-              onChange={(event) => setStatus(event.target.value === "ready" ? "ready" : "stub")}
-            >
-              <option value="stub">in Arbeit</option>
-              <option value="ready">verfügbar</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span>Twin ohne Baustein</span>
-            <select
-              className={field}
-              value={lab}
-              onChange={(event) => setLab(event.target.value === "teleop" || event.target.value === "goal" ? event.target.value : "none")}
-            >
-              <option value="none">keine eigene Fahrt</option>
-              <option value="teleop">Tastatur</option>
-              <option value="goal">Zielpose</option>
-            </select>
-          </label>
-        </div>
+        <label className="grid gap-1 text-sm">
+          <span>Twin ohne Baustein</span>
+          <select
+            className={field}
+            value={lab}
+            onChange={(event) => setLab(event.target.value === "teleop" || event.target.value === "goal" ? event.target.value : "none")}
+          >
+            <option value="none">keine eigene Fahrt</option>
+            <option value="teleop">Tastatur</option>
+            <option value="goal">Zielpose</option>
+          </select>
+        </label>
         <label className="grid gap-1 text-sm">
           <span>Fachbegriffe, durch Komma getrennt</span>
           <input className={field} value={termsText} onChange={(event) => setTermsText(event.target.value)} />

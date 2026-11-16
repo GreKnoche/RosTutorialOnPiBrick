@@ -21,6 +21,7 @@ import {
   clampZoom,
   lookForTopRight,
 } from "@/lib/city-view";
+import { useDebugAdmin } from "@/lib/debug-admin";
 import { formatDe } from "@/lib/format";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
@@ -284,7 +285,10 @@ export function CityLab({
   const stoppingRef = useRef(false);
   const logRef = useRef<HTMLPreElement>(null);
   const [mapUp, setMapUp] = useState(false);
+  const admin = useDebugAdmin();
   const [drift, setDrift] = useState(false);
+  const driftRef = useRef(false);
+  driftRef.current = drift;
   const [camera, setCamera] = useState(false);
   const [rays, setRays] = useState(false);
   const raysRef = useRef(false);
@@ -879,6 +883,17 @@ export function CityLab({
     placeAt(spawn);
   }, [spawnBoot, rosUp, spawn]);
 
+  useEffect(() => {
+    if (admin || !driftRef.current) return;
+    setDrift(false);
+    linkRef.current?.send({
+      type: "flags",
+      client: sessionRef.current,
+      drift: false,
+      camera: cameraRef.current,
+    });
+  }, [admin]);
+
   const sendFlags = (nextDrift: boolean, nextCamera: boolean) => {
     cameraRef.current = nextCamera;
     linkRef.current?.send({
@@ -1127,6 +1142,7 @@ export function CityLab({
         </div>
         <Button
           type="button"
+          data-tour="center"
           aria-label="Auf das Auto zentrieren"
           className="absolute right-3 bottom-3 size-9 px-0"
           onClick={recenter}
@@ -1136,18 +1152,20 @@ export function CityLab({
       </div>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <FlagBox
-              on={drift}
-              disabled={!rosUp}
-              onToggle={() => {
-                const next = !drift;
-                setDrift(next);
-                sendFlags(next, camera);
-              }}
-            >
-              Drift
-            </FlagBox>
+          <div data-tour="toggles" className="flex flex-wrap items-center gap-2">
+            {admin ? (
+              <FlagBox
+                on={drift}
+                disabled={!rosUp}
+                onToggle={() => {
+                  const next = !drift;
+                  setDrift(next);
+                  sendFlags(next, camera);
+                }}
+              >
+                Drift
+              </FlagBox>
+            ) : null}
             <FlagBox on={rays} onToggle={() => setRays((current) => !current)}>
               Lidar-Strahlen
             </FlagBox>
@@ -1156,7 +1174,7 @@ export function CityLab({
               title="Zeichnet das Auto größer als in echt, damit es beim Herauszoomen sichtbar bleibt. Aus zeigt die echte Größe."
               onToggle={() => setMinBody((current) => !current)}
             >
-              Vergrößert
+              Auto vergrößert
             </FlagBox>
             {costmapToggle ? (
               <FlagBox
@@ -1197,6 +1215,7 @@ export function CityLab({
           {onPlay ? (
             <button
               type="button"
+              data-tour="play"
               aria-label={showStop ? "Nav2 stoppen" : "Code abspielen"}
               autoComplete="off"
               onClick={() => {

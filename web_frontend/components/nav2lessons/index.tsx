@@ -3,6 +3,7 @@ import btMonitor from "./bt-monitor";
 import btStruktur from "./bt-struktur";
 import controller from "./controller";
 import costmap from "./costmap";
+import einparken from "./einparken";
 import folgen from "./folgen";
 import planner from "./planner";
 import plugin from "./plugin";
@@ -25,7 +26,7 @@ function shown(station: Nav2Station): Nav2Station {
 }
 
 /** Road order, without the driveway. */
-export const STATIONS: Nav2Station[] = [folgen, controller, costmap, planner, plugin, btStruktur, btMonitor].map(shown);
+export const STATIONS: Nav2Station[] = [folgen, controller, costmap, planner, einparken, plugin, btStruktur, btMonitor].map(shown);
 
 for (const station of STATIONS) {
   for (const field of station.fields) {

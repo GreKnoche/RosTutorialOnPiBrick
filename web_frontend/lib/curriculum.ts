@@ -6,7 +6,6 @@ export type {
   Curriculum,
   LabKind,
   Lesson,
-  LessonStatus,
   TrackId,
   TrackMeta,
 } from "@/lib/types";

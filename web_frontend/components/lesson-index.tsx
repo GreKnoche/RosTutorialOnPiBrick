@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { TwinStamp } from "@/components/logo-mark";
 import { useCompletedKeys } from "@/components/lesson-progress";
 import { lessonHref, type Lesson } from "@/lib/curriculum";
@@ -33,7 +32,6 @@ function LessonRow({
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">{lesson.summary}</span>
         </span>
         {done && stampDone ? <TwinStamp /> : null}
-        {lesson.status === "ready" ? <Badge variant="default">verfügbar</Badge> : null}
       </Link>
     </li>
   );

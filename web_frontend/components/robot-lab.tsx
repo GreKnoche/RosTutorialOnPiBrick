@@ -910,16 +910,6 @@ function draw(
           : "Klicken, um ein Ziel zu setzen"
         : "Nur Roboterschnittstelle — keine Steuerung";
   ctx.fillText(hint, 14, height - 16);
-
-  if (lab === "none" && !rulerMode && !turnMode && !pathMode) {
-    ctx.fillStyle = "rgba(8,10,14,0.45)";
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "rgba(255,255,255,0.88)";
-    ctx.font = `${Math.max(13, ppm * 0.04)}px ui-sans-serif, system-ui`;
-    ctx.textAlign = "center";
-    ctx.fillText("Lektion in Arbeit — Roboterschnittstelle unverändert", width / 2, height / 2);
-    ctx.textAlign = "start";
-  }
 }
 
 function drawWaypoints(

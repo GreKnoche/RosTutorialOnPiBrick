@@ -56,14 +56,13 @@ Damit reicht es, wenn das Kapitel noch keine eigene Fahrt hat.
   "id": "09",
   "slug": "neue-lektion",
   "title": "Titel der Lektion",
-  "status": "stub",
   "summary": "Ein Satz direkt unter der Überschrift.",
   "track": "autonom",
   "lab": "none"
 }
 ```
 
-`status: "ready"` setzt das Kennzeichen „verfügbar“. `"stub"` lässt es weg. Die Reihenfolge im Array ist die Reihenfolge im Lernpfad.
+Die Reihenfolge im Array ist die Reihenfolge im Lernpfad.
 
 2. Die Datei `content/autonom/09-neue-lektion/copy.ts` anlegen. Der Ordner heißt immer `<id>-<slug>`. Das Studio schreibt dieselbe Datei.
 

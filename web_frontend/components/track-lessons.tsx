@@ -1,5 +1,5 @@
+import type { ReactNode } from "react";
 import { PathIcon } from "@/components/path-icon";
-import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { TrackPath } from "@/components/track-path";
 import { readCatalog } from "@/lib/catalog-file";
@@ -13,14 +13,15 @@ import {
 export function TrackLessons({
   trackId,
   kicker,
+  children,
 }: {
   trackId: TrackId;
   kicker: string;
+  children?: ReactNode;
 }) {
   const catalog = readCatalog();
   const track = getTrackMeta(trackId, catalog);
   const lessons = lessonsForTrack(trackId, catalog);
-  const ready = lessons.filter((lesson) => lesson.status === "ready").length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,14 +37,17 @@ export function TrackLessons({
         {track?.description ? (
           <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">{track.description}</p>
         ) : null}
-        {lessons.length > 0 ? (
-          <div className="flex flex-wrap gap-2 text-sm">
-            {ready > 0 && <Badge variant="default">{ready} Lektionen verfügbar</Badge>}
-            <Badge variant="outline">{lessons.length - ready} Lektionen in Arbeit</Badge>
-          </div>
-        ) : null}
       </section>
-      {lessons.length > 0 ? <TrackPath lessons={lessons} /> : null}
+      {lessons.length > 0 ? (
+        children ? (
+          <div className="grid items-start gap-8 lg:grid-cols-[auto_minmax(0,1fr)]">
+            <TrackPath lessons={lessons} />
+            <div className="flex min-w-0 flex-col gap-6 pt-3">{children}</div>
+          </div>
+        ) : (
+          <TrackPath lessons={lessons} />
+        )
+      ) : null}
     </div>
   );
 }
