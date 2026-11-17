@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Republish Gazebo IMU onto /imu, with optional yaw-rate bias.
 
-IMU truth stays on /imu/perfect. Companion owns /odom and TF odom -> base_link.
+IMU truth stays on /imu/perfect. The compare launch publishes TF from /odom/perfect.
 """
 
 from __future__ import annotations

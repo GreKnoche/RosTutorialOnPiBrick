@@ -30,6 +30,7 @@ py-modules = [
     "city_scene",
     "drive",
     "main",
+    "nav_lab",
     "robot_tf",
     "twin",
     "twin_ros",

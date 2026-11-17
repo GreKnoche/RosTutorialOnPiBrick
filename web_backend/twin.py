@@ -52,6 +52,7 @@ class TwinSample:
     busy: bool = False
     generation: int = 0
     owner: str | None = None
+    mode: str = "idle"
     left_rad: float = 0.0
     right_rad: float = 0.0
 
@@ -110,6 +111,7 @@ class CanvasPlant:
         self.owner: str | None = None
         self.drive_seq: object = None
         self._mode = "idle"
+        self.quiet_cmd = False
         self._hold = Twist2D()
         self._queue: list[Segment] = []
         self._left = 0.0
@@ -149,6 +151,7 @@ class CanvasPlant:
         self.goal = None
         self.reached = False
         self._mode = "idle"
+        self.quiet_cmd = False
         self._hold = Twist2D()
         self._queue = []
         self._left = 0.0
@@ -243,6 +246,7 @@ class CanvasPlant:
         self.lap.reset(pose.x, pose.y, home)
 
     def command_twist(self, linear: float, angular: float) -> None:
+        self.quiet_cmd = False
         self._mode = "teleop"
         self._queue = []
         self._left = 0.0
@@ -254,6 +258,7 @@ class CanvasPlant:
         self.command = Twist2D(float(linear), float(angular))
 
     def command_goal(self, x: float, y: float, theta: float) -> None:
+        self.quiet_cmd = False
         self._queue = []
         self._left = 0.0
         self._mode = "goal"
@@ -265,6 +270,7 @@ class CanvasPlant:
         self, paths_m: list[tuple[float, float]], jump: bool = False
     ) -> list[Pose2D] | None:
         """Start a path. A returned list means it already finished (jump or empty)."""
+        self.quiet_cmd = True
         self.reached = False
         self.goal = None
         start = self._pose()
@@ -278,6 +284,7 @@ class CanvasPlant:
         return None
 
     def cancel(self) -> None:
+        self.quiet_cmd = False
         self._mode = "idle"
         self._queue = []
         self._left = 0.0
@@ -368,6 +375,7 @@ class CanvasPlant:
             busy=self._mode in {"drive", "goal"},
             generation=self.generation,
             owner=self.owner,
+            mode=self._mode,
             left_rad=self.left_rad,
             right_rad=self.right_rad,
         )
@@ -520,6 +528,7 @@ def sample_dict(sample: TwinSample) -> dict[str, object]:
         "busy": sample.busy,
         "generation": sample.generation,
         "owner": sample.owner,
+        "mode": sample.mode,
     }
 
 
@@ -667,6 +676,18 @@ class TwinHub:
                 view.update(props)
             self._city_view = view
 
+    def touch_city(self, applied_linear: float, applied_angular: float, props: dict[str, object]) -> None:
+        """Refresh twist and lap without rebuilding the scan."""
+        with self._lock:
+            if not self._city_view:
+                return
+            view = dict(self._city_view)
+            view["applied_linear"] = applied_linear
+            view["applied_angular"] = applied_angular
+            if props:
+                view.update(props)
+            self._city_view = view
+
     def store_costmap(self, packet: dict[str, object] | None) -> None:
         """Keep the latest grid. None tells the page the previous picture is stale."""
         with self._lock:
@@ -706,6 +727,17 @@ class TwinHub:
             if clutter is not None:
                 view["clutter"] = clutter
             view.pop("image", None)
+            if props:
+                view.update(props)
+            self._free_view = view
+
+    def touch_free(self, applied_linear: float, applied_angular: float, props: dict[str, object]) -> None:
+        with self._lock:
+            if not self._free_view:
+                return
+            view = dict(self._free_view)
+            view["applied_linear"] = applied_linear
+            view["applied_angular"] = applied_angular
             if props:
                 view.update(props)
             self._free_view = view

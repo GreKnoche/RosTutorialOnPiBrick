@@ -253,3 +253,48 @@ def test_obstacle_cloud_is_an_odom_pointcloud() -> None:
     assert math.isclose(x, 1.25)
     assert math.isclose(y, 2.5)
     assert math.isclose(z, 0.5)
+
+
+def test_a_slow_scan_does_not_stall_odom(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("sensor_msgs.msg")
+    monkeypatch.setenv("ROS_DOMAIN_ID", "93")
+    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
+    if rclpy.ok():
+        pytest.skip("rclpy is already running")
+
+    rclpy.init()
+    twin: CanvasTwinNode | None = None
+    listener: Node | None = None
+    executor: SingleThreadedExecutor | None = None
+    try:
+        twin = CanvasTwinNode(TwinHub())
+        listener = Node("hear_odom_while_scanning")
+        poses: list[float] = []
+        listener.create_subscription(Odometry, "odom", lambda msg: poses.append(float(msg.pose.pose.position.x)), 10)
+        executor = SingleThreadedExecutor()
+        executor.add_node(twin)
+        executor.add_node(listener)
+        twin.submit({"type": "city", "enter": True, "client": "labor"})
+        city = twin.plant.city
+        assert city is not None
+        original = city.scan
+
+        def slow(x: float, y: float, theta: float) -> list[float]:
+            time.sleep(0.2)
+            return original(x, y, theta)
+
+        city.scan = slow  # type: ignore[method-assign]
+        poses.clear()
+        deadline = time.monotonic() + 0.6
+        while time.monotonic() < deadline:
+            executor.spin_once(timeout_sec=0.05)
+        assert len(poses) >= 7
+    finally:
+        if executor is not None:
+            executor.shutdown()
+        if listener is not None:
+            listener.destroy_node()
+        if twin is not None:
+            twin.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

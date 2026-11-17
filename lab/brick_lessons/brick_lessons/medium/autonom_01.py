@@ -17,7 +17,7 @@ KEY = "autonom_01"
 
 # Dieselben Größen wie die Slider im Modus Touring. Strecke = Umdrehungen * Radumfang.
 RADUMFANG_CM = 17.4
-UMDREHUNGEN = 1.0
+UMDREHUNGEN = 4.5
 
 
 class LessonClient(Node):

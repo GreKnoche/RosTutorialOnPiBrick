@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-ros-gz-bridge \
     ros-jazzy-sdformat-urdf \
     ros-jazzy-teleop-twist-keyboard \
+    ros-jazzy-nav2-map-server \
+    ros-jazzy-nav2-lifecycle-manager \
     python3-colcon-common-extensions \
     python3-opencv \
     python3-yaml \
@@ -18,11 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /ws
 COPY gazebo/src /ws/src
 COPY shared/brick_math /ws/src/brick_math
-COPY companion/src/brick_core /ws/src/brick_core
-COPY companion/src/brick_interfaces /ws/src/brick_interfaces
+COPY brick/brick_core /ws/src/brick_core
+COPY brick/brick_interfaces /ws/src/brick_interfaces
 COPY camera_lidar /ws/src/camera_lidar
 
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/ros/jazzy/setup.bash && colcon build --symlink-install
 
-CMD ["bash", "-lc", "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && ros2 launch brick_gz_bringup sim.launch.py"]
+CMD ["bash", "-lc", "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && ros2 launch brick_gz_bringup compare.launch.py"]

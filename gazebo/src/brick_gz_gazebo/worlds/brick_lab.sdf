@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<!-- Empty tabletop with the EV3 driving base. Same ROS contract as companion/pi-brick. -->
+<!-- Empty tabletop with the EV3 driving base. Same ROS contract as the Pi. -->
 <sdf version="1.11">
   <world name="brick_lab">
     <physics name="1ms" type="ignored">

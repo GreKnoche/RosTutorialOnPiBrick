@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withCityObstacles } from "@/lib/city-costmap";
@@ -10,6 +10,10 @@ import { followerError, mergeFollower } from "@/lib/follower-yaml";
 import { mergePlugin, mergePluginParams, mergeSmac, plannerClass, pluginError, pluginParamsError, smacError } from "@/lib/planner-yaml";
 
 export const runtime = "nodejs";
+
+function robotApi(): string {
+  return process.env.NEXT_PUBLIC_ROBOT_API || process.env.ROBOT_API || "http://127.0.0.1:8000";
+}
 
 const MAX_TEXT = 100_000;
 const LOG_LIMIT = 4_000;
@@ -68,11 +72,11 @@ function sh(text: string): string {
 }
 
 function rosPrelude(): string {
-  const hostSetup = path.resolve(process.cwd(), "..", "companion/install/setup.bash");
+  const hostSetup = path.resolve(process.cwd(), "..", "install/setup.bash");
   return [
     "source /opt/ros/jazzy/setup.bash",
-    "if [ -f /ws/companion/install/setup.bash ]; then",
-    "  source /ws/companion/install/setup.bash",
+    "if [ -f /ws/install/setup.bash ]; then",
+    "  source /ws/install/setup.bash",
     `elif [ -f ${sh(hostSetup)} ]; then`,
     `  source ${sh(hostSetup)}`,
     "fi",
@@ -133,11 +137,11 @@ async function writeText(file: string, text: string) {
 }
 
 function missionFile(): string {
-  return path.resolve(process.cwd(), "..", "companion/src/brick_nav/behavior_trees/mission.xml");
+  return path.resolve(process.cwd(), "..", "lab/brick_nav/behavior_trees/mission.xml");
 }
 
 function throughFile(): string {
-  return path.resolve(process.cwd(), "..", "companion/src/brick_nav/behavior_trees/through_poses.xml");
+  return path.resolve(process.cwd(), "..", "lab/brick_nav/behavior_trees/through_poses.xml");
 }
 
 function stockParams(): string {
@@ -300,12 +304,6 @@ function treeOf(value: unknown): string | null {
   return value.endsWith("\n") ? value : `${value}\n`;
 }
 
-function push(target: "studentLog" | "navLog", chunk: Buffer | string) {
-  const text = chunk.toString();
-  slot[target] = (slot[target] + text).slice(-LOG_LIMIT);
-  if (target === "studentLog" && slot.studentLog.trim()) slot.starting = false;
-  if (target === "navLog" && slot.navRun) slot.navRunLog = (slot.navRunLog + text).slice(-LOG_LIMIT);
-}
 
 function rosBash(command: string, limit = LOG_LIMIT): Promise<{ code: number; out: string }> {
   return new Promise((resolve) => {
@@ -319,224 +317,6 @@ function rosBash(command: string, limit = LOG_LIMIT): Promise<{ code: number; ou
     });
     child.once("close", (code) => resolve({ code: code ?? 1, out }));
   });
-}
-
-function cmdline(pid: number): string {
-  try {
-    return readFileSync(`/proc/${pid}/cmdline`).toString("utf8").replaceAll("\0", " ");
-  } catch {
-    return "";
-  }
-}
-
-function processGroup(pid: number): number | null {
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const end = stat.lastIndexOf(")");
-    if (end < 0) return null;
-    const group = Number(stat.slice(end + 2).split(" ")[2]);
-    return Number.isInteger(group) && group > 1 ? group : null;
-  } catch {
-    return null;
-  }
-}
-
-function labNavPids(): number[] {
-  let names: string[] = [];
-  try {
-    names = readdirSync("/proc");
-  } catch {
-    return [];
-  }
-  const found: number[] = [];
-  for (const name of names) {
-    if (!/^\d+$/.test(name)) continue;
-    const pid = Number(name);
-    if (pid === process.pid) continue;
-    const args = cmdline(pid);
-    if (args.includes("student_nav.launch.py") || args.includes(`${path.sep}.student${path.sep}nav2_params.yaml`)) {
-      found.push(pid);
-    }
-  }
-  return found;
-}
-
-function signalGroups(signal: NodeJS.Signals) {
-  const own = processGroup(process.pid);
-  const groups = new Set<number>();
-  for (const pid of labNavPids()) {
-    const group = processGroup(pid);
-    if (group == null || group === own) {
-      try {
-        process.kill(pid, signal);
-      } catch {
-        /* already gone */
-      }
-      continue;
-    }
-    if (groups.has(group)) continue;
-    groups.add(group);
-    try {
-      process.kill(-group, signal);
-    } catch {
-      try {
-        process.kill(pid, signal);
-      } catch {
-        /* already gone */
-      }
-    }
-  }
-}
-
-function signalGroup(child: ChildProcess | null, signal: NodeJS.Signals) {
-  if (!child || child.pid == null || child.exitCode !== null) return;
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
-    child.kill(signal);
-  }
-}
-
-function waitExit(child: ChildProcess, ms: number): Promise<boolean> {
-  if (child.exitCode !== null) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(child.exitCode !== null), ms);
-    child.once("exit", () => {
-      clearTimeout(timer);
-      resolve(true);
-    });
-  });
-}
-
-async function stopProcess(child: ChildProcess | null) {
-  if (!child || child.exitCode !== null) return;
-  signalGroup(child, "SIGINT");
-  if (await waitExit(child, 4000)) return;
-  signalGroup(child, "SIGKILL");
-  await waitExit(child, 2000);
-}
-
-async function stopLabNav() {
-  await stopProcess(slot.nav);
-  signalGroups("SIGINT");
-  const polite = Date.now() + 4_000;
-  while (labNavPids().length > 0 && Date.now() < polite) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  if (labNavPids().length === 0) return;
-  signalGroups("SIGKILL");
-  const hard = Date.now() + 2_000;
-  while (labNavPids().length > 0 && Date.now() < hard) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-}
-
-function watch(child: ChildProcess, target: "studentLog" | "navLog", gen: number | null) {
-  const onData = (chunk: Buffer) => {
-    if (gen !== null && gen !== slot.studentGen) return;
-    push(target, chunk);
-  };
-  child.stdout?.on("data", onData);
-  child.stderr?.on("data", onData);
-}
-
-function endNavRun() {
-  slot.navRun = false;
-}
-
-async function stopStudent() {
-  slot.studentGen += 1;
-  const child = slot.student;
-  slot.student = null;
-  endNavRun();
-  await stopProcess(child);
-}
-
-function startGroup(command: string): ChildProcess {
-  return spawn("bash", ["-c", command], {
-    env: process.env,
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-}
-
-function graphProbe(kind: "active" | "navigator"): string {
-  const setup =
-    kind === "active"
-      ? ["from std_srvs.srv import Trigger", "client = node.create_client(Trigger, '/lifecycle_manager_navigation/is_active')"].join(
-          "\n",
-        )
-      : "";
-  const step =
-    kind === "active"
-      ? [
-          "if client.service_is_ready():",
-          "    future = client.call_async(Trigger.Request())",
-          "    rclpy.spin_until_future_complete(node, future, timeout_sec=0.4)",
-          "    result = future.result() if future.done() else None",
-          "    found = bool(result and result.success)",
-          "else:",
-          "    rclpy.spin_once(node, timeout_sec=0.2)",
-        ].join("\n")
-      : [
-          "rclpy.spin_once(node, timeout_sec=0.2)",
-          "nodes = node.get_node_names_and_namespaces()",
-          'found = any(ns.rstrip("/") + "/" + name == "/bt_navigator" for name, ns in nodes)',
-        ].join("\n");
-  const mark = kind === "active" ? "NAV_READY" : "NAV_UP";
-  return [
-    "python3 - <<'PY'",
-    "import time",
-    "import rclpy",
-    "from rclpy.node import Node",
-    "rclpy.init()",
-    "node = Node('nav_ready_probe')",
-    setup,
-    "found = False",
-    "deadline = time.time() + 1.2",
-    "while time.time() < deadline and not found:",
-    ...step.split("\n").map((line) => `    ${line}`),
-    `print('${mark}' if found else 'NAV_WAIT')`,
-    "node.destroy_node()",
-    "rclpy.shutdown()",
-    "PY",
-  ].join("\n");
-}
-
-function probeHit(out: string, mark: string): boolean {
-  return out.split("\n").some((line) => line.trim() === mark);
-}
-
-async function navReady(child: ChildProcess, gen: number): Promise<boolean> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (slot.startGen !== gen || child.exitCode !== null) return false;
-    const info = await rosBash(graphProbe("active"));
-    if (slot.startGen !== gen || child.exitCode !== null) return false;
-    if (probeHit(info.out, "NAV_READY")) return true;
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  return false;
-}
-
-async function navigatorGone(gen: number): Promise<"gone" | "up" | "aborted"> {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (slot.startGen !== gen) return "aborted";
-    const listed = await rosBash(graphProbe("navigator"));
-    if (slot.startGen !== gen) return "aborted";
-    if (!probeHit(listed.out, "NAV_UP")) return "gone";
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  if (slot.startGen !== gen) return "aborted";
-  const listed = await rosBash(graphProbe("navigator"));
-  return probeHit(listed.out, "NAV_UP") ? "up" : "gone";
-}
-
-function liveLabNav(navKey: string): boolean {
-  const child = slot.nav;
-  if (!child || child.exitCode !== null || child.pid == null || slot.navKey !== navKey) return false;
-  return cmdline(child.pid).includes("student_nav.launch.py");
 }
 
 function pluginWorkspace(): string {
@@ -631,75 +411,6 @@ async function buildBtPlugin(source: string, hash: string): Promise<string | nul
   return null;
 }
 
-async function ensureNav(
-  navKey: string,
-  posePath: string,
-  throughPath: string,
-  paramsPath: string,
-  withFollower: boolean,
-  pluginLibs: string[],
-  needPluginWs: boolean,
-  gen: number,
-): Promise<string | null> {
-  if (slot.startGen !== gen) return "Nav2 gestoppt.";
-  if (liveLabNav(navKey)) return null;
-  await stopLabNav();
-  slot.nav = null;
-  slot.navKey = "";
-  slot.navLog = "";
-  slot.navRunLog = "";
-  if (slot.startGen !== gen) return "Nav2 gestoppt.";
-  const gone = await navigatorGone(gen);
-  if (gone === "aborted" || slot.startGen !== gen) return "Nav2 gestoppt.";
-  if (gone === "up") {
-    return "Nav2 läuft schon ohne diese XML. Beende den anderen Stack und starte noch einmal.";
-  }
-  const launch = path.join(process.cwd(), "scripts", "student_nav.launch.py");
-  const pluginSetup = path.join(pluginWorkspace(), "install", "setup.bash");
-  const libs = pluginLibs.join(":");
-  const pluginArg = libs ? ` plugin_lib_names:=${sh(libs)}` : "";
-  const command = [
-    rosPrelude(),
-    needPluginWs ? `source ${sh(pluginSetup)}` : "",
-    `exec ros2 launch ${sh(launch)} pose_xml:=${sh(posePath)} through_xml:=${sh(throughPath)} cache_dir:=${sh(cacheDir())} params_file:=${sh(paramsPath)} with_follower:=${withFollower ? "true" : "false"}${pluginArg}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  const child = startGroup(command);
-  slot.nav = child;
-  watch(child, "navLog", null);
-  child.once("exit", () => {
-    if (slot.nav === child) {
-      slot.nav = null;
-      slot.navKey = "";
-    }
-  });
-  if (!(await navReady(child, gen))) {
-    const log = slot.navLog.trim();
-    await stopProcess(child);
-    if (slot.nav === child) slot.nav = null;
-    if (slot.startGen !== gen) return "Nav2 gestoppt.";
-    return log || "Nav2 ist nicht hochgekommen.";
-  }
-  if (slot.startGen !== gen) {
-    await stopProcess(child);
-    if (slot.nav === child) slot.nav = null;
-    return "Nav2 gestoppt.";
-  }
-  slot.navKey = navKey;
-  return null;
-}
-
-function exitWithin(child: ChildProcess, ms: number): Promise<number | null> {
-  if (child.exitCode !== null) return Promise.resolve(child.exitCode);
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      resolve(code);
-    });
-  });
-}
 
 function stopStarting(gen: number) {
   if (slot.startGen === gen) slot.starting = false;
@@ -728,7 +439,6 @@ async function runStudent(
   }
   const gen = ++slot.startGen;
   slot.starting = true;
-  await stopStudent();
   if (slot.startGen !== gen || slot.stops !== stopMark) {
     stopStarting(gen);
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
@@ -792,105 +502,69 @@ async function runStudent(
   const needPluginWs = plugin !== null || btPlugin !== null;
   const paramsBytes = await readFile(params.file, "utf8");
   const navKey = `${createHash("sha256").update(pose).digest("hex")}:${createHash("sha256").update(through).digest("hex")}:${pluginHash}:${btHash}:${createHash("sha256").update(paramsBytes).digest("hex")}:${withFollower ? "1" : "0"}:${pluginLibs.join(",")}`;
-  const navError = await ensureNav(navKey, posePath, throughPath, params.file, withFollower, pluginLibs, needPluginWs, gen);
   if (slot.startGen !== gen || slot.stops !== stopMark) {
     stopStarting(gen);
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
   }
-  if (navError) {
-    stopStarting(gen);
-    return { ok: false as const, error: navError };
+  const pluginSetup = needPluginWs ? path.join(pluginWorkspace(), "install", "setup.bash") : "";
+  let payload: { ok?: boolean; aborted?: boolean; error?: string; running?: boolean; log?: string } | null = null;
+  try {
+    const response = await fetch(`${robotApi()}/nav/run`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        student: sourcePath,
+        params_file: params.file,
+        pose_xml: posePath,
+        through_xml: throughPath,
+        cache_dir: dir,
+        nav_key: navKey,
+        plugin_setup: pluginSetup,
+        plugin_libs: pluginLibs,
+        with_follower: withFollower,
+      }),
+    });
+    payload = (await response.json()) as { ok?: boolean; aborted?: boolean; error?: string; running?: boolean; log?: string };
+  } catch {
+    payload = null;
   }
-  const studentGen = slot.studentGen;
-  slot.navRunLog = "";
-  slot.navRun = true;
-  const child = startGroup([rosPrelude(), `exec python3 -u ${sh(sourcePath)}`].join("\n"));
-  slot.student = child;
-  watch(child, "studentLog", studentGen);
-  child.once("exit", () => {
-    if (slot.student === child) slot.student = null;
-    endNavRun();
-    stopStarting(gen);
-  });
-  const early = await exitWithin(child, 1500);
   if (slot.startGen !== gen || slot.stops !== stopMark) {
     stopStarting(gen);
+    void fetch(`${robotApi()}/nav/run`, { method: "DELETE" }).catch(() => {});
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
   }
-  if (early !== null && early !== 0) {
-    if (slot.student === child) slot.student = null;
-    endNavRun();
+  if (!payload || !payload.ok) {
     stopStarting(gen);
-    return { ok: false as const, error: slot.studentLog.trim() || "Der Knoten ist sofort beendet." };
+    if (payload?.aborted) {
+      return { ok: false as const, aborted: true as const, error: payload.error || "Nav2 gestoppt." };
+    }
+    return { ok: false as const, error: payload?.error || "Nav2 ist nicht hochgekommen." };
   }
-  if (slot.studentLog.trim()) stopStarting(gen);
-  return { ok: true as const, running: early === null, log: slot.studentLog.trim() };
-}
-
-function navErrors(): string {
-  return slot.navRunLog
-    .split("\n")
-    .filter((line) => /\[ERROR\]|\[FATAL\]/.test(line))
-    .slice(-8)
-    .join("\n")
-    .trim();
-}
-
-async function zeroTwist() {
-  await rosBash(
-    [
-      "python3 - <<'PY'",
-      "import random",
-      "import time",
-      "import rclpy",
-      "from geometry_msgs.msg import Twist",
-      "rclpy.init()",
-      "node = rclpy.create_node('nav_stop_%d' % random.randrange(1_000_000_000))",
-      "pub = node.create_publisher(Twist, 'cmd_vel', 10)",
-      "deadline = time.time() + 1.2",
-      "while time.time() < deadline:",
-      "    pub.publish(Twist())",
-      "    rclpy.spin_once(node, timeout_sec=0.05)",
-      "node.destroy_node()",
-      "rclpy.shutdown()",
-      "PY",
-    ].join("\n"),
-  );
-}
-
-async function haltMission() {
-  slot.stops += 1;
-  slot.startGen += 1;
-  slot.starting = false;
-  endNavRun();
-  signalGroup(slot.student, "SIGINT");
-  signalGroup(slot.nav, "SIGINT");
-  signalGroups("SIGINT");
-  void zeroTwist();
-  await enqueue(async () => {
-    await stopStudent();
-    await stopLabNav();
-    slot.nav = null;
-    slot.navKey = "";
-    slot.navLog = "";
-    slot.navRunLog = "";
-    await zeroTwist();
-    slot.studentLog = "Nav2 gestoppt.\n";
-    slot.starting = false;
-  });
+  stopStarting(gen);
+  return { ok: true as const, running: Boolean(payload.running), log: payload.log || "" };
 }
 
 export async function DELETE() {
-  await haltMission();
-  return Response.json({ ok: true, running: false, starting: false, log: "Nav2 gestoppt." });
+  slot.stops += 1;
+  slot.startGen += 1;
+  slot.starting = false;
+  try {
+    const response = await fetch(`${robotApi()}/nav/run`, { method: "DELETE" });
+    const payload = (await response.json()) as { ok?: boolean; running?: boolean; starting?: boolean; log?: string };
+    return Response.json(payload);
+  } catch {
+    return Response.json({ ok: true, running: false, starting: false, log: "Nav2 gestoppt." });
+  }
 }
 
 export async function GET() {
-  const running = slot.student !== null && slot.student.exitCode === null;
-  const student = slot.studentLog.trim();
-  const starting = slot.starting && !student;
-  const log = starting ? "" : [student, running ? "" : navErrors()].filter(Boolean).join("\n");
-  return Response.json({ ok: true, running, starting, log });
+  try {
+    const response = await fetch(`${robotApi()}/nav/run`);
+    const payload = (await response.json()) as { ok?: boolean; running?: boolean; starting?: boolean; log?: string };
+    return Response.json(payload);
+  } catch {
+    return Response.json({ ok: true, running: false, starting: false, log: "" });
+  }
 }
 
 export async function POST(request: Request) {

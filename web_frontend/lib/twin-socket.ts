@@ -24,6 +24,7 @@ export type TwinState = {
   busy: boolean;
   generation: number;
   owner: string | null;
+  mode?: string;
   ranges?: Array<number | null>;
   image?: string;
   appliedLinear?: number;
@@ -93,6 +94,7 @@ function asState(data: Record<string, unknown>): TwinState | null {
     busy: data.busy === true,
     generation: typeof data.generation === "number" ? data.generation : 0,
     owner: typeof data.owner === "string" ? data.owner : null,
+    mode: typeof data.mode === "string" ? data.mode : undefined,
     ranges,
     image: typeof data.image === "string" ? data.image : undefined,
     appliedLinear: typeof data.applied_linear === "number" ? data.applied_linear : undefined,

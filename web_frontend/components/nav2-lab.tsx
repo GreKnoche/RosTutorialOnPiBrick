@@ -194,6 +194,7 @@ export function Nav2Lab({
               missionKey={stationId}
               costmapToggle={MISSION_ORDER.indexOf(stationId) >= MISSION_ORDER.indexOf("costmap")}
               pathToggle
+              obstacleLegend
               walls={stationId === "costmap" || stationId === "bt-monitor"}
               round={round}
               melons={kind === "melons"}

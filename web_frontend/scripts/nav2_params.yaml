@@ -1,6 +1,4 @@
-# Lab copy of companion/src/brick_nav/config/nav2_params.yaml. The web image has no brick_nav.
 # Nav2 drive-to-pose on odometry only. No map, no AMCL, no lidar.
-# Gazebo uses config/nav2_params_gazebo.yaml. /map comes from slam_toolbox.
 bt_navigator:
   ros__parameters:
     global_frame: odom

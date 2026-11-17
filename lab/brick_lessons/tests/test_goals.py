@@ -5,7 +5,7 @@ from pathlib import Path
 
 from brick_lessons.goals import GOALS, Step
 
-REPO = Path(__file__).resolve().parents[4]
+REPO = Path(__file__).resolve().parents[3]
 LEVELS = REPO / "web_frontend" / "lib" / "lesson-levels.ts"
 PACKAGE = Path(__file__).resolve().parents[1] / "brick_lessons"
 _LEVEL = re.compile(

@@ -6,9 +6,9 @@ import { followerSection } from "@/lib/follower-yaml";
 import { pluginSection } from "@/lib/planner-yaml";
 
 const FILES: Record<string, string> = {
-  mission: "companion/src/brick_nav/behavior_trees/mission.xml",
-  through: "companion/src/brick_nav/behavior_trees/through_poses.xml",
-  navigate_to_pose: "companion/src/brick_nav/behavior_trees/navigate_to_pose.xml",
+  mission: "lab/brick_nav/behavior_trees/mission.xml",
+  through: "lab/brick_nav/behavior_trees/through_poses.xml",
+  navigate_to_pose: "lab/brick_nav/behavior_trees/navigate_to_pose.xml",
 };
 
 export async function GET(request: Request) {

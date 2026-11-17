@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 URDF_PATH = (
-    Path(__file__).resolve().parents[1] / "companion" / "src" / "brick_description" / "urdf" / "brick.urdf"
+    Path(__file__).resolve().parents[1] / "brick" / "brick_description" / "urdf" / "brick.urdf"
 )
 
 

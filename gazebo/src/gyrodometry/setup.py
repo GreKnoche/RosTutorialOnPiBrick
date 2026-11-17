@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer="gregor",
     maintainer_email="gregor.knoche@stud.htwk-leipzig.de",
-    description="Borenstein gyrodometry: fuse companion /odom with /imu onto /odom/gyro.",
+    description="Borenstein gyrodometry: fuse wheel /odom with /imu onto /odom/gyro.",
     license="Apache-2.0",
     extras_require={
         "test": [

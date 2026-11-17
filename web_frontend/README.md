@@ -11,7 +11,7 @@ Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lekt
 
 ## Docker
 
-Frontend und Backend laufen zusammen. Der Container nutzt das Host-Netz, Port 61333 und Port 8000, und `ROS_DOMAIN_ID` aus `shared/ros.env`. Compose hängt `web_frontend/` in den Container, und der Startbefehl ist `next dev`. Eine gespeicherte Seite wird neu gebaut, ohne neues Image. Speichern im Editor schreibt weiter nach `companion/src/brick_lessons/brick_lessons/` auf dem Host.
+Frontend und Backend laufen in einem Container. Das Backend startet Nav2 und die Action `/drive`. Der Twin veröffentlicht `/odom`. Der Container nutzt das Host-Netz, Port 61333 und Port 8000, und `ROS_DOMAIN_ID` aus `shared/ros.env`. Gazebo nicht gleichzeitig starten. Compose hängt `web_frontend/` in den Container, und der Startbefehl ist `next dev`. Eine gespeicherte Seite wird neu gebaut, ohne neues Image. Speichern im Editor schreibt weiter nach `lab/brick_lessons/brick_lessons/` auf dem Host.
 
 ```bash
 cd web
@@ -43,7 +43,7 @@ Unter der Einleitung hat jeder nötige, noch unbekannte Fachbegriff einen eigene
 
 Jede Lektion hat Beginner, Medium und Hard. Der Umschalter hängt `?stufe=medium` oder `?stufe=hard` an die Adresse. Ohne Parameter bleibt Beginner. Animation und Robo-Lab bleiben auf allen drei Stufen. Medium und Hard zeigen darunter den Editor. Der Knoten ruft `/drive` auf. Der Action Server schickt `/cmd_vel`, und der Canvas-Twin auf der Seite fährt mit.
 
-Die Ziele stehen in [`lib/lesson-levels.ts`](lib/lesson-levels.ts). Dieselben Zahlen stehen in `companion/src/brick_lessons/brick_lessons/goals.py`. Medium und Hard schreiben den Knoten im Editor auf der Lektionsseite. Speichern schreibt `brick_lessons/medium/<track>_<id>.py` oder `hard/<track>_<id>.py`. Hard hat Import, `rclpy.init` und `destroy_node` schon stehen. Eine neue Lektion braucht einen Eintrag an beiden Stellen, sonst schlägt der Pytest in `brick_lessons` fehl.
+Die Ziele stehen in [`lib/lesson-levels.ts`](lib/lesson-levels.ts). Dieselben Zahlen stehen in `lab/brick_lessons/brick_lessons/goals.py`. Medium und Hard schreiben den Knoten im Editor auf der Lektionsseite. Speichern schreibt `brick_lessons/medium/<track>_<id>.py` oder `hard/<track>_<id>.py`. Hard hat Import, `rclpy.init` und `destroy_node` schon stehen. Eine neue Lektion braucht einen Eintrag an beiden Stellen, sonst schlägt der Pytest in `brick_lessons` fehl.
 
 ## Nur Text
 

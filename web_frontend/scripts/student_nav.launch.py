@@ -8,7 +8,6 @@ from __future__ import annotations
 import os
 
 import yaml
-from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
@@ -16,27 +15,7 @@ from launch_ros.actions import Node
 
 
 def _params_source() -> str:
-    beside = os.path.join(os.path.dirname(__file__), "nav2_params.yaml")
-    if os.path.isfile(beside):
-        return beside
-    try:
-        share = os.path.join(get_package_share_directory("brick_nav"), "config", "nav2_params.yaml")
-    except PackageNotFoundError:
-        share = ""
-    if share and os.path.isfile(share):
-        return share
-    return os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "companion",
-            "src",
-            "brick_nav",
-            "config",
-            "nav2_params.yaml",
-        )
-    )
+    return os.path.join(os.path.dirname(__file__), "nav2_params.yaml")
 
 
 def _tree(name: str) -> str:
@@ -45,8 +24,7 @@ def _tree(name: str) -> str:
             os.path.dirname(__file__),
             "..",
             "..",
-            "companion",
-            "src",
+            "lab",
             "brick_nav",
             "behavior_trees",
             name,

@@ -34,8 +34,8 @@ RUN if [ "$WITH_BRICKPI3" = "1" ]; then \
 WORKDIR /ws
 COPY shared /ws/shared
 COPY shared/brick_math /ws/src/brick_math
-COPY companion/src/brick_core /ws/src/brick_core
-COPY companion/src/brick_interfaces /ws/src/brick_interfaces
+COPY brick/brick_core /ws/src/brick_core
+COPY brick/brick_interfaces /ws/src/brick_interfaces
 COPY pi-brick/brick_hw /ws/src/brick_hw
 COPY shared/chassis.yaml /ws/src/brick_hw/config/chassis.yaml
 

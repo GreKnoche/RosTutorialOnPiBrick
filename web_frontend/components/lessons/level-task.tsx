@@ -60,7 +60,7 @@ export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" |
   const key = lessonLevelKey(lesson.track, lesson.id);
   const modes = lessonUsesModes(lesson.track, lesson.id);
   const steps = spec ? spec[level] : [];
-  const file = `companion/src/brick_lessons/brick_lessons/${level}/${key}.py`;
+  const file = `lab/brick_lessons/brick_lessons/${level}/${key}.py`;
   const command = `ros2 run brick_lessons ${key}_${level}`;
   const eyebrow = modes ? "Cruise" : level === "medium" ? "Medium" : "Hard";
   return (
@@ -97,31 +97,20 @@ export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" |
         {command}
       </p>
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-heading">Action Server starten</h3>
+        <h3 className="text-sm font-medium text-heading">Action Server</h3>
         <ul className="flex flex-col gap-2 text-sm leading-7">
           <li>
-            Canvas: das Web-Backend ist der Twin auf dieser Seite. Es veröffentlicht /odom und
-            nimmt /cmd_vel an, der Knoten bewegt also dieselbe Fläche. Dann{" "}
-            <code className="font-mono text-[0.65rem]">
-              ros2 launch brick_bringup tutorial.launch.py backend:=canvas
-            </code>
+            Das Web-Backend stellt /drive bereit. Es veröffentlicht /odom vom Twin und nimmt
+            /cmd_vel an, der Knoten bewegt also dieselbe Fläche. Die Zeichnung folgt dieser Fahrt.
           </li>
           <li>
-            Gazebo:{" "}
-            <code className="font-mono text-[0.65rem]">
-              ros2 launch brick_bringup tutorial.launch.py backend:=gazebo
-            </code>
-          </li>
-          <li>
-            Hardware:{" "}
-            <code className="font-mono text-[0.65rem]">
-              ros2 launch brick_bringup tutorial.launch.py backend:=hardware
-            </code>
+            Der BrickPi-Container hört /cmd_vel und fährt mit. Er veröffentlicht kein eigenes /odom.
           </li>
         </ul>
         <p className="max-w-2xl text-sm leading-7">
           Der Server liest die Radodometrie auf /odom, nicht /odom/selected, und schickt den
-          Fortschritt als Feedback zurück.
+          Fortschritt als Feedback zurück. Gazebo ist eine eigene Sitzung und läuft nicht
+          zusammen mit diesem Labor.
         </p>
       </div>
     </LessonSection>

@@ -27,8 +27,8 @@ services:
     volumes:
       - ./src:/ws/src
       - ../shared/brick_math:/ws/src/brick_math
-      - ../companion/src/brick_core:/ws/src/brick_core
-      - ../companion/src/brick_interfaces:/ws/src/brick_interfaces
+      - ../brick/brick_core:/ws/src/brick_core
+      - ../brick/brick_interfaces:/ws/src/brick_interfaces
       - ../camera_lidar:/ws/src/camera_lidar
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY}:${XAUTHORITY}:ro
@@ -40,4 +40,4 @@ services:
       && source /opt/ros/jazzy/setup.bash
       && colcon --log-base /tmp/log build --symlink-install --build-base /tmp/build --install-base /tmp/install
       && source /tmp/install/setup.bash
-      && ros2 launch brick_gz_bringup sim.launch.py world:=$${WORLD}"
+      && ros2 launch brick_gz_bringup compare.launch.py world:=$${WORLD}"

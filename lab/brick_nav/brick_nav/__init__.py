@@ -1,1 +1,1 @@
-# Lesson nodes. Drive-to-pose is the Nav2 controller stand-in for this slice.
+"""Behavior trees for the web Nav2 lessons live in behavior_trees/."""

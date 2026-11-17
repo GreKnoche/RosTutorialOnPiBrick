@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer="gregor",
     maintainer_email="gregor_knoche@outlook.de",
-    description="ROS-free 2D yaw and quaternion helpers shared by companion, Pi, and Gazebo.",
+    description="ROS-free 2D yaw and quaternion helpers shared by the ROS packages, Pi, and Gazebo.",
     license="Apache-2.0",
     tests_require=["pytest"],
     entry_points={"console_scripts": []},

@@ -222,6 +222,7 @@ def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -
         "busy",
         "generation",
         "owner",
+        "mode",
     }
     assert set(hub.snapshot()) == plain
     assert hub.city_view() == {}
@@ -232,6 +233,15 @@ def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -
     assert "image" not in hub.snapshot()
     assert hub.city_view()["image"] == "abc"
     assert hub.city_view()["ranges"] == [1.5, None]
+    hub.touch_city(0.2, -0.1, {"bumps": 2})
+    assert hub.city_view()["ranges"] == [1.5, None]
+    assert hub.city_view()["image"] == "abc"
+    assert hub.city_view()["applied_linear"] == 0.2
+    assert hub.city_view()["bumps"] == 2
+    hub.clear_city()
+    hub.touch_city(1.0, 0.0, {"bumps": 9})
+    assert hub.city_view() == {}
+    hub.store_city([1.5, None], 0.1, 0.0, "abc")
     hub.store_city([1.5, None], 0.1, 0.0, None, keep_image=False)
     assert "image" not in hub.city_view()
     apply_message(plant, {"type": "city", "enter": False, "client": "labor"})

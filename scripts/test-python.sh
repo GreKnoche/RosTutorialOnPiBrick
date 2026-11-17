@@ -14,7 +14,7 @@ incoming="${PYTHONPATH:-}"
 PY_VER="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 ROS_SITE="/opt/ros/jazzy/lib/python${PY_VER}/site-packages"
 
-PYTHONPATH="web_backend:companion/src/brick_core:companion/src/brick_drive:companion/src/brick_lessons:companion/src/brick_nav:companion/src/brick_calibrate:companion/src/gyrodometry:shared/brick_math"
+PYTHONPATH="web_backend:brick/brick_core:lab/brick_drive:lab/brick_lessons:gazebo/src/gyrodometry:shared/brick_math"
 if [[ -d "$ROS_SITE" ]]; then
   PYTHONPATH="${PYTHONPATH}:${ROS_SITE}"
 fi
@@ -28,10 +28,8 @@ exec "$PYTHON" -m pytest \
   -p no:launch_testing \
   -p no:launch_ros \
   web_backend/tests \
-  companion/src/brick_core/tests \
-  companion/src/brick_drive/tests \
-  companion/src/brick_lessons/tests \
-  companion/src/brick_nav/tests \
-  companion/src/brick_calibrate/tests \
-  companion/src/gyrodometry/tests \
+  brick/brick_core/tests \
+  lab/brick_drive/tests \
+  lab/brick_lessons/tests \
+  gazebo/src/gyrodometry/tests \
   shared/brick_math/tests

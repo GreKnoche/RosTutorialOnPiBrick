@@ -2,7 +2,8 @@
 
 The city lab also publishes /scan, /camera/image_raw, and /imu. Those three
 stay quiet until a lab page holds the city, so a lesson keeps the old graph.
-The camera frame is the expensive one: it stays off until that page asks.
+Scan, camera, and the obstacle cloud are built off the drive tick, so a slow
+frame does not delay /odom. The camera stays off until that page asks.
 """
 
 from __future__ import annotations
@@ -66,6 +67,53 @@ def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointClo
     return msg
 
 
+class _CitySense:
+    """One lidar snapshot computed away from the drive tick."""
+
+    __slots__ = (
+        "gen",
+        "epoch",
+        "x",
+        "y",
+        "theta",
+        "ranges",
+        "applied_linear",
+        "applied_angular",
+        "clutter",
+        "props",
+        "key",
+        "points",
+    )
+
+    def __init__(
+        self,
+        gen: int,
+        epoch: int,
+        x: float,
+        y: float,
+        theta: float,
+        ranges: list[float],
+        applied_linear: float,
+        applied_angular: float,
+        clutter: list[dict[str, object]],
+        props: dict[str, object],
+        key: tuple[tuple[float, float, float, float], ...],
+        points: list[tuple[float, float]] | None,
+    ) -> None:
+        self.gen = gen
+        self.epoch = epoch
+        self.x = x
+        self.y = y
+        self.theta = theta
+        self.ranges = ranges
+        self.applied_linear = applied_linear
+        self.applied_angular = applied_angular
+        self.clutter = clutter
+        self.props = props
+        self.key = key
+        self.points = points
+
+
 class CanvasTwinNode(Node):
     def __init__(self, hub: TwinHub) -> None:
         super().__init__("canvas_twin")
@@ -117,10 +165,26 @@ class CanvasTwinNode(Node):
         self._publish_description()
         self.create_timer(2.0, self._publish_description)
         self._sensor_tick = 0
+        self._city_held = False
+        self._city_epoch = 0
+        self._free_epoch = 0
+        self._sense_lock = threading.Lock()
+        self._sense_stop = threading.Event()
+        self._sense_packet: _CitySense | None = None
+        self._sense_sent = -1
+        self._sense_count = 0
+        self._sampled_key: tuple[tuple[float, float, float, float], ...] | None = None
+        self._pending_cloud: tuple[tuple[tuple[float, float, float, float], ...], list[tuple[float, float]]] | None = None
+        self._nav_image: bytes | None = None
+        self._nav_image_gen = 0
+        self._nav_image_sent = 0
         self._cam_stop = threading.Event()
         self._cam_thread = threading.Thread(target=self._camera_loop, name="city_camera", daemon=True)
         self._cam_thread.start()
+        self._sense_thread = threading.Thread(target=self._sense_loop, name="city_sense", daemon=True)
+        self._sense_thread.start()
         self._timer = self.create_timer(self._dt, self._tick)
+        self.create_timer(self._dt, self._flush_sensors)
         self.sync()
         self.get_logger().info(
             f"canvas twin up dt={self._dt:.3f}s "
@@ -173,21 +237,18 @@ class CanvasTwinNode(Node):
         self._mirror_chassis()
         self.sync(result)
 
+    def destroy_node(self) -> bool:
+        self._cam_stop.set()
+        self._sense_stop.set()
+        return super().destroy_node()
+
     def sync(self, result: ApplyResult | None = None) -> None:
         self._publish_model()
         self._publish_cmd()
-        if self.plant.city is not None:
-            self._publish_sensors()
-        else:
-            self._sensor_tick = 0
-            self._cloud_tick = 0
-            self._cloud_key = None
-            self.hub.clear_city()
-        self.hub.store(self.plant.sample())
-        if result is not None and result.done is not None:
-            self.hub.emit_done(done_message(result))
+        self._finish_drive(result)
 
     def _tick(self) -> None:
+        """Motion only. Lidar and camera are other threads."""
         done = self.plant.step(self._dt)
         result = None
         if done is not None:
@@ -195,7 +256,56 @@ class CanvasTwinNode(Node):
         self.sync(result)
         if self.free.city is not None:
             self.free.step(self._dt)
-            self._sync_free()
+            self.hub.store_free(self.free.sample())
+            self.hub.touch_free(
+                float(self.free.applied.linear),
+                float(self.free.applied.angular),
+                self._live_props(self.free),
+            )
+
+    def _finish_drive(self, result: ApplyResult | None) -> None:
+        if self.plant.city is None:
+            if self._city_held:
+                self._idle_sensors()
+                self._city_held = False
+        else:
+            self._city_held = True
+            self.hub.touch_city(
+                float(self.plant.applied.linear),
+                float(self.plant.applied.angular),
+                self._live_props(self.plant),
+            )
+        self.hub.store(self.plant.sample())
+        if result is not None and result.done is not None:
+            self.hub.emit_done(done_message(result))
+
+    def _live_props(self, plant: CanvasPlant) -> dict[str, object]:
+        city = plant.city
+        if city is None:
+            return {}
+        return {
+            "scene": city.scene,
+            "arch": city.arch_on,
+            "dock": city.dock_on,
+            "runner": city.runner_dict() if city.runner_on else None,
+            "lap": plant.lap_status(),
+            "bumps": plant.bumps,
+        }
+
+    def _idle_sensors(self) -> None:
+        with self._sense_lock:
+            self._city_epoch += 1
+            self._sense_packet = None
+            self._sense_sent = -1
+            self._pending_cloud = None
+            self._nav_image = None
+            self._nav_image_gen += 1
+            self._nav_image_sent = self._nav_image_gen
+        self._sensor_tick = 0
+        self._cloud_tick = 0
+        self._cloud_key = None
+        self._cloud_republish = False
+        self.hub.clear_city()
 
     def _mirror_chassis(self) -> None:
         radius = float(self.plant.chassis.wheel_radius_m)
@@ -212,6 +322,15 @@ class CanvasTwinNode(Node):
         )
 
     def _publish_cmd(self) -> None:
+        if self.plant.quiet_cmd:
+            if self._sent == (0.0, 0.0):
+                return
+            self._sent = (0.0, 0.0)
+            self._echo.append((0.0, 0.0))
+            if len(self._echo) > 30:
+                self._echo.popleft()
+            self._cmd_pub.publish(Twist())
+            return
         linear = float(self.plant.command.linear)
         angular = float(self.plant.command.angular)
         key = (round(linear, 4), round(angular, 4))
@@ -290,75 +409,185 @@ class CanvasTwinNode(Node):
         self._description_pub.publish(message)
 
     def _camera_loop(self) -> None:
-        """Freedrive camera only. The Nav2 city keeps its own render on the control tick."""
-        from city_camera import bmp_bytes
-
+        """Both cameras. Neither one runs on the drive tick."""
         period = 0.1
-        while True:
-            plant = self.free
-            city = plant.city
-            if not plant.camera or city is None:
+        while not self._cam_stop.is_set():
+            started = time.monotonic()
+            free = self._render_free_camera()
+            nav = self._render_nav_camera()
+            worked = free or nav
+            if not worked:
                 if self._cam_stop.wait(0.2):
                     return
                 continue
-            started = time.monotonic()
-            pose = plant.odom.pose
-            try:
-                raw = city.render(float(pose.x), float(pose.y), float(pose.theta))
-            except Exception:
-                raw = None
-            if raw is not None:
-                self.hub.store_free_image(base64.b64encode(bmp_bytes(raw, IMAGE_W, IMAGE_H)).decode("ascii"))
             if self._cam_stop.wait(max(0.0, period - (time.monotonic() - started))):
                 return
+
+    def _render_free_camera(self) -> bool:
+        from city_camera import bmp_bytes
+
+        plant = self.free
+        city = plant.city
+        if not plant.camera or city is None:
+            return False
+        pose = plant.odom.pose
+        try:
+            raw = city.render(float(pose.x), float(pose.y), float(pose.theta))
+        except Exception:
+            return False
+        self.hub.store_free_image(base64.b64encode(bmp_bytes(raw, IMAGE_W, IMAGE_H)).decode("ascii"))
+        return True
+
+    def _render_nav_camera(self) -> bool:
+        plant = self.plant
+        city = plant.city
+        if not plant.camera or city is None:
+            return False
+        pose = plant.odom.pose
+        try:
+            raw = city.render(float(pose.x), float(pose.y), float(pose.theta))
+        except Exception:
+            return False
+        with self._sense_lock:
+            if plant.city is None or not plant.camera:
+                return False
+            self._nav_image = raw
+            self._nav_image_gen += 1
+        return True
 
     def _sync_free(self) -> None:
         plant = self.free
         self.hub.store_free(plant.sample())
-        city = plant.city
-        if city is None:
+        if plant.city is None:
+            with self._sense_lock:
+                self._free_epoch += 1
             self.hub.clear_free()
             return
+        self.hub.touch_free(
+            float(plant.applied.linear),
+            float(plant.applied.angular),
+            self._live_props(plant),
+        )
+
+    def _sense_loop(self) -> None:
+        while not self._sense_stop.is_set():
+            started = time.monotonic()
+            try:
+                self._sense_nav()
+                self._sense_free()
+            except Exception as exc:
+                self.get_logger().warn(f"city sense failed ({exc})")
+            if self._sense_stop.wait(max(0.0, self._dt - (time.monotonic() - started))):
+                return
+
+    def _sense_nav(self) -> None:
+        plant = self.plant
+        city = plant.city
+        if city is None:
+            self._sampled_key = None
+            return
+        with self._sense_lock:
+            epoch = self._city_epoch
         pose = plant.odom.pose
-        ranges = city.scan(pose.x, pose.y, pose.theta)
-        self.hub.store_free_city(
-            [None if not math.isfinite(item) else float(item) for item in ranges],
+        x, y, theta = float(pose.x), float(pose.y), float(pose.theta)
+        ranges = city.scan(x, y, theta)
+        key = tuple(city.collision_rects())
+        self._sense_count += 1
+        points = None
+        if key != self._sampled_key or self._sense_count % 10 == 0:
+            points = city.obstacle_samples()
+            self._sampled_key = key
+        packet = _CitySense(
+            self._sense_count,
+            epoch,
+            x,
+            y,
+            theta,
+            ranges,
             float(plant.applied.linear),
             float(plant.applied.angular),
             city.clutter_dicts(),
-            {
-                "scene": city.scene,
-                "arch": city.arch_on,
-                "dock": city.dock_on,
-                "runner": city.runner_dict() if city.runner_on else None,
-                "lap": plant.lap_status(),
-                "bumps": plant.bumps,
-            },
+            self._live_props(plant),
+            key,
+            points,
         )
+        with self._sense_lock:
+            if epoch != self._city_epoch or plant.city is None:
+                return
+            self._sense_packet = packet
 
-    def _publish_sensors(self) -> None:
-        city = self.plant.city
+    def _sense_free(self) -> None:
+        plant = self.free
+        city = plant.city
         if city is None:
             return
+        with self._sense_lock:
+            epoch = self._free_epoch
+        pose = plant.odom.pose
+        ranges = city.scan(float(pose.x), float(pose.y), float(pose.theta))
+        finite = [None if not math.isfinite(item) else float(item) for item in ranges]
+        with self._sense_lock:
+            if epoch != self._free_epoch or plant.city is None:
+                return
+            self.hub.store_free_city(
+                finite,
+                float(plant.applied.linear),
+                float(plant.applied.angular),
+                city.clutter_dicts(),
+                self._live_props(plant),
+            )
+
+    def _claim_sense(self) -> _CitySense | None:
+        with self._sense_lock:
+            packet = self._sense_packet
+            if packet is None or packet.gen == self._sense_sent or packet.epoch != self._city_epoch:
+                return None
+            self._sense_sent = packet.gen
+            return packet
+
+    def _flush_sensors(self) -> None:
+        if self.plant.city is None:
+            return
         now = self.get_clock().now().to_msg()
-        pose = self.plant.odom.pose
-        ranges = city.scan(pose.x, pose.y, pose.theta)
+        packet = self._claim_sense()
+        if packet is not None:
+            self._publish_scan(now, packet)
+            self._publish_imu(now, packet)
+            finite = [None if not math.isfinite(item) else float(item) for item in packet.ranges]
+            with self._sense_lock:
+                if packet.epoch == self._city_epoch and self.plant.city is not None:
+                    self.hub.store_city(
+                        finite,
+                        packet.applied_linear,
+                        packet.applied_angular,
+                        None,
+                        packet.clutter,
+                        packet.props,
+                        keep_image=False,
+                    )
+                    if packet.points is not None:
+                        self._pending_cloud = (packet.key, packet.points)
+        self._publish_nav_image(now)
+        if self.plant.city is not None:
+            self._publish_obstacles(now)
+
+    def _publish_scan(self, now: object, packet: _CitySense) -> None:
         scan = LaserScan()
-        scan.header.stamp = now
+        scan.header.stamp = now  # type: ignore[assignment]
         scan.header.frame_id = "base_link"
         scan.angle_min = SCAN_MIN
         scan.angle_max = SCAN_MIN + (SCAN_COUNT - 1) * SCAN_INCREMENT
         scan.angle_increment = SCAN_INCREMENT
         scan.range_min = RANGE_MIN_M
         scan.range_max = RANGE_MAX_M
-        scan.ranges = [float(item) for item in ranges]
+        scan.ranges = [float(item) for item in packet.ranges]
         self._scan_pub.publish(scan)
-        self._publish_obstacles(now)
 
+    def _publish_imu(self, now: object, packet: _CitySense) -> None:
         imu = Imu()
-        imu.header.stamp = now
+        imu.header.stamp = now  # type: ignore[assignment]
         imu.header.frame_id = "gyro_link"
-        qx, qy, qz, qw = yaw_to_quaternion(pose.theta)
+        qx, qy, qz, qw = yaw_to_quaternion(packet.theta)
         imu.orientation.x = qx
         imu.orientation.y = qy
         imu.orientation.z = qz
@@ -366,40 +595,28 @@ class CanvasTwinNode(Node):
         imu.orientation_covariance[0] = 0.1
         imu.orientation_covariance[4] = 0.1
         imu.orientation_covariance[8] = 0.02
-        imu.angular_velocity.z = float(self.plant.applied.angular)
+        imu.angular_velocity.z = packet.applied_angular
         imu.angular_velocity_covariance[8] = 0.05
         imu.linear_acceleration.x = float(self.plant.linear_accel)
         imu.linear_acceleration_covariance[0] = 0.1
         self._imu_pub.publish(imu)
 
-        self._sensor_tick += 1
-        if self.plant.camera and self._sensor_tick % 2 == 0:
-            frame = Image()
-            frame.header.stamp = now
-            frame.header.frame_id = "camera_link"
-            frame.height = IMAGE_H
-            frame.width = IMAGE_W
-            frame.encoding = "rgb8"
-            frame.is_bigendian = 0
-            frame.step = IMAGE_W * 3
-            frame.data = city.render(pose.x, pose.y, pose.theta)
-            self._image_pub.publish(frame)
-        self.hub.store_city(
-            [None if not math.isfinite(item) else float(item) for item in ranges],
-            float(self.plant.applied.linear),
-            float(self.plant.applied.angular),
-            None,
-            city.clutter_dicts(),
-            {
-                "scene": city.scene,
-                "arch": city.arch_on,
-                "dock": city.dock_on,
-                "runner": city.runner_dict() if city.runner_on else None,
-                "lap": self.plant.lap_status(),
-                "bumps": self.plant.bumps,
-            },
-            keep_image=False,
-        )
+    def _publish_nav_image(self, now: object) -> None:
+        with self._sense_lock:
+            if self._nav_image is None or self._nav_image_gen == self._nav_image_sent:
+                return
+            raw = self._nav_image
+            self._nav_image_sent = self._nav_image_gen
+        frame = Image()
+        frame.header.stamp = now  # type: ignore[assignment]
+        frame.header.frame_id = "camera_link"
+        frame.height = IMAGE_H
+        frame.width = IMAGE_W
+        frame.encoding = "rgb8"
+        frame.is_bigendian = 0
+        frame.step = IMAGE_W * 3
+        frame.data = raw
+        self._image_pub.publish(frame)
 
     def _on_costmap(self, msg: OccupancyGrid) -> None:
         info = msg.info
@@ -418,14 +635,15 @@ class CanvasTwinNode(Node):
         self.hub.store_path(pack_path(msg.poses))
 
     def _publish_obstacles(self, stamp: object) -> None:
-        city = self.plant.city
-        if city is None:
+        with self._sense_lock:
+            pending = self._pending_cloud
+        if self.plant.city is None:
             return
         self._cloud_tick += 1
-        key = tuple(city.collision_rects())
-        changed = key != self._cloud_key
-        if changed:
-            self._cloud_key = key
+        changed = False
+        if pending is not None and pending[0] != self._cloud_key:
+            changed = True
+            self._cloud_key = pending[0]
             # Lesson blocks are not a map. Drop the old picture and mark only what is set now.
             self.hub.store_costmap(None)
             self.hub.store_path(None)
@@ -436,10 +654,12 @@ class CanvasTwinNode(Node):
                 self._cloud_republish = True
             else:
                 return
+        if pending is None:
+            return
         if not changed and not self._cloud_republish and self._cloud_tick % 10 != 0:
             return
         self._cloud_republish = False
-        self._cloud_pub.publish(obstacle_cloud(city.obstacle_samples(), stamp))
+        self._cloud_pub.publish(obstacle_cloud(pending[1], stamp))
 
     def _begin_costmap_clear(self) -> None:
         ready = [client for client in (self._clear_global, self._clear_local) if client.service_is_ready()]

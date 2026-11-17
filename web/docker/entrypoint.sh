@@ -2,7 +2,7 @@
 set -eo pipefail
 
 source /opt/ros/jazzy/setup.bash
-source /ws/companion/install/setup.bash
+source /ws/install/setup.bash
 export FASTDDS_BUILTIN_TRANSPORTS="${FASTDDS_BUILTIN_TRANSPORTS:-UDPv4}"
 
 cd /ws/web_backend

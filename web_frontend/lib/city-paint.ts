@@ -1,6 +1,6 @@
 import { paintProbe } from "@/lib/city-layer";
 import type { CityProbe } from "@/lib/city-probe";
-import { SCAN_MIN, SCAN_STEP, cityScreen } from "@/lib/city-view";
+import { SCAN_MIN, SCAN_STEP, cityPpm } from "@/lib/city-view";
 import { MELONS } from "@/lib/melons";
 import { TRACK_CAR } from "@/lib/track-car";
 import type { CostmapGrid, NavPath } from "@/lib/twin-socket";
@@ -220,6 +220,117 @@ function drawMelon(ctx: CanvasRenderingContext2D, x: number, y: number, ppm: num
 
 type Screen = { x: number; y: number; ppm: number };
 
+function shadeHex(hex: string, scale: number) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
+  const value = Number.parseInt(hex.slice(1), 16);
+  const channel = (shift: number) =>
+    Math.max(0, Math.min(255, Math.round(((value >> shift) & 255) * scale)))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
+
+/** Top-down gable over the whole footprint. Houses only, obstacles stay flat. */
+function paintHouseRoof(
+  ctx: CanvasRenderingContext2D,
+  to: (x: number, y: number) => Screen,
+  house: Rect,
+  ppm: number,
+) {
+  const top = to(house.x, house.y + house.h);
+  const bottom = to(house.x + house.w, house.y);
+  const x = top.x;
+  const y = top.y;
+  const w = bottom.x - top.x;
+  const h = bottom.y - top.y;
+  if (w < 3 || h < 3) return;
+  const alongX = house.w >= house.h;
+  const dark = shadeHex(house.color, 0.68);
+  const light = shadeHex(house.color, 1.22);
+  const hip = shadeHex(house.color, 0.84);
+  const tile = shadeHex(house.color, 0.5);
+  const span = alongX ? h : w;
+  const inset = Math.min(alongX ? w : h, span) * 0.22;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  if (alongX) {
+    ctx.fillStyle = dark;
+    ctx.fillRect(x, y, w, h * 0.5);
+    ctx.fillStyle = light;
+    ctx.fillRect(x, y + h * 0.5, w, h * 0.5);
+  } else {
+    ctx.fillStyle = dark;
+    ctx.fillRect(x, y, w * 0.5, h);
+    ctx.fillStyle = light;
+    ctx.fillRect(x + w * 0.5, y, w * 0.5, h);
+  }
+  ctx.fillStyle = hip;
+  ctx.beginPath();
+  if (alongX) {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + inset, y + h * 0.5);
+    ctx.lineTo(x, y + h);
+    ctx.moveTo(x + w, y);
+    ctx.lineTo(x + w - inset, y + h * 0.5);
+    ctx.lineTo(x + w, y + h);
+  } else {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w * 0.5, y + inset);
+    ctx.lineTo(x + w, y);
+    ctx.moveTo(x, y + h);
+    ctx.lineTo(x + w * 0.5, y + h - inset);
+    ctx.lineTo(x + w, y + h);
+  }
+  ctx.fill();
+  if (span >= 12) {
+    ctx.strokeStyle = tile;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const step = Math.max(2.5, Math.min(span * 0.18, ppm * 0.065));
+    if (alongX) {
+      for (let yy = y + step; yy < y + h * 0.5 - 1; yy += step) {
+        const side = inset * (1 - (yy - y) / (h * 0.5));
+        ctx.moveTo(x + side, yy);
+        ctx.lineTo(x + w - side, yy);
+      }
+      for (let yy = y + h * 0.5 + step; yy < y + h - 1; yy += step) {
+        const side = inset * (1 - (y + h - yy) / (h * 0.5));
+        ctx.moveTo(x + side, yy);
+        ctx.lineTo(x + w - side, yy);
+      }
+    } else {
+      for (let xx = x + step; xx < x + w * 0.5 - 1; xx += step) {
+        const side = inset * (1 - (xx - x) / (w * 0.5));
+        ctx.moveTo(xx, y + side);
+        ctx.lineTo(xx, y + h - side);
+      }
+      for (let xx = x + w * 0.5 + step; xx < x + w - 1; xx += step) {
+        const side = inset * (1 - (x + w - xx) / (w * 0.5));
+        ctx.moveTo(xx, y + side);
+        ctx.lineTo(xx, y + h - side);
+      }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = "#fff6dc";
+  ctx.lineWidth = Math.max(1.5, Math.min(span * 0.07, ppm * 0.032));
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  if (alongX) {
+    ctx.moveTo(x + inset, y + h * 0.5);
+    ctx.lineTo(x + w - inset, y + h * 0.5);
+  } else {
+    ctx.moveTo(x + w * 0.5, y + inset);
+    ctx.lineTo(x + w * 0.5, y + h - inset);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function obbCorners(cx: number, cy: number, w: number, h: number, theta: number): Array<[number, number]> {
   const cosine = Math.cos(theta);
   const sine = Math.sin(theta);
@@ -232,13 +343,21 @@ function obbCorners(cx: number, cy: number, w: number, h: number, theta: number)
   return local.map(([lx, ly]) => [cx + lx * cosine - ly * sine, cy + lx * sine + ly * cosine] as [number, number]);
 }
 
-const worldCache: { key: string; canvas: HTMLCanvasElement | null } = { key: "", canvas: null };
+/** Streets live on a plate larger than the window, so a moving camera only blits. */
+const LAYER_CAP = 4096;
+
+const worldCache: {
+  key: string;
+  canvas: HTMLCanvasElement | null;
+  anchorX: number;
+  anchorY: number;
+  ppm: number;
+} = { key: "", canvas: null, anchorX: 0, anchorY: 0, ppm: 0 };
 
 function worldKey(
   width: number,
   height: number,
   zoom: number,
-  view: { x: number; y: number },
   city: CityMap | null,
   clutter: Rect[],
   probe: CityProbe | null,
@@ -255,13 +374,19 @@ function worldKey(
     width,
     height,
     zoom.toFixed(4),
-    view.x.toFixed(3),
-    view.y.toFixed(3),
     city ? `${city.houses.length}:${city.roads.length}:${city.edges.length}:${city.finish.length}` : "0",
     boxes,
     probeKey,
     runnerKey,
   ].join("|");
+}
+
+function screenOf(viewX: number, viewY: number, worldX: number, worldY: number, originX: number, originY: number, ppm: number): Screen {
+  return {
+    x: originX + (worldX - viewX) * ppm,
+    y: originY - (worldY - viewY) * ppm,
+    ppm,
+  };
 }
 
 function paintWorld(
@@ -346,6 +471,7 @@ function paintWorld(
         ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
       }
     }
+    for (const house of city.houses) paintHouseRoof(ctx, to, house, ppm);
     ctx.strokeStyle = "rgba(255,247,237,0.35)";
     ctx.lineWidth = Math.max(1, ppm * 0.01);
     ctx.beginPath();
@@ -362,7 +488,8 @@ function paintWorld(
     if (probe) paintProbe(ctx, to, ppm, probe, city.graph, city.arch, city.dock, runner);
 }
 
-function cachedWorld(
+function blitWorld(
+  ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   zoom: number,
@@ -372,21 +499,36 @@ function cachedWorld(
   probe: CityProbe | null,
   runner: Rect | null,
 ) {
-  const key = worldKey(width, height, zoom, view, city, clutter, probe, runner);
+  const ppm = cityPpm(width, height, zoom);
+  const key = worldKey(width, height, zoom, city, clutter, probe, runner);
+  const scale = Math.max(1, Math.min(3, LAYER_CAP / Math.max(width, 1), LAYER_CAP / Math.max(height, 1)));
+  const layerW = Math.max(1, Math.round(width * scale));
+  const layerH = Math.max(1, Math.round(height * scale));
   let layer = worldCache.canvas;
   if (!layer) {
     layer = document.createElement("canvas");
     worldCache.canvas = layer;
   }
-  if (worldCache.key === key && layer.width === width && layer.height === height) return layer;
-  layer.width = width;
-  layer.height = height;
-  const ctx = layer.getContext("2d");
-  if (!ctx) return layer;
-  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
-  paintWorld(ctx, to, to(view.x, view.y).ppm, city, clutter, probe, runner, width, height);
-  worldCache.key = key;
-  return layer;
+  const marginX = ((layerW - width) / 2 / Math.max(ppm, 1e-6)) * 0.72;
+  const marginY = ((layerH - height) / 2 / Math.max(ppm, 1e-6)) * 0.72;
+  const drifted =
+    Math.abs(view.x - worldCache.anchorX) > marginX || Math.abs(view.y - worldCache.anchorY) > marginY;
+  if (worldCache.key !== key || layer.width !== layerW || layer.height !== layerH || drifted) {
+    layer.width = layerW;
+    layer.height = layerH;
+    const pen = layer.getContext("2d");
+    if (pen) {
+      const to = (x: number, y: number) => screenOf(view.x, view.y, x, y, layerW / 2, layerH / 2, ppm);
+      paintWorld(pen, to, ppm, city, clutter, probe, runner, layerW, layerH);
+      worldCache.anchorX = view.x;
+      worldCache.anchorY = view.y;
+      worldCache.ppm = ppm;
+      worldCache.key = key;
+    }
+  }
+  const srcX = layerW / 2 + (view.x - worldCache.anchorX) * worldCache.ppm - width / 2;
+  const srcY = layerH / 2 - (view.y - worldCache.anchorY) * worldCache.ppm - height / 2;
+  ctx.drawImage(layer, srcX, srcY, width, height, 0, 0, width, height);
 }
 
 function drawGates(
@@ -508,11 +650,10 @@ export function draw(
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const view = look ?? pose;
-  const to = (x: number, y: number) => cityScreen(view.x, view.y, x, y, width, height, zoom);
-  const ppm = to(pose.x, pose.y).ppm;
-  const layer = cachedWorld(width, height, zoom, view, city, clutter, probe, runner);
+  const ppm = cityPpm(width, height, zoom);
+  const to = (x: number, y: number) => screenOf(view.x, view.y, x, y, width / 2, height / 2, ppm);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(layer, 0, 0);
+  blitWorld(ctx, width, height, zoom, view, city, clutter, probe, runner);
   if (costmap) paintCostmap(ctx, to, costmap);
   if (path) paintPath(ctx, to, path, ppm);
   if (gates && city) drawGates(ctx, to, ppm, courseGates ?? city.gates, lap);

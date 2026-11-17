@@ -1,4 +1,4 @@
-"""ROS-free 2D yaw/quaternion helpers shared by companion, Pi, and Gazebo."""
+"""ROS-free 2D yaw/quaternion helpers shared by the ROS packages, Pi, and Gazebo."""
 
 from __future__ import annotations
 

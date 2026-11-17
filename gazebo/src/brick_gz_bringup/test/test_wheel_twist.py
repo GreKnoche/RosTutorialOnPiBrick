@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-_BRICK_CORE = Path(__file__).resolve().parents[4] / "companion" / "src" / "brick_core"
+_BRICK_CORE = Path(__file__).resolve().parents[4] / "brick" / "brick_core"
 sys.path.insert(0, str(_SCRIPTS))
 sys.path.insert(0, str(_BRICK_CORE))
 

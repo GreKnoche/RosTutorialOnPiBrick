@@ -3,7 +3,7 @@
 <package format="3">
   <name>gyrodometry</name>
   <version>0.1.0</version>
-  <description>Borenstein gyrodometry: fuse companion /odom with /imu onto /odom/gyro.</description>
+  <description>Borenstein gyrodometry: fuse wheel /odom with /imu onto /odom/gyro.</description>
   <maintainer email="gregor.knoche@stud.htwk-leipzig.de">gregor</maintainer>
   <license>Apache-2.0</license>
 

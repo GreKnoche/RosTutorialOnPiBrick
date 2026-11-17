@@ -1,3 +1,5 @@
+# I/O only. brick_hw publishes sensors and takes /cmd_vel and /wheel_speeds.
+# It does not publish /odom. Same ROS_DOMAIN_ID as the web lab (shared/ros.env).
 services:
   agent:
     build:

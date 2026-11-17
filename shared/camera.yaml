@@ -1,7 +1,6 @@
 # Grayscale lane camera on a Technic portal above the EV3 brick, looking forward (+X).
 # Placeholder until the real lens and focus are measured.
 # sim.launch rewrites the Gazebo sensor from this file.
-# tutorial.launch rewrites the URDF mount from this file.
 # ROS topic names must match gazebo/src/brick_gz_bringup/config/bridge.yaml.
 encoding: mono8
 width: 320

@@ -238,7 +238,7 @@ def camera_urdf_fragment(camera: Camera) -> str:
     origin = " ".join(_fmt(v) for v in (x, y, z))
     rpy = " ".join(_fmt(v) for v in (roll, pitch, yaw))
     return f"""{_BEGIN}
-  <!-- Grayscale lane camera. tutorial.launch rewrites this block from shared/camera.yaml. -->
+  <!-- Grayscale lane camera. Mount comes from shared/camera.yaml. -->
   <link name="{camera.frame}">
     <visual>
       <origin xyz="-0.004 0 0" rpy="0 0 0"/>

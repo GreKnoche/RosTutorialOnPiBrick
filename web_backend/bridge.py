@@ -92,6 +92,9 @@ class RobotBridge:
         self._joints: tuple[float, float] | None = None
         self._hub: Any = None
         self._twin: Any = None
+        self._drive: Any = None
+        self._drive_executor: Any = None
+        self._drive_thread: threading.Thread | None = None
 
     @property
     def robot_ready(self) -> bool:
@@ -121,6 +124,7 @@ class RobotBridge:
             self._executor = SingleThreadedExecutor()
             self._executor.add_node(self._node)
             self._attach_twin()
+            self._attach_drive()
             self._thread = threading.Thread(target=self._spin, name="web_drive_client", daemon=True)
             self._running = True
             self._thread.start()
@@ -138,6 +142,7 @@ class RobotBridge:
         if thread is not None and thread.is_alive():
             self._robot_ready = False
             return
+        self._stop_drive()
         if self._twin is not None:
             self._twin.destroy_node()
             self._twin = None
@@ -230,6 +235,42 @@ class RobotBridge:
                     twin.destroy_node()
                 except Exception:
                     pass
+
+    def _attach_drive(self) -> None:
+        try:
+            from brick_drive.drive_action import DriveAction
+            from rclpy.executors import MultiThreadedExecutor
+
+            self._drive = DriveAction()
+            self._drive_executor = MultiThreadedExecutor(num_threads=2)
+            self._drive_executor.add_node(self._drive)
+            self._drive_thread = threading.Thread(
+                target=self._drive_executor.spin, name="drive_action", daemon=True
+            )
+            self._drive_thread.start()
+        except Exception as exc:
+            print(f"drive action off ({exc})", flush=True)
+            self._stop_drive()
+
+    def _stop_drive(self) -> None:
+        executor = self._drive_executor
+        self._drive_executor = None
+        if executor is not None:
+            try:
+                executor.shutdown()
+            except Exception:
+                pass
+        thread = self._drive_thread
+        self._drive_thread = None
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2.0)
+        drive = self._drive
+        self._drive = None
+        if drive is not None:
+            try:
+                drive.destroy_node()
+            except Exception:
+                pass
 
     def call(self, left: float, right: float, timeout_sec: float = 95.0) -> WheelResult:
         if not self._running or self._pub is None or self._thread is None or not self._thread.is_alive():

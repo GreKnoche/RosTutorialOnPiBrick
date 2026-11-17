@@ -27,7 +27,7 @@ def test_repo_yaml_matches_checked_in_models() -> None:
     camera = load_camera(repo / "shared" / "camera.yaml")
     assert camera == Camera()
     sdf = (repo / "gazebo/src/brick_gz_description/models/ev3/model.sdf").read_text(encoding="utf-8")
-    urdf = (repo / "companion/src/brick_description/urdf/brick.urdf").read_text(encoding="utf-8")
+    urdf = (repo / "brick/brick_description/urdf/brick.urdf").read_text(encoding="utf-8")
     gz_urdf = (repo / "gazebo/src/brick_gz_description/urdf/brick.urdf").read_text(encoding="utf-8")
     assert splice_marked_block(sdf, camera_sdf_fragment(camera)) == sdf
     assert splice_marked_block(urdf, camera_urdf_fragment(camera)) == urdf

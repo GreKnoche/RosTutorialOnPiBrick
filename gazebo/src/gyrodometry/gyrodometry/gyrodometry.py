@@ -5,7 +5,7 @@ increment replaces the encoder increment only while |ω_gyro − ω_odo|
 exceeds a threshold (a bump, a kerb, slip). The rest of the time the
 encoder yaw is used so gyro drift does not accumulate.
 
-Works on hardware, Gazebo, and the sim twin: companion /odom plus /imu.
+Works on hardware, Gazebo, and the sim twin: wheel /odom plus /imu.
 """
 
 from __future__ import annotations

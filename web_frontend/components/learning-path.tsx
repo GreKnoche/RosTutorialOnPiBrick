@@ -76,10 +76,43 @@ function trimPolyline(points: Point[], inset: number): Point[] {
   return out;
 }
 
-function roundedPolyline(points: Point[], radius: number): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
+function quadPoint(a: Point, b: Point, c: Point, t: number): Point {
+  const u = 1 - t;
+  return {
+    x: u * u * a.x + 2 * u * t * b.x + t * t * c.x,
+    y: u * u * a.y + 2 * u * t * b.y + t * t * c.y,
+  };
+}
+
+const CURVE_STEPS = 8;
+
+function quadLength(a: Point, b: Point, c: Point) {
+  let len = 0;
+  let prev = a;
+  for (let i = 1; i <= CURVE_STEPS; i++) {
+    const p = quadPoint(a, b, c, i / CURVE_STEPS);
+    len += Math.hypot(p.x - prev.x, p.y - prev.y);
+    prev = p;
+  }
+  return len;
+}
+
+type Stretch = { a: Point; b: Point; c: Point | null; len: number };
+
+/** Short hops crawl. A long run down the road stays quick. */
+function driveDuration(pixels: number) {
+  if (pixels < 24) return 0;
+  const closeness = 1 / (1 + pixels / 480);
+  return Math.round(280 + closeness * 1100);
+}
+
+/** Same centerline as the drawn road, plus where each station sits along it. */
+function serpentineRoad(nodes: Point[]): { d: string; at: number[]; length: number } {
+  const points = trimPolyline(serpentinePolyline(nodes), ROAD_INSET);
+  const stretches: Stretch[] = [];
+  if (points.length === 0) return { d: "", at: [], length: 0 };
   let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
+  let cursor = points[0];
   for (let i = 1; i < points.length - 1; i++) {
     const prev = points[i - 1];
     const curr = points[i];
@@ -90,18 +123,52 @@ function roundedPolyline(points: Point[], radius: number): string {
     const outDy = next.y - curr.y;
     const inLen = Math.hypot(inDx, inDy) || 1;
     const outLen = Math.hypot(outDx, outDy) || 1;
-    const r = Math.min(radius, inLen / 2, outLen / 2);
+    const r = Math.min(HAIRPIN, inLen / 2, outLen / 2);
     const enter = { x: curr.x - (inDx / inLen) * r, y: curr.y - (inDy / inLen) * r };
     const leave = { x: curr.x + (outDx / outLen) * r, y: curr.y + (outDy / outLen) * r };
+    const run = Math.hypot(enter.x - cursor.x, enter.y - cursor.y);
+    if (run > 0.5) stretches.push({ a: cursor, b: enter, c: null, len: run });
+    stretches.push({ a: enter, b: curr, c: leave, len: quadLength(enter, curr, leave) });
     d += ` L ${fmt(enter.x)} ${fmt(enter.y)} Q ${fmt(curr.x)} ${fmt(curr.y)} ${fmt(leave.x)} ${fmt(leave.y)}`;
+    cursor = leave;
   }
   const end = points[points.length - 1];
+  const tail = Math.hypot(end.x - cursor.x, end.y - cursor.y);
+  if (tail > 0.5) stretches.push({ a: cursor, b: end, c: null, len: tail });
   d += ` L ${fmt(end.x)} ${fmt(end.y)}`;
-  return d;
-}
 
-function serpentinePath(nodes: Point[]): string {
-  return roundedPolyline(trimPolyline(serpentinePolyline(nodes), ROAD_INSET), HAIRPIN);
+  const total = stretches.reduce((sum, stretch) => sum + stretch.len, 0) || 1;
+  const at = new Array<number>(nodes.length).fill(0);
+  let next = 0;
+  let acc = 0;
+  const mark = (p: Point, length: number) => {
+    while (next < nodes.length) {
+      const dist = Math.hypot(p.x - nodes[next].x, p.y - nodes[next].y);
+      const hit = next === 0 ? dist >= 46 : dist <= 44;
+      if (!hit) return;
+      at[next] = (length / total) * 100;
+      next += 1;
+    }
+  };
+  if (stretches.length > 0) mark(stretches[0].a, 0);
+  for (const stretch of stretches) {
+    let walked = 0;
+    let prev = stretch.a;
+    for (let s = 1; s <= CURVE_STEPS; s++) {
+      const p = stretch.c
+        ? quadPoint(stretch.a, stretch.b, stretch.c, s / CURVE_STEPS)
+        : {
+            x: stretch.a.x + (stretch.b.x - stretch.a.x) * (s / CURVE_STEPS),
+            y: stretch.a.y + (stretch.b.y - stretch.a.y) * (s / CURVE_STEPS),
+          };
+      walked += Math.hypot(p.x - prev.x, p.y - prev.y);
+      mark(p, acc + walked);
+      prev = p;
+      if (next >= nodes.length) return { d, at, length: total };
+    }
+    acc += stretch.len;
+  }
+  return { d, at, length: total };
 }
 
 function measureCenters(list: HTMLElement, nodes: (HTMLElement | null)[], count: number): Point[] | null {
@@ -119,38 +186,6 @@ function measureCenters(list: HTMLElement, nodes: (HTMLElement | null)[], count:
   return points;
 }
 
-function pathLengths(d: string) {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  el.setAttribute("d", d);
-  return el;
-}
-
-/** Park just clear of a station, on the road that arrives there. The start sits on the way out. */
-function parkPercent(d: string, nodes: Point[], index: number, dock: boolean): number {
-  const el = pathLengths(d);
-  const total = el.getTotalLength();
-  if (total <= 0) return 0;
-  const here = nodes[index];
-  if (!here) return 0;
-  const clearance = index === 0 ? 46 : dock ? 30 : 44;
-  const steps = Math.max(1, Math.ceil(total / 2));
-  if (index === 0) {
-    for (let i = 0; i <= steps; i++) {
-      const len = (total * i) / steps;
-      const p = el.getPointAtLength(len);
-      if (Math.hypot(p.x - here.x, p.y - here.y) >= clearance) return (len / total) * 100;
-    }
-    return 8;
-  }
-  for (let i = 0; i <= steps; i++) {
-    const len = (total * i) / steps;
-    const p = el.getPointAtLength(len);
-    if (Math.hypot(p.x - here.x, p.y - here.y) <= clearance) {
-      return (Math.max(0, len) / total) * 100;
-    }
-  }
-  return (el.getTotalLength() / total) * 100;
-}
 
 export const NAV2_PATH_COLORS: PathColors = {
   fill: "#e6b325",
@@ -264,10 +299,12 @@ export function LearningPath({
   const [pose, setPose] = useState<Pose>({ x: 0, y: 0, heading: 90 });
   const [placed, setPlaced] = useState(false);
   const [glide, setGlide] = useState(false);
-  const [track, setTrack] = useState<{ d: string; travel: number } | null>(null);
+  const [track, setTrack] = useState<{ d: string; travel: number; duration: number } | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const roadRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<(HTMLElement | null)[]>([]);
+  const roadCache = useRef<{ key: string; d: string; at: number[]; length: number } | null>(null);
+  const parkedIndex = useRef(-1);
   const phaseRef = useRef<Phase>("wait");
   const doneKey = playable.map((step) => (done[step.id] ? "1" : "0")).join("");
   const stepKey = `${doneKey}:${runningId ?? ""}:${heldId ?? ""}`;
@@ -286,8 +323,18 @@ export function LearningPath({
     if (shape === "serpentine") {
       const centers = measureCenters(list, nodeRefs.current, steps.length);
       if (!centers) return;
-      const d = serpentinePath(centers);
-      setTrack({ d, travel: parkPercent(d, centers, index, phaseRef.current === "dock") });
+      const key = centers.map((point) => `${Math.round(point.x)}:${Math.round(point.y)}`).join("|");
+      const cached = roadCache.current;
+      const road = cached?.key === key ? cached : { key, ...serpentineRoad(centers) };
+      roadCache.current = road;
+      const travel = road.at[index] ?? 0;
+      const hopped = parkedIndex.current !== -1 && parkedIndex.current !== index;
+      parkedIndex.current = index;
+      setTrack((prev) => {
+        if (prev && prev.d === road.d && prev.travel === travel) return prev;
+        const pixels = hopped && prev ? (Math.abs(travel - prev.travel) / 100) * road.length : 0;
+        return { d: road.d, travel, duration: driveDuration(pixels) };
+      });
       setPlaced(true);
       return;
     }
@@ -449,7 +496,7 @@ export function LearningPath({
           className={`pointer-events-none absolute z-20 size-8 drop-shadow-sm ${placed ? "opacity-100" : "opacity-0"} ${
             serpentine
               ? glide
-                ? "transition-[offset-distance] duration-1000 ease-in-out motion-reduce:transition-none"
+                ? "transition-[offset-distance] ease-in-out motion-reduce:transition-none"
                 : ""
               : glide
                 ? "top-0 left-0 transition-[left,top,transform] duration-700 ease-in-out motion-reduce:transition-none"
@@ -464,6 +511,7 @@ export function LearningPath({
                   offsetDistance: `${track?.travel ?? 0}%`,
                   offsetRotate: "auto",
                   offsetAnchor: "center",
+                  transitionDuration: glide ? `${track?.duration ?? 0}ms` : "0ms",
                 }
               : {
                   left: pose.x,

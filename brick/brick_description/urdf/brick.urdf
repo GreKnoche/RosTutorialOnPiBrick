@@ -283,7 +283,7 @@
   </joint>
 
   <!-- BEGIN camera -->
-  <!-- Grayscale lane camera. tutorial.launch rewrites this block from shared/camera.yaml. -->
+  <!-- Grayscale lane camera. Mount comes from shared/camera.yaml. -->
   <link name="camera_link">
     <visual>
       <origin xyz="-0.004 0 0" rpy="0 0 0"/>

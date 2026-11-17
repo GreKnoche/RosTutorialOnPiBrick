@@ -3,7 +3,7 @@
 <package format="3">
   <name>brick_math</name>
   <version>0.1.0</version>
-  <description>ROS-free 2D yaw and quaternion helpers shared by companion, Pi, and Gazebo.</description>
+  <description>ROS-free 2D yaw and quaternion helpers shared by the ROS packages, Pi, and Gazebo.</description>
   <maintainer email="gregor_knoche@outlook.de">gregor</maintainer>
   <license>Apache-2.0</license>
 

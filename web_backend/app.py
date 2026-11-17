@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from bridge import RobotBridge, WheelGateway
 from drive import mount as mount_drive
+from nav_lab import NavLab
 
 
 def create_app(bridge: WheelGateway | None = None) -> FastAPI:
@@ -29,6 +30,9 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
         finally:
             if owned is not None:
                 owned.stop()
+            nav = getattr(app.state, "nav", None)
+            if nav is not None:
+                await asyncio.to_thread(nav.stop)
 
     app = FastAPI(lifespan=lifespan)
     app.add_middleware(
@@ -38,7 +42,11 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.add_exception_handler(RequestValidationError, invalid_body)
+    app.state.nav = NavLab()
     app.add_api_route("/health", health, methods=["GET"])
+    app.add_api_route("/nav/run", nav_status, methods=["GET"])
+    app.add_api_route("/nav/run", nav_stop, methods=["DELETE"])
+    app.add_api_route("/nav/run", nav_start, methods=["POST"])
     app.add_api_route("/city", city_map, methods=["GET"])
     app.add_api_route("/city/probe/{kapitel}", city_probe, methods=["GET"])
     app.add_api_websocket_route("/ws/twin", twin_socket)
@@ -65,6 +73,27 @@ def city_probe(kapitel: str) -> dict[str, object]:
     if body is None:
         raise HTTPException(status_code=404, detail="keine Stadtprobe")
     return body
+
+
+def nav_status(request: Request) -> dict[str, object]:
+    return request.app.state.nav.status()
+
+
+async def nav_stop(request: Request) -> dict[str, object]:
+    return await asyncio.to_thread(request.app.state.nav.stop)
+
+
+async def nav_start(request: Request) -> JSONResponse:
+    body = await request.json()
+    if not isinstance(body, dict):
+        return JSONResponse({"ok": False, "error": "Der Knoten ist leer."}, status_code=400)
+    lab: NavLab = request.app.state.nav
+    mark = lab.stop_mark()
+    result = await asyncio.to_thread(lab.start, body, mark)
+    if not result.get("ok"):
+        status = 200 if result.get("aborted") else 500
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
 
 
 def health(request: Request) -> dict[str, bool]:

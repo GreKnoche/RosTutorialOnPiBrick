@@ -77,7 +77,7 @@ planner_server:
     costmap_update_timeout: 1.0
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.2
+      tolerance: 0.1
       use_astar: false
       allow_unknown: true
 
@@ -120,7 +120,7 @@ export const HYBRID = NAVFN.replace(
 export const NAVFN_PARAMS = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_navfn_planner::NavfnPlanner"
 # Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
-tolerance: 0.2
+tolerance: 0.1
 # Verwendet A* (true) statt Dijkstra (false) für die Pfadsuche
 use_astar: false
 # Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
@@ -130,7 +130,7 @@ allow_unknown: true
 export const SMAC2D = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlanner2D"
 # Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
-tolerance: 0.5
+tolerance: 0.1
 # Verkleinert die Costmap vor der Suche, um Rechenzeit zu sparen (true/false)
 downsample_costmap: false
 # Faktor, um den die Auflösung bei aktiviertem Downsampling vergröbert wird (1 = Original)
@@ -167,6 +167,8 @@ smoother:
 
 export const THETA = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_theta_star_planner::ThetaStarPlanner"
+# Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
+tolerance: 0.1
 # Suchnachbarschaft auf dem Raster: 4 (nur orthogonal) oder 8 (inkl. Diagonalen)
 how_many_corners: 8
 # Gewicht für die euklidische Pfadlänge. Liegt der Wert unter 1, nutzt die Heuristik denselben Wert
@@ -184,7 +186,7 @@ use_final_approach_orientation: false
 export const LATTICE = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlannerLattice"
 # Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
-tolerance: 0.25
+tolerance: 0.1
 # Erlaubt die Pfadplanung durch unbekannte (noch nicht kartierte) Zellen (true/false)
 allow_unknown: true
 # Maximale Anzahl an Suchschritten, bevor die Planung abgebrochen wird
@@ -239,7 +241,7 @@ if (pluginParamsError(LATTICE, "nav2_smac_planner::SmacPlannerLattice")) {
 export const SMAC = `# Planner-Plugin-Klasse (der Name "GridBased" bleibt für den Behavior Tree erhalten)
 plugin: "nav2_smac_planner::SmacPlannerHybrid"
 # Erlaubter Abstand in m zum exakten Zielpunkt, falls dieser nicht direkt erreichbar ist
-tolerance: 0.20
+tolerance: 0.1
 # Verkleinert die Costmap vor der Suche, um Rechenzeit zu sparen (true/false)
 downsample_costmap: false
 # Faktor, um den die Auflösung bei aktiviertem Downsampling vergröbert wird (1 = Original)

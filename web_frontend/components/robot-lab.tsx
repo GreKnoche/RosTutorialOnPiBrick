@@ -176,6 +176,8 @@ export function RobotLab({
   const turnEnabled = turn !== undefined;
   const pathEnabled = path !== undefined;
   const [rosUp, setRosUp] = useState(false);
+  const rosUpRef = useRef(false);
+  const remoteRef = useRef(false);
   const [status, setStatus] = useState("am Start");
   const [snapshot, setSnapshot] = useState<Snapshot>({
     pose: { x: 0, y: 0, theta: 0 },
@@ -320,7 +322,8 @@ export function RobotLab({
     viewRef.current.trail = [];
     followRef.current = true;
     const jump = jumped();
-    const done = plant.commandPaths(paths, jump);
+    const done = rosUpRef.current ? null : plant.commandPaths(paths, jump);
+    if (rosUpRef.current) remoteRef.current = true;
     const seq = ++seqRef.current;
     mirror({
       type: "drive",
@@ -347,16 +350,52 @@ export function RobotLab({
 
   useEffect(() => {
     const link = openTwin({
-      onConnection: (up) => setRosUp(up),
-      onState: () => {},
-      onDone: () => {},
+      onConnection: (up) => {
+        rosUpRef.current = up;
+        setRosUp(up);
+      },
+      onState: (sample) => {
+        const plant = plantRef.current;
+        if (!plant) return;
+        const external =
+          sample.mode === "teleop" &&
+          sample.owner !== clientId.current &&
+          Math.hypot(sample.linear, sample.angular) > 1e-3;
+        if (sample.mode === "drive" || external) {
+          remoteRef.current = true;
+          plant.reset(sample.x, sample.y, sample.theta);
+          plant.command = { linear: sample.linear, angular: sample.angular };
+          showPlant(null, false);
+          return;
+        }
+        const actionStopped =
+          sample.mode === "teleop" &&
+          sample.owner !== clientId.current &&
+          Math.hypot(sample.linear, sample.angular) <= 1e-3;
+        if (remoteRef.current && (sample.mode === "idle" || actionStopped)) {
+          remoteRef.current = false;
+          plant.reset(sample.x, sample.y, sample.theta);
+          const finished = followRef.current;
+          followRef.current = false;
+          showPlant(null, finished);
+        }
+      },
+      onDone: (msg) => {
+        if (msg.client !== clientId.current || !followRef.current) return;
+        const plant = plantRef.current;
+        const last = msg.poses[msg.poses.length - 1];
+        if (plant && last) plant.reset(last.x, last.y, last.theta);
+        remoteRef.current = false;
+        followRef.current = false;
+        showPlant(msg.jump ? msg.poses : null, true);
+      },
     });
     linkRef.current = link;
     return () => {
       link.close();
       linkRef.current = null;
     };
-  }, []);
+  }, [showPlant]);
 
   useEffect(() => {
     let last = performance.now();
@@ -364,7 +403,7 @@ export function RobotLab({
       const plant = plantRef.current;
       const view = viewRef.current;
       const pathSpec = pathRef.current;
-      if (plant) {
+      if (plant && !remoteRef.current) {
         const now = performance.now();
         let dt = Math.min(0.25, (now - last) / 1000);
         last = now;

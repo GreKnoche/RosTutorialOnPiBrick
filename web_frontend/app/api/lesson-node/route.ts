@@ -11,7 +11,7 @@ function lessonFile(track: string, id: string, level: string): string | null {
   const root = path.resolve(
     process.cwd(),
     "..",
-    "companion/src/brick_lessons/brick_lessons",
+    "lab/brick_lessons/brick_lessons",
     level,
   );
   const file = path.resolve(root, `${track}_${id}.py`);

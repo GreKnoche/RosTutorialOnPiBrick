@@ -1,4 +1,4 @@
-"""Source the companion overlay, then from this directory run: python3 main.py"""
+"""Source the ROS overlay, then from this directory run: python3 main.py"""
 
 from __future__ import annotations
 

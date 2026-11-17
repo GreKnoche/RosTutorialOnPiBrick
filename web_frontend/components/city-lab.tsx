@@ -80,6 +80,14 @@ type Course = {
   trigger?: ObstacleTrigger;
 };
 
+function checkpointsPassed(lap: LapState | null, ids: readonly string[]) {
+  if (ids.length === 0) return 0;
+  if (lap?.done) return ids.length;
+  if (!lap?.next) return 0;
+  const at = ids.indexOf(lap.next);
+  return at < 0 ? 0 : at;
+}
+
 type GhostTake = {
   on: boolean;
   settled: boolean;
@@ -253,6 +261,39 @@ function pathKey(path: NavPath | null) {
   return `${path.length}:${first.x.toFixed(2)},${first.y.toFixed(2)}:${last.x.toFixed(2)},${last.y.toFixed(2)}`;
 }
 
+type MotionAnchor = {
+  x: number;
+  y: number;
+  theta: number;
+  linear: number;
+  angular: number;
+  at: number;
+};
+
+function wrapTurn(delta: number) {
+  return Math.atan2(Math.sin(delta), Math.cos(delta));
+}
+
+/** Unicycle step from the last server sample. Same arc as the plant. */
+function coast(anchor: MotionAnchor, now: number) {
+  const dt = Math.min(0.25, Math.max(0, (now - anchor.at) / 1000));
+  const { x, y, theta, linear: v, angular: w } = anchor;
+  if (dt === 0 || (Math.abs(v) < 1e-4 && Math.abs(w) < 1e-4)) return { x, y, theta };
+  if (Math.abs(w) < 1e-3) {
+    return { x: x + v * Math.cos(theta) * dt, y: y + v * Math.sin(theta) * dt, theta };
+  }
+  const next = theta + w * dt;
+  return {
+    x: x + (v / w) * (Math.sin(next) - Math.sin(theta)),
+    y: y - (v / w) * (Math.cos(next) - Math.cos(theta)),
+    theta: next,
+  };
+}
+
+function parkAnchor(pose: { x: number; y: number; theta: number }, now = performance.now()): MotionAnchor {
+  return { x: pose.x, y: pose.y, theta: pose.theta, linear: 0, angular: 0, at: now };
+}
+
 function CameraAside({
   camera,
   poseRef,
@@ -360,6 +401,7 @@ export function CityLab({
   costmapToggle = false,
   pathToggle = false,
   walls = false,
+  obstacleLegend = false,
   freedrive = false,
   cameraPane = false,
   defaultCamera = false,
@@ -389,6 +431,8 @@ export function CityLab({
   costmapToggle?: boolean;
   pathToggle?: boolean;
   walls?: boolean;
+  /** Small map key: yellow square means a spawned obstacle. */
+  obstacleLegend?: boolean;
   freedrive?: boolean;
   cameraPane?: boolean;
   defaultCamera?: boolean;
@@ -397,6 +441,7 @@ export function CityLab({
   const frameRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<CityMap | null>(null);
   const poseRef = useRef({ x: 1.576, y: 5.554, theta: 0 });
+  const anchorRef = useRef<MotionAnchor>(parkAnchor({ x: 1.576, y: 5.554, theta: 0 }, 0));
   const lapRef = useRef<LapState | null>(null);
   const [lap, setLap] = useState<LapState | null>(null);
   const rangesRef = useRef<Array<number | null> | undefined>(undefined);
@@ -549,6 +594,12 @@ export function CityLab({
   zoomRef.current = zoom;
   const lookRef = useRef<{ x: number; y: number } | null>(lookForTopRight());
   const dragRef = useRef<{ id: number; x: number; y: number; lookX: number; lookY: number } | null>(null);
+  useEffect(() => {
+    if (!missionKey) return;
+    lookRef.current = lookForTopRight();
+    dragRef.current = null;
+    setZoom(ZOOM_DEFAULT);
+  }, [missionKey]);
   const melonsRef = useRef(freshMelons());
   const [melonsLeft, setMelonsLeft] = useState(MELONS.length);
   const [wallsHit, setWallsHit] = useState(0);
@@ -655,7 +706,10 @@ export function CityLab({
         const city = parseCity(data);
         if (cancel || !city) return;
         cityRef.current = city;
-        if (!havePose.current) poseRef.current = { ...city.start };
+        if (!havePose.current) {
+          poseRef.current = { ...city.start };
+          anchorRef.current = parkAnchor(city.start);
+        }
         setMapUp(true);
       })
       .catch(() => {});
@@ -695,6 +749,21 @@ export function CityLab({
         setPhase(next);
       },
       onState(sample: TwinState) {
+        const now = performance.now();
+        const shown = coast(anchorRef.current, now);
+        const dx = sample.x - shown.x;
+        const dy = sample.y - shown.y;
+        const dth = wrapTurn(sample.theta - shown.theta);
+        const jump = !havePose.current || Math.hypot(dx, dy) > 0.4 || Math.abs(dth) > 0.7;
+        const gain = jump ? 1 : 0.5;
+        anchorRef.current = {
+          x: shown.x + dx * gain,
+          y: shown.y + dy * gain,
+          theta: shown.theta + dth * gain,
+          linear: sample.appliedLinear ?? sample.linear,
+          angular: sample.appliedAngular ?? sample.angular,
+          at: now,
+        };
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
         const nextLap = sample.lap ?? null;
@@ -786,24 +855,15 @@ export function CityLab({
 
   useEffect(() => {
     let painted = "";
-    const step = () => {
-      const pose = poseRef.current;
+    let frameId = 0;
+    const paint = () => {
+      const pose = coast(anchorRef.current, performance.now());
       const look = lookRef.current;
       const view = look ?? pose;
       const runner = runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null);
       const frame = frameRef.current;
       const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
       const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
-      const run = ghostRunRef.current;
-      if (ghostHoldRef.current !== null && !run && ghostOnRef.current) {
-        const next = lapRef.current?.next ?? "";
-        if (next === "start") ghostSawStart.current = true;
-        else if (ghostSawStart.current && next) {
-          const offset = ghostHoldRef.current;
-          ghostHoldRef.current = null;
-          ghostRunRef.current = { t0: performance.now() - offset * 1000, line: offset };
-        }
-      }
       const clock = ghostRunRef.current;
       const held = ghostHoldRef.current;
       const ghostPose =
@@ -815,8 +875,8 @@ export function CityLab({
         pose.y.toFixed(3),
         pose.theta.toFixed(3),
         ghostPose ? `${ghostPose.x.toFixed(2)}:${ghostPose.y.toFixed(2)}:${ghostPose.theta.toFixed(2)}` : "",
-        view.x.toFixed(3),
-        view.y.toFixed(3),
+        view.x.toFixed(2),
+        view.y.toFixed(2),
         zoomRef.current,
         raysRef.current ? "1" : "0",
         minBodyRef.current ? "1" : "0",
@@ -865,6 +925,19 @@ export function CityLab({
           pathToggleRef.current && showPathRef.current ? pathRef.current : null,
           bodyColorRef.current,
         );
+      }
+      frameId = window.requestAnimationFrame(paint);
+    };
+    const step = () => {
+      const run = ghostRunRef.current;
+      if (ghostHoldRef.current !== null && !run && ghostOnRef.current) {
+        const next = lapRef.current?.next ?? "";
+        if (next === "start") ghostSawStart.current = true;
+        else if (ghostSawStart.current && next) {
+          const offset = ghostHoldRef.current;
+          ghostHoldRef.current = null;
+          ghostRunRef.current = { t0: performance.now() - offset * 1000, line: offset };
+        }
       }
       const runningCourse = courseRef.current;
       const here = poseRef.current;
@@ -980,9 +1053,11 @@ export function CityLab({
         setStatusText((previous) => (previous === report.text ? previous : report.text));
       }
     };
+    paint();
     step();
     const id = window.setInterval(step, 50);
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.clearInterval(id);
     };
   }, [mapUp]);
@@ -1006,7 +1081,9 @@ export function CityLab({
         probeRef.current = next;
         setProbe(next);
         if (next && !havePose.current) {
-          poseRef.current = { x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 };
+          const home = { x: next.start.x, y: next.start.y, theta: next.start.theta ?? 0 };
+          poseRef.current = home;
+          anchorRef.current = parkAnchor(home);
         }
       })
       .catch(() => {});
@@ -1053,12 +1130,10 @@ export function CityLab({
   const roundSeen = useRef(round);
   const holdMelons = useRef(false);
   const placeAt = (home: { x: number; y: number; theta: number }) => {
-    poseRef.current = { x: home.x, y: home.y, theta: home.theta };
+    const homePose = { x: home.x, y: home.y, theta: home.theta };
+    poseRef.current = homePose;
+    anchorRef.current = parkAnchor(homePose);
     havePose.current = true;
-    const origin = cityRef.current?.start;
-    if (origin && Math.hypot(home.x - origin.x, home.y - origin.y) > 0.5) {
-      lookRef.current = { x: home.x, y: home.y };
-    }
     linkRef.current?.send({
       type: "reset",
       client: sessionRef.current,
@@ -1276,6 +1351,8 @@ export function CityLab({
   }, [nodeLog]);
 
   const showStop = playBusy || runLive || stopping;
+  const checkpointIds = course?.checkpoints.map((gate) => gate.id) ?? [];
+  const checkpointsDone = checkpointsPassed(lap, checkpointIds);
 
   const body = (
     <div className="flex min-w-0 flex-col gap-4">
@@ -1323,16 +1400,27 @@ export function CityLab({
             {raceNote || lap.text}
           </p>
         ) : null}
-        {!kapitel && (melons || walls) ? (
+        {!kapitel && (melons || walls || gates) ? (
           <div className="absolute top-3 left-8 z-10 flex max-w-[18rem] flex-col gap-1">
             {melons ? (
               <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
                 {melonsLeft === 0 ? "Alle Melonen" : `Melonen ${spotsRef.current.length - melonsLeft}/${spotsRef.current.length}`}
               </p>
             ) : null}
-            {walls ? (
+            {gates && checkpointIds.length > 0 ? (
               <p className="w-fit rounded-full bg-[#1c1404]/80 px-3 py-1 text-xs font-semibold text-[#f4efe4]">
-                {wallsHit === 1 ? "Wand 1" : `Wände ${wallsHit}`}
+                {checkpointsDone === checkpointIds.length
+                  ? "Alle Checkpoints"
+                  : `Checkpoints ${checkpointsDone}/${checkpointIds.length}`}
+              </p>
+            ) : null}
+            {walls ? (
+              <p
+                className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                  wallsHit < 1 ? "bg-[#14301c]/90 text-[#d7ffe4]" : "bg-[#4a1c14]/90 text-[#ffd0c8]"
+                }`}
+              >
+                {wallsHit < 1 ? "Wände < 1" : wallsHit === 1 ? "Wand 1" : `Wände ${wallsHit}`}
               </p>
             ) : null}
             {melonNote ? (
@@ -1354,13 +1442,30 @@ export function CityLab({
             {formatDe(mapPin.x, 2)} m, {formatDe(mapPin.y, 2)} m, {formatDe(wrapAngle(mapPin.theta), 2)}
           </span>
         ) : null}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1">
-          <Button type="button" aria-label="Herauszoomen" onClick={() => setZoom((current) => clampZoom(current / 1.25))}>
-            −
-          </Button>
-          <Button type="button" aria-label="Hineinzoomen" onClick={() => setZoom((current) => clampZoom(current * 1.25))}>
-            +
-          </Button>
+        <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start gap-1.5">
+          {obstacleLegend ? (
+            <div className="pointer-events-none flex flex-col gap-1 rounded bg-neutral-900/75 px-2 py-1 text-[0.7rem] text-[#f4efe4]">
+              <p className="flex items-center gap-1.5">
+                <span aria-hidden className="relative size-2.5 shrink-0 overflow-hidden bg-[#e4c48a]">
+                  <span className="absolute inset-x-0 top-0 h-1/2 bg-black/35" />
+                  <span className="absolute inset-x-0 top-1/2 h-px bg-white" />
+                </span>
+                houses
+              </p>
+              <p className="flex items-center gap-1.5">
+                <span aria-hidden className="size-2.5 shrink-0 bg-[#ffe060]" />
+                obstacles
+              </p>
+            </div>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <Button type="button" aria-label="Herauszoomen" onClick={() => setZoom((current) => clampZoom(current / 1.25))}>
+              −
+            </Button>
+            <Button type="button" aria-label="Hineinzoomen" onClick={() => setZoom((current) => clampZoom(current * 1.25))}>
+              +
+            </Button>
+          </div>
         </div>
         <Button
           type="button"

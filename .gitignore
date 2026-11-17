@@ -11,9 +11,12 @@ __pycache__/
 test-results/
 playwright-report/
 
-companion/build/
-companion/install/
-companion/log/
+brick/build/
+brick/install/
+brick/log/
+lab/build/
+lab/install/
+lab/log/
 gazebo/build/
 gazebo/install/
 gazebo/log/
@@ -23,7 +26,7 @@ pi-brick/log/
 build/
 install/
 log/
-companion/src/brick_description/config/chassis.yaml
+brick/brick_description/config/chassis.yaml
 pi-brick/brick_hw/config/chassis.yaml
 
 *.log

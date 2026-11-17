@@ -31,15 +31,17 @@ COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /ws
 COPY shared /ws/shared
-COPY companion/src/brick_interfaces /ws/companion/src/brick_interfaces
-COPY companion/src/brick_core /ws/companion/src/brick_core
-COPY companion/src/brick_description/urdf /ws/companion/src/brick_description/urdf
-COPY companion/src/brick_lessons/brick_lessons /ws/companion/src/brick_lessons/brick_lessons
-RUN ln -s ../../shared/brick_math /ws/companion/src/brick_math
+COPY brick/brick_interfaces /ws/src/brick_interfaces
+COPY brick/brick_core /ws/src/brick_core
+COPY brick/brick_description/urdf /ws/brick/brick_description/urdf
+COPY lab/brick_lessons/brick_lessons /ws/lab/brick_lessons/brick_lessons
+COPY lab/brick_nav/behavior_trees /ws/lab/brick_nav/behavior_trees
+COPY lab/brick_drive /ws/src/brick_drive
+RUN ln -s /ws/shared/brick_math /ws/src/brick_math
 
-WORKDIR /ws/companion
+WORKDIR /ws
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
-    && colcon build --symlink-install --packages-select brick_math brick_interfaces brick_core
+    && colcon build --symlink-install --packages-select brick_math brick_interfaces brick_core brick_drive
 
 COPY web_backend /ws/web_backend
 RUN python3 -m venv --system-site-packages /ws/web_backend/.venv \
