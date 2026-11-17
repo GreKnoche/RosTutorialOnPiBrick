@@ -71,7 +71,10 @@ const plugin: Nav2Station = {
     +"**Eigenschaft:** A*-Suche mit vordefinierten Fahr-Manövern (Motion Primitives).\n"
     +"**Vorteil:** **Ideal für komplexe Roboter-Geometrien**, da vorgeprüfte Mini-Fahrwege kombiniert werden und so der Rechenaufwand zur Laufzeit sinkt.\n"
     +"**Nachteil:** Starrheit durch die feste Manöver-Bibliothek (unpassende Primitiven blockieren die Planung).\n"
-    +"**Hier sichtbar:** **Glatte Kurven** trotz fehlendem Smoother, aber **Zickzack-Kurs** in der engen, schrägen Gasse wegen fester Manöver-Schritte.\n\n",
+    +"**Hier sichtbar:** **Glatte Kurven** trotz fehlendem Smoother, aber **Zickzack-Kurs** in der engen, schrägen Gasse wegen fester Manöver-Schritte.\n\n"
+    +"**Aufgabe:**\n"
+    +"**1.** Fahre die Tour mit jedem Planner.\n"
+    +"**2.** Sammle die Melonen und vergleiche Pfad und Fahrverhalten.\n",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 52 },
     { id: "global_costmap", x: 50, y: 22 },

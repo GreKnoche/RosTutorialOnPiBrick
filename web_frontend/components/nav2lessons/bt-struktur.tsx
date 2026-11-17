@@ -69,7 +69,10 @@ const btStruktur: Nav2Station = {
   showProgress: true,
   cityObstacles: true,
   explain:
-    "In dieser Mission geht es einen funktionierenden Behavior Tree(BT) zu erstellen. Die Animationen unten zeigen wie verschiedene Wurzelelemente eingesetzt werden. Diese sollen dazu genutzt werden um den BT zu vervollständigen.\n\nEin wichtiger Kindknoten ist dabei der Backup-Knoten, diesen kannst du folgendermaßen einsetzen:\n**<BackUp backup_dist=\"?\" backup_speed=\"?\"/>**\nDabei die Fragezeichen druch konkrete Werte ersetzen.\n\nHinweise:\n**1.** Den besten Einstieg bietet </Element1>.\n**2.** Es gibt mehrere Lösungen, die Kommentare im BT dienen nur der Vereinfachung.",
+    "In dieser Mission geht es einen funktionierenden Behavior Tree(BT) zu erstellen. Die Animationen unten zeigen wie verschiedene Wurzelelemente eingesetzt werden. Diese sollen dazu genutzt werden um den BT zu vervollständigen.\n\nEin wichtiger Kindknoten ist dabei der Backup-Knoten, diesen kannst du folgendermaßen einsetzen:\n**<BackUp backup_dist=\"?\" backup_speed=\"?\"/>**\nDabei die Fragezeichen druch konkrete Werte ersetzen.\n\nHinweise:\n**1.** Den besten Einstieg bietet </Element1>.\n**2.** Es gibt mehrere Lösungen, die Kommentare im BT dienen nur der Vereinfachung.\n\n"
+    + "**Aufgabe:**\n"
+    + "**1.** Ersetze die Platzhalter im Behavior Tree durch passende Kontrollknoten.\n"
+    + "**2.** Baue BackUp ein, damit der Roboter die Sackgasse verlässt und beide Melonen erreicht.",
   nodes: [
     { id: "waypoint_lesson", x: 8, y: 50 },
     { id: "mission", x: 36, y: 50 },

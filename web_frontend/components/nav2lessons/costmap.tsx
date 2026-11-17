@@ -23,7 +23,11 @@ const costmap: Nav2Station = {
   tree: "through",
   showProgress: true,
   cityObstacles: true,
-  explain: "Hier bearbeiten wir die Konfiguration der \"global Costmap\". Costmaps werden von den Plannern verwendet um auf diesen die Wegpunkte auszurechnen, die Costmaps liefern dazu die Hindernisse bzw. Einschränkungen. Die Mission ist zu bestehen in dem nur Einstellungen in der global_costmap vorgenommen werden. Zur Not können Einstellungen auch im Controller erfolgen. Toggle die Costmap am Button unter der Karte an und aus, vor dem ersten Start kann es etwas fehlerhaft sein",
+  explain:
+    "Hier bearbeiten wir die Konfiguration der \"global Costmap\". Costmaps werden von den Plannern verwendet um auf diesen die Wegpunkte auszurechnen, die Costmaps liefern dazu die Hindernisse bzw. Einschränkungen. Die Mission ist zu bestehen in dem nur Einstellungen in der global_costmap vorgenommen werden. Zur Not können Einstellungen auch im Controller erfolgen. Toggle die Costmap am Button unter der Karte an und aus, vor dem ersten Start kann es etwas fehlerhaft sein.\n\n"
+    + "**Aufgabe:**\n"
+    + "**1.** Setze den Wegpunkt zur Melone.\n"
+    + "**2.** Passe die global_costmap an, sodass der Planner einen Weg durch die Engstellen findet.",
   nodes: [
     { id: "waypoint_lesson", x: 12, y: 50 },
     { id: "global_costmap", x: 42, y: 22 },

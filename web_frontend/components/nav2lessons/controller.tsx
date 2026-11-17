@@ -10,7 +10,10 @@ const controller: Nav2Station = {
   showProgress: false,
   cityObstacles: false,
   explain:
-    "Der Controller ist vergleichbar mit dem Fahrer eines Fahrzeugs: Er bekommt vom Navi (Planner) die Route und setzt sie in konkrete Fahrbefehle um. Der Regulated Pure Pursuit verfolgt dabei immer einen Zielpunkt ein Stück voraus auf der Linie ('Pure Pursuit' / Lookahead), passt die Geschwindigkeit vor Kurven und Hindernissen automatisch an ('Regulated') und dreht den Roboter bei großen Winkelabweichungen zuerst auf der Stelle in Richtung Pfad.",
+    "Der Controller ist vergleichbar mit dem Fahrer eines Fahrzeugs: Er bekommt vom Navi (Planner) die Route und setzt sie in konkrete Fahrbefehle um. Der Regulated Pure Pursuit verfolgt dabei immer einen Zielpunkt ein Stück voraus auf der Linie ('Pure Pursuit' / Lookahead), passt die Geschwindigkeit vor Kurven und Hindernissen automatisch an ('Regulated') und dreht den Roboter bei großen Winkelabweichungen zuerst auf der Stelle in Richtung Pfad.\n\n"
+    + "**Aufgabe:**\n"
+    + "**1.** Setze Wegpunkte durch die Tore.\n"
+    + "**2.** Stelle FollowPath so ein, dass der Roboter den Parcours schafft.",
   nodes: [
     { id: "waypoint_lesson", x: 22, y: 50 },
     { id: "controller", x: 78, y: 50 },
