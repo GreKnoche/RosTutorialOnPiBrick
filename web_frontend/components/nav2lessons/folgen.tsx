@@ -4,7 +4,7 @@ import type { Nav2Station } from "./types";
 const folgen: Nav2Station = {
   id: "folgen",
   focus: "waypoint_follower",
-  edit: ["waypoint_lesson", "waypoint_follower", "maneuver"],
+  edit: ["waypoint_lesson", "maneuver"],
   client: "waypoints",
   tree: "pose",
   showProgress: false,

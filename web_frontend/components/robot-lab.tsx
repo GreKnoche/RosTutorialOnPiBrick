@@ -236,6 +236,7 @@ export function RobotLab({
       if (pathSpec) pathSpec.onPose({ ...shown });
       if (done) {
         const trail = view.trail.map((point) => ({ ...point }));
+        followRef.current = false;
         if (rulerSpec) rulerSpec.onDone(drivenMetersFromPose(shown));
         else if (turnSpec) turnSpec.onDone(shown.theta);
         else if (pathSpec) pathSpec.onDone(shown, trail);
@@ -321,9 +322,9 @@ export function RobotLab({
     plant.reset(x, y, theta);
     viewRef.current.trail = [];
     followRef.current = true;
+    remoteRef.current = false;
     const jump = jumped();
-    const done = rosUpRef.current ? null : plant.commandPaths(paths, jump);
-    if (rosUpRef.current) remoteRef.current = true;
+    const done = plant.commandPaths(paths, jump);
     const seq = ++seqRef.current;
     mirror({
       type: "drive",
@@ -357,6 +358,9 @@ export function RobotLab({
       onState: (sample) => {
         const plant = plantRef.current;
         if (!plant) return;
+        // The lesson canvas owns its drive. Twin snapshots would reset that
+        // path, stall the drawing, and skip the mission.
+        if (rulerRef.current || turnRef.current || pathRef.current) return;
         const external =
           sample.mode === "teleop" &&
           sample.owner !== clientId.current &&
@@ -381,6 +385,7 @@ export function RobotLab({
         }
       },
       onDone: (msg) => {
+        if (rulerRef.current || turnRef.current || pathRef.current) return;
         if (msg.client !== clientId.current || !followRef.current) return;
         const plant = plantRef.current;
         const last = msg.poses[msg.poses.length - 1];

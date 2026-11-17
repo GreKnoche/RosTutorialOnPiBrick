@@ -12,6 +12,12 @@ const BODY_L = 68;
 const BODY_W = 44;
 const tracks = curriculumOutline().map((item) => item.track);
 
+const CARD_LINE: Record<TrackId, string> = {
+  autonom: "Einsteigerkurs für Anfänger",
+  ros: "Noch nicht fertig",
+  nav2: "Einstieg ins Nav2 Framework",
+};
+
 const ROAD_W = 76;
 const FLAG = 32;
 
@@ -237,8 +243,13 @@ export function TrackRace() {
                   : undefined
               }
             >
-              <PathIcon id={track.id} className="size-7 sm:size-8" />
-              <span className="w-full min-w-0 text-balance">{track.title}</span>
+              <PathIcon id={track.id} className="size-7 shrink-0 sm:size-8" />
+              <span className="flex w-full min-w-0 flex-col gap-1">
+                <span className="text-balance">{track.title}</span>
+                <span className="text-xs font-normal leading-snug text-muted-foreground sm:text-sm">
+                  {CARD_LINE[track.id]}
+                </span>
+              </span>
             </button>
           ))}
         </div>
