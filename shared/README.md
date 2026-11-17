@@ -17,4 +17,4 @@ Pi and Gazebo are I/O boxes. The web lab's canvas twin owns `/odom` for Nav2 and
 | `/odom/gyro` | `nav_msgs/Odometry` | Borenstein fuse. In Gazebo it reads `/odom/encoder` and `/imu`. |
 | TF `odom → base_link` | web twin in the lab; Gazebo compare uses `/odom/perfect` | one publisher per session |
 
-Gazebo-only: `/odom/perfect`, `/odom/wheel`, `/odom/encoder`. A static map is `map → odom` (identity). No SLAM.
+Gazebo-only: `/odom/perfect`, `/odom/encoder`, `/odom/gyro`. A static map is `map → odom` (identity). No SLAM.

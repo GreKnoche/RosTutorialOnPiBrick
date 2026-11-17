@@ -20,7 +20,7 @@ services:
       - XDG_RUNTIME_DIR=/tmp/runtime-ev3
       - QT_X11_NO_MITSHM=1
       - GZ_VERSION=harmonic
-      - WORLD=${WORLD:-oval}
+      - WORLD=${WORLD:-relief}
       - BRICK_CAMERA_YAML=/ws/camera.yaml
     devices:
       - /dev/dri

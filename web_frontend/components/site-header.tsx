@@ -13,7 +13,7 @@ const links = [
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
   { href: "/freedrive", label: "Freedrive" },
-  { href: "/studio", label: "Studio" },
+  { href: "/studio", label: "Studio", adminOnly: true },
 ];
 
 function linkActive(href: string, pathname: string) {
@@ -140,6 +140,8 @@ function DebugAccess() {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const admin = useDebugAdmin();
+  const navLinks = links.filter((link) => !("adminOnly" in link && link.adminOnly) || admin);
   if (pathname === "/") return null;
   return (
     <header className="relative z-30 border-b border-border/80 bg-background/80 backdrop-blur">
@@ -149,7 +151,7 @@ export function SiteHeader() {
           <span className="text-lg tracking-tight">EV3-Nav2-Labor</span>
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-1 text-sm">
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}

@@ -152,8 +152,8 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "world",
-                default_value="oval",
-                description="Gazebo world: oval (stadium road, default), lab (flat), ruler (1 m tape), or relief (kerbs).",
+                default_value="relief",
+                description="Gazebo world: relief (kerb course, default), oval (stadium road), lab (flat), or ruler (1 m tape).",
             ),
             DeclareLaunchArgument(
                 "gz_args_prefix",

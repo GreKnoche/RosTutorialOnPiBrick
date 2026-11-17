@@ -46,13 +46,15 @@ function MapClock({ runKey, running }: { runKey: number; running: boolean }) {
 
   useEffect(() => {
     if (runKey === 0) return;
-    origin.current = performance.now();
+    origin.current = 0;
     setStamp(runKey);
     setMs(0);
   }, [runKey]);
 
   useEffect(() => {
     if (!running || stamp !== runKey || runKey === 0) return;
+    origin.current = performance.now();
+    setMs(0);
     const id = window.setInterval(() => {
       setMs(performance.now() - origin.current);
     }, 200);
@@ -458,6 +460,7 @@ export function CityLab({
   const nodeLog = useSyncExternalStore(subscribeRunTerminal, readRunTerminal, serverRunTerminal);
   const [booting, setBooting] = useState(false);
   const [runLive, setRunLive] = useState(false);
+  const [navRunning, setNavRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
   const stoppingRef = useRef(false);
   const logRef = useRef<HTMLPreElement>(null);
@@ -566,6 +569,8 @@ export function CityLab({
   const monitorMovedRef = useRef(false);
   const monitorStillRef = useRef(0);
   const monitorDoneRef = useRef(false);
+  const holdMelons = useRef(false);
+  const melonHomeSince = useRef(0);
   const clearedRef = useRef(onMelonsCleared);
   clearedRef.current = onMelonsCleared;
   const gatesClearedRef = useRef(onGatesCleared);

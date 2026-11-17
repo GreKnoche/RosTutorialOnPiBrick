@@ -2,7 +2,7 @@
 # Public: /cmd_vel in, /joint_states /imu /ultrasonic /camera/image_raw out
 # (US via scan_to_range). Camera topics follow shared/camera.yaml at launch.
 # The compare launch owns /odom/encoder, /odom/gyro, and TF from /odom/perfect.
-# Debug-only: /odom/wheel, /odom/perfect. Do not bridge DiffDrive or OdometryPublisher TF.
+# Debug-only: /odom/perfect. Do not bridge DiffDrive wheel odom or OdometryPublisher TF.
 ---
 - ros_topic_name: "/cmd_vel"
   gz_topic_name: "/model/ev3/cmd_vel"
@@ -13,11 +13,6 @@
   gz_topic_name: "/clock"
   ros_type_name: "rosgraph_msgs/msg/Clock"
   gz_type_name: "gz.msgs.Clock"
-  direction: GZ_TO_ROS
-- ros_topic_name: "/odom/wheel"
-  gz_topic_name: "/model/ev3/odometry"
-  ros_type_name: "nav_msgs/msg/Odometry"
-  gz_type_name: "gz.msgs.Odometry"
   direction: GZ_TO_ROS
 - ros_topic_name: "/odom/perfect"
   gz_topic_name: "/model/ev3/odometry_truth"
