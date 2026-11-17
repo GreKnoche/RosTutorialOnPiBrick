@@ -1,4 +1,4 @@
-"""Medium. Der Knoten steht. Ergänze den Aufruf der Aktion /drive.
+"""Cruise. Der Knoten steht. Ergänze den Aufruf der Aktion /drive.
 
 Ziele: brick_lessons.goals.GOALS["autonom_08"].medium
 Start: ros2 run brick_lessons autonom_08_medium

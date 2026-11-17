@@ -155,6 +155,30 @@ def test_imu_yaw_follows_the_pose_and_a_start_accelerates() -> None:
     assert plant.odom.pose.theta > 0.02
 
 
+def test_freedrive_drives_its_own_city_and_leaves_nav2_alone() -> None:
+    from city import City
+
+    nav = CanvasPlant()
+    free = CanvasPlant(world=City(), direct=True)
+    apply_message(nav, {"type": "city", "enter": True, "client": "labor"})
+    apply_message(free, {"type": "city", "enter": True, "client": "free"})
+    nav_x = nav.odom.pose.x
+    apply_message(free, {"type": "twist", "linear": 0.2, "angular": 0.0, "client": "free"})
+    free.step(0.2)
+    assert free.odom.pose.x > nav_x + 0.03
+    assert math.isclose(nav.odom.pose.x, nav_x)
+    apply_message(free, {"type": "twist", "linear": 0.0, "angular": 0.0, "client": "lesson"})
+    assert math.isclose(free.command.linear, 0.2)
+    apply_message(free, {"type": "flags", "client": "free", "clutter": True})
+    assert free.city is not None and free.city.clutter
+    assert nav.city is not None and nav.city.clutter == []
+    apply_message(nav, {"type": "twist", "linear": 0.2, "angular": 0.0, "client": "labor"})
+    assert math.isclose(nav.command.linear, 0.0)
+    apply_message(free, {"type": "city", "enter": False, "client": "free"})
+    assert free.city is None
+    assert nav.city is CITY
+
+
 def test_a_lesson_command_does_not_move_the_city() -> None:
     plant = CanvasPlant()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})

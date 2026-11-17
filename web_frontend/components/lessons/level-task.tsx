@@ -6,52 +6,67 @@ import {
   formatStep,
   lessonLevelKey,
   lessonLevels,
+  lessonUsesModes,
   type LessonLevel,
 } from "@/lib/lesson-levels";
 import { cn } from "@/lib/utils";
 
-const LEVELS: { id: LessonLevel; label: string }[] = [
+const DIFFICULTIES: { id: LessonLevel; label: string }[] = [
   { id: "beginner", label: "Beginner" },
   { id: "medium", label: "Medium" },
   { id: "hard", label: "Hard" },
 ];
 
+const MODES: { id: LessonLevel; label: string }[] = [
+  { id: "beginner", label: "Touring" },
+  { id: "medium", label: "Cruise" },
+];
+
 export function LevelSwitch({ lesson, level }: { lesson: Lesson; level: LessonLevel }) {
   const href = lessonHref(lesson);
+  const modes = lessonUsesModes(lesson.track, lesson.id);
+  const items = modes ? MODES : DIFFICULTIES;
   return (
-    <nav aria-label="Schwierigkeit" className="flex flex-wrap gap-2">
-      {LEVELS.map((item) => {
-        const current = level === item.id;
-        return (
-          <Link
-            key={item.id}
-            href={item.id === "beginner" ? href : `${href}?stufe=${item.id}`}
-            aria-current={current ? "page" : undefined}
-            className={cn(
-              "rounded-lg border px-2.5 py-1 text-sm",
-              current
-                ? "border-transparent bg-primary text-primary-foreground"
-                : "border-border bg-card hover:bg-muted",
-            )}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="flex flex-wrap items-center gap-2">
+      {modes ? (
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Modus</span>
+      ) : null}
+      <nav aria-label={modes ? "Modus" : "Schwierigkeit"} className="flex flex-wrap gap-2">
+        {items.map((item) => {
+          const current = level === item.id;
+          return (
+            <Link
+              key={item.id}
+              href={item.id === "beginner" ? href : `${href}?stufe=${item.id}`}
+              aria-current={current ? "page" : undefined}
+              className={cn(
+                "rounded-lg border px-2.5 py-1 text-sm",
+                current
+                  ? "border-transparent bg-primary text-primary-foreground"
+                  : "border-border bg-card hover:bg-muted",
+              )}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 
 export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" | "hard" }) {
   const spec = lessonLevels[`${lesson.track}:${lesson.id}`];
   const key = lessonLevelKey(lesson.track, lesson.id);
+  const modes = lessonUsesModes(lesson.track, lesson.id);
   const steps = spec ? spec[level] : [];
   const file = `companion/src/brick_lessons/brick_lessons/${level}/${key}.py`;
   const command = `ros2 run brick_lessons ${key}_${level}`;
+  const eyebrow = modes ? "Cruise" : level === "medium" ? "Medium" : "Hard";
   return (
     <LessonSection
       id="stufe"
-      eyebrow={level === "medium" ? "Medium" : "Hard"}
+      eyebrow={eyebrow}
       title={
         level === "medium"
           ? "Im vorgefertigten Knoten die Aktion aufrufen"
@@ -75,7 +90,7 @@ export function LevelTask({ lesson, level }: { lesson: Lesson; level: "medium" |
           </ol>
         </div>
       ) : null}
-      <NodeEditor track={lesson.track} lessonId={lesson.id} level={level} />
+      <NodeEditor track={lesson.track} lessonId={lesson.id} level={level} highlight={modes} />
       <p className="font-mono text-[0.65rem] leading-5">
         {file}
         <br />

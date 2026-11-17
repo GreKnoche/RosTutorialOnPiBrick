@@ -32,7 +32,7 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
   },
   "autonom:03": {
     focus:
-      "Medium schickt eine gerade 1-m-Fahrt. Hard schickt vier Ziele nacheinander, jedes 1 m und danach π/2, und legt damit ein Quadrat. Der Fortschritt kommt jedes Mal aus /odom.",
+      "Cruise schickt eine gerade 1-m-Fahrt. Der Fortschritt kommt aus /odom.",
     medium: [meter],
     hard: [halfSquare, halfSquare, halfSquare, halfSquare],
   },
@@ -104,7 +104,7 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
   },
   "ros:06": {
     focus:
-      "Derselbe Knoten und dieselbe Aktion. Canvas, Gazebo und Hardware unterscheiden sich nur darin, wer /cmd_vel ausführt und /odom veröffentlicht.",
+      "Cruise schickt dieselbe Aktion. Canvas, Gazebo und Hardware unterscheiden sich nur darin, wer /cmd_vel ausführt und /odom veröffentlicht.",
     medium: [meter],
     hard: [meter],
   },
@@ -116,9 +116,29 @@ export const lessonLevels: Record<string, LessonLevelSpec> = {
   },
 };
 
+/** Diese Lektionen haben Modi statt Schwierigkeitsstufen. Hard gibt es dort nicht. */
+const MODE_LESSONS = new Set([
+  "autonom:01",
+  "autonom:02",
+  "autonom:03",
+  "autonom:07",
+  "autonom:08",
+  "ros:06",
+]);
+
+export function lessonUsesModes(track: string, id: string): boolean {
+  return MODE_LESSONS.has(`${track}:${id}`);
+}
+
 export function parseLevel(value: string | undefined): LessonLevel {
   if (value === "medium" || value === "hard") return value;
   return "beginner";
+}
+
+/** Hard-Adressen der Modus-Lektionen fallen auf Touring zurück. */
+export function lessonLevelFor(track: string, id: string, level: LessonLevel): LessonLevel {
+  if (lessonUsesModes(track, id) && level === "hard") return "beginner";
+  return level;
 }
 
 export function lessonLevelKey(track: string, id: string): string {

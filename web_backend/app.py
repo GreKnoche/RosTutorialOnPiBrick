@@ -89,9 +89,14 @@ async def twin_socket(websocket: WebSocket) -> None:
     reader = asyncio.create_task(_twin_reader(websocket, bridge, session))
     try:
         while not reader.done():
-            payload = {"type": "state", **bridge.twin_snapshot()}
+            free = session.get("lane") == "free"
+            if free:
+                payload = {"type": "state", **getattr(bridge, "twin_free_snapshot", bridge.twin_snapshot)()}
+            else:
+                payload = {"type": "state", **bridge.twin_snapshot()}
             if session["city"]:
-                view = getattr(bridge, "twin_city_view", lambda: {})()
+                view_name = "twin_free_city_view" if free else "twin_city_view"
+                view = getattr(bridge, view_name, lambda: {})()
                 if isinstance(view, dict) and view:
                     payload["ranges"] = view.get("ranges")
                     payload["applied_linear"] = view.get("applied_linear")
@@ -106,12 +111,22 @@ async def twin_socket(websocket: WebSocket) -> None:
                     if isinstance(view.get("bumps"), int):
                         payload["bumps"] = view["bumps"]
                     session["tick"] = int(session["tick"]) + 1
-                    if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
-                        payload["image"] = view["image"]
-                    if session["tick"] % 20 == 0 and "costmap" in view:
-                        payload["costmap"] = view["costmap"]
-                    if session["tick"] % 4 == 0 and "path" in view:
-                        payload["path"] = view["path"]
+                    if free:
+                        slot = getattr(bridge, "twin_free_image", lambda: (0, None))()
+                        gen, image = slot if isinstance(slot, tuple) and len(slot) == 2 else (0, None)
+                        if isinstance(image, str) and gen != session.get("image_gen"):
+                            session["image_gen"] = gen
+                            payload["image"] = image
+                        nav = getattr(bridge, "twin_city_view", lambda: {})()
+                        if session["tick"] % 4 == 0 and isinstance(nav, dict) and "path" in nav:
+                            payload["path"] = nav["path"]
+                    else:
+                        if session["tick"] % 2 == 0 and isinstance(view.get("image"), str):
+                            payload["image"] = view["image"]
+                        if session["tick"] % 20 == 0 and "costmap" in view:
+                            payload["costmap"] = view["costmap"]
+                        if session["tick"] % 4 == 0 and "path" in view:
+                            payload["path"] = view["path"]
             await websocket.send_json(payload)
             await _send_done(websocket, listen)
             await asyncio.sleep(0.05)
@@ -125,7 +140,14 @@ async def twin_socket(websocket: WebSocket) -> None:
             submit = getattr(bridge, "twin_submit", None)
             client = session["client"]
             if submit is not None:
-                submit({"type": "city", "enter": False, "client": client if isinstance(client, str) else None})
+                leave: dict[str, object] = {
+                    "type": "city",
+                    "enter": False,
+                    "client": client if isinstance(client, str) else None,
+                }
+                if session.get("lane") == "free":
+                    leave["lane"] = "free"
+                submit(leave)
 
 
 async def _send_done(websocket: WebSocket, listen: queue.Queue[object]) -> None:
@@ -141,6 +163,8 @@ async def _twin_reader(websocket: WebSocket, bridge: object, session: dict[str, 
     submit = getattr(bridge, "twin_submit", None)
     while True:
         payload = await websocket.receive_json()
+        if isinstance(payload, dict) and payload.get("lane") == "free":
+            session["lane"] = "free"
         if isinstance(payload, dict) and payload.get("type") == "city":
             session["city"] = bool(payload.get("enter"))
             client = payload.get("client")

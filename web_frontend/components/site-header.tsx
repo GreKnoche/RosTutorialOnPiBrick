@@ -12,6 +12,7 @@ const links = [
   { href: "/autonom", label: "Autonom" },
   { href: "/ros", label: "ROS 2" },
   { href: "/nav2", label: "Nav2" },
+  { href: "/freedrive", label: "Freedrive" },
   { href: "/studio", label: "Studio" },
 ];
 

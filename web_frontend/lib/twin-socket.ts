@@ -232,7 +232,7 @@ function asDone(data: Record<string, unknown>): TwinDone | null {
 }
 
 /** Pose stream from the backend twin. Commands wait until the socket is open. */
-export function openTwin(handlers: Handlers): TwinLink {
+export function openTwin(handlers: Handlers, lane?: "free"): TwinLink {
   let socket: WebSocket | null = null;
   let closed = false;
   let retry = 0;
@@ -294,7 +294,7 @@ export function openTwin(handlers: Handlers): TwinLink {
 
   return {
     send(payload) {
-      const text = JSON.stringify(payload);
+      const text = JSON.stringify(lane ? { ...payload, lane } : payload);
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(text);
         return;

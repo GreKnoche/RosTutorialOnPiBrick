@@ -22,7 +22,9 @@ import {
   lookForTopRight,
 } from "@/lib/city-view";
 import { useDebugAdmin } from "@/lib/debug-admin";
+import { DEFAULT_CHASSIS } from "@/lib/ev3-core";
 import { formatDe } from "@/lib/format";
+import { TRACK_CAR } from "@/lib/track-car";
 import { ghostAt, ghostCrossTime, ghostPoses, ghostRace, ghostTrace, type GhostPose } from "@/lib/ghost-lap";
 import { MELONS, freshMelons, nearestMelon, takeMelons } from "@/lib/melons";
 import { holdRunTerminal, noteRunPhase, readRunTerminal, serverRunTerminal, setRunTerminal, subscribeRunTerminal } from "@/lib/run-terminal";
@@ -162,6 +164,48 @@ function FlagBox({
   );
 }
 
+const TWIN_COLOR_KEY = "learn2ros.twin.color";
+
+const TWIN_COLORS = [
+  { id: "autonom", label: "Rot", value: TRACK_CAR.autonom },
+  { id: "ros", label: "Blau", value: TRACK_CAR.ros },
+  { id: "nav2", label: "Gelb", value: TRACK_CAR.nav2 },
+];
+
+function readTwinColor() {
+  try {
+    const raw = window.localStorage.getItem(TWIN_COLOR_KEY);
+    if (raw && /^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase();
+  } catch {
+    /* private mode */
+  }
+  return TRACK_CAR.nav2;
+}
+
+function DriveKey({
+  label,
+  code,
+  onDown,
+  onUp,
+}: {
+  label: string;
+  code: string;
+  onDown: (code: string) => void;
+  onUp: (code: string) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      onPointerDown={() => onDown(code)}
+      onPointerUp={() => onUp(code)}
+      onPointerLeave={() => onUp(code)}
+      onPointerCancel={() => onUp(code)}
+    >
+      {label}
+    </Button>
+  );
+}
+
 function clipNumber(value: number) {
   const trimmed = value.toFixed(2).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
   return trimmed.includes(".") ? trimmed : `${trimmed}.0`;
@@ -209,6 +253,88 @@ function pathKey(path: NavPath | null) {
   return `${path.length}:${first.x.toFixed(2)},${first.y.toFixed(2)}:${last.x.toFixed(2)},${last.y.toFixed(2)}`;
 }
 
+function CameraAside({
+  camera,
+  poseRef,
+  motionRef,
+  appliedRef,
+  cameraSrcRef,
+  cameraGenRef,
+}: {
+  camera: boolean;
+  poseRef: { current: { x: number; y: number; theta: number } };
+  motionRef: { current: { linear: number; angular: number } };
+  appliedRef: { current: { linear: number; angular: number } };
+  cameraSrcRef: { current: string | null };
+  cameraGenRef: { current: number };
+}) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const waitRef = useRef<HTMLDivElement>(null);
+  const poseLine = useRef<HTMLElement>(null);
+  const yawLine = useRef<HTMLElement>(null);
+  const cmdLine = useRef<HTMLElement>(null);
+  const odomLine = useRef<HTMLElement>(null);
+  useEffect(() => {
+    let seen = -1;
+    const paint = () => {
+      const pose = poseRef.current;
+      const cmd = motionRef.current;
+      const applied = appliedRef.current;
+      if (poseLine.current) poseLine.current.textContent = `${formatDe(pose.x, 2)} m, ${formatDe(pose.y, 2)} m`;
+      if (yawLine.current) yawLine.current.textContent = `${formatDe((wrapAngle(pose.theta) * 180) / Math.PI, 1)}°`;
+      if (cmdLine.current) cmdLine.current.textContent = `${formatDe(cmd.linear, 2)} m/s, ${formatDe(cmd.angular, 2)} rad/s`;
+      if (odomLine.current) {
+        odomLine.current.textContent = `${formatDe(applied.linear, 2)} m/s, ${formatDe(applied.angular, 2)} rad/s`;
+      }
+      const frame = cameraSrcRef.current;
+      if (camera && frame && cameraGenRef.current !== seen && imgRef.current && waitRef.current) {
+        seen = cameraGenRef.current;
+        imgRef.current.src = `data:image/bmp;base64,${frame}`;
+        imgRef.current.hidden = false;
+        waitRef.current.hidden = true;
+      }
+      if (!camera && imgRef.current && waitRef.current) {
+        imgRef.current.hidden = true;
+        waitRef.current.hidden = false;
+      }
+    };
+    paint();
+    const id = window.setInterval(paint, 50);
+    return () => window.clearInterval(id);
+  }, [camera, poseRef, motionRef, appliedRef, cameraSrcRef, cameraGenRef]);
+  return (
+    <aside className="flex flex-col gap-3">
+      <div className="overflow-hidden rounded-lg border border-border bg-black">
+        <img ref={imgRef} alt="Kamerabild von /camera/image_raw" width={320} height={240} hidden className="h-auto w-full" />
+        <div ref={waitRef} className="flex aspect-[4/3] items-center justify-center px-3 text-center text-sm text-white/70">
+          {camera ? "Kamera wartet auf /camera/image_raw" : "Kamerabild ist aus"}
+        </div>
+      </div>
+      <dl className="space-y-1.5 rounded-lg border border-border bg-card px-3 py-3 font-mono text-[11px]">
+        <div className="flex justify-between gap-3">
+          <dt>Pose</dt>
+          <dd ref={poseLine}>—</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>/imu Gier</dt>
+          <dd ref={yawLine}>—</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>/cmd_vel</dt>
+          <dd ref={cmdLine}>—</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>/odom</dt>
+          <dd ref={odomLine}>—</dd>
+        </div>
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        Kamerafenster zu /camera/image_raw. Das Bild folgt der Fahrt, solange Kamerabild an ist.
+      </p>
+    </aside>
+  );
+}
+
 export function CityLab({
   kapitel = null,
   notice = null,
@@ -234,6 +360,9 @@ export function CityLab({
   costmapToggle = false,
   pathToggle = false,
   walls = false,
+  freedrive = false,
+  cameraPane = false,
+  defaultCamera = false,
 }: {
   kapitel?: string | null;
   notice?: ReactNode;
@@ -260,6 +389,9 @@ export function CityLab({
   costmapToggle?: boolean;
   pathToggle?: boolean;
   walls?: boolean;
+  freedrive?: boolean;
+  cameraPane?: boolean;
+  defaultCamera?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -289,7 +421,10 @@ export function CityLab({
   const [drift, setDrift] = useState(false);
   const driftRef = useRef(false);
   driftRef.current = drift;
-  const [camera, setCamera] = useState(false);
+  const [camera, setCamera] = useState(defaultCamera);
+  const cameraSrcRef = useRef<string | null>(null);
+  const cameraGenRef = useRef(0);
+  const appliedRef = useRef({ linear: 0, angular: 0 });
   const [rays, setRays] = useState(false);
   const raysRef = useRef(false);
   raysRef.current = rays;
@@ -304,6 +439,13 @@ export function CityLab({
   const [showPath, setShowPath] = useState(pathToggle);
   const showPathRef = useRef(false);
   showPathRef.current = showPath;
+  const [bodyColor, setBodyColor] = useState(TRACK_CAR.nav2);
+  const bodyColorRef = useRef(TRACK_CAR.nav2);
+  bodyColorRef.current = freedrive ? bodyColor : TRACK_CAR.nav2;
+  const freedriveRef = useRef(freedrive);
+  freedriveRef.current = freedrive;
+  const driveKeys = useRef(new Set<string>());
+  const publishDriveRef = useRef<() => void>(() => {});
   const pathToggleRef = useRef(pathToggle);
   pathToggleRef.current = pathToggle;
   useEffect(() => {
@@ -312,7 +454,41 @@ export function CityLab({
   useEffect(() => {
     setShowPath(pathToggle);
   }, [pathToggle]);
-  const cameraRef = useRef(false);
+  useEffect(() => {
+    if (!freedrive) return;
+    setBodyColor(readTwinColor());
+  }, [freedrive]);
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera]);
+  const publishDrive = () => {
+    if (!freedriveRef.current) return;
+    const keys = driveKeys.current;
+    let linear = 0;
+    let angular = 0;
+    if (keys.has("w") || keys.has("arrowup")) linear += DEFAULT_CHASSIS.maxLinear;
+    if (keys.has("s") || keys.has("arrowdown")) linear -= DEFAULT_CHASSIS.maxLinear;
+    if (keys.has("a") || keys.has("arrowleft")) angular += DEFAULT_CHASSIS.maxAngular;
+    if (keys.has("d") || keys.has("arrowright")) angular -= DEFAULT_CHASSIS.maxAngular;
+    linkRef.current?.send({
+      type: "twist",
+      linear,
+      angular,
+      client: sessionRef.current,
+    });
+  };
+  publishDriveRef.current = publishDrive;
+  const holdDrive = (code: string) => {
+    driveKeys.current.add(code);
+    publishDrive();
+  };
+  const releaseDrive = (code: string) => {
+    driveKeys.current.delete(code);
+    publishDrive();
+  };
+  const cameraRef = useRef(defaultCamera);
+  const cameraPaneRef = useRef(cameraPane);
+  cameraPaneRef.current = cameraPane;
   const probeRef = useRef<CityProbe | null>(null);
   const titleRef = useRef("");
   const runnerRef = useRef<Rect | null>(null);
@@ -511,6 +687,7 @@ export function CityLab({
           }
           const id = kapitelRef.current;
           if (id) link.send({ type: "probe", client: session, kapitel: id });
+          publishDriveRef.current();
         }
       },
       onPhase(next) {
@@ -531,6 +708,14 @@ export function CityLab({
             : nextLap,
         );
         motionRef.current = { linear: sample.linear, angular: sample.angular };
+        if (sample.image) {
+          cameraSrcRef.current = sample.image;
+          cameraGenRef.current += 1;
+        }
+        appliedRef.current = {
+          linear: sample.appliedLinear ?? sample.linear,
+          angular: sample.appliedAngular ?? sample.angular,
+        };
         sampleGhostRef.current(sample);
         if (sample.ranges) rangesRef.current = sample.ranges;
         if (sample.clutter !== undefined) clutterRef.current = sample.clutter;
@@ -545,7 +730,7 @@ export function CityLab({
           : null;
       },
       onDone() {},
-    });
+    }, freedrive ? "free" : undefined);
     linkRef.current = link;
     link.send({ type: "city", enter: true, client: session });
     return () => {
@@ -554,6 +739,37 @@ export function CityLab({
       if (linkRef.current === link) linkRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!freedrive) return;
+    void fetch("/api/waypoint-run", { method: "DELETE" }).catch(() => {});
+    const keys = driveKeys.current;
+    const steer = (event: KeyboardEvent, down: boolean) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      const key = event.key.toLowerCase();
+      if (!["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) return;
+      event.preventDefault();
+      if (down) keys.add(key);
+      else keys.delete(key);
+      publishDriveRef.current();
+    };
+    const onDown = (event: KeyboardEvent) => steer(event, true);
+    const onUp = (event: KeyboardEvent) => steer(event, false);
+    const stop = () => {
+      keys.clear();
+      publishDriveRef.current();
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", stop);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", stop);
+      stop();
+    };
+  }, [freedrive]);
 
   useEffect(() => {
     const lap = lapRef.current;
@@ -619,6 +835,7 @@ export function CityLab({
         lapRef.current?.grass ? "1" : "0",
         costmapToggleRef.current && showCostmapRef.current ? costmapKey(costmapRef.current) : "",
         pathToggleRef.current && showPathRef.current ? pathKey(pathRef.current) : "",
+        bodyColorRef.current,
       ].join("|");
       if (raysRef.current && rangesRef.current) {
         signature += rangesRef.current.map((range) => (range == null ? "-" : range.toFixed(2))).join(",");
@@ -646,6 +863,7 @@ export function CityLab({
           spotsRef.current,
           costmapToggleRef.current && showCostmapRef.current ? costmapRef.current : null,
           pathToggleRef.current && showPathRef.current ? pathRef.current : null,
+          bodyColorRef.current,
         );
       }
       const runningCourse = courseRef.current;
@@ -1009,6 +1227,7 @@ export function CityLab({
   }, [playBusy]);
 
   useEffect(() => {
+    if (freedrive) return;
     let cancel = false;
     let timer = 0;
     let abandon = 0;
@@ -1049,7 +1268,7 @@ export function CityLab({
       window.clearTimeout(timer);
       window.clearTimeout(abandon);
     };
-  }, [playBusy]);
+  }, [playBusy, freedrive]);
 
   useEffect(() => {
     const box = logRef.current;
@@ -1058,8 +1277,8 @@ export function CityLab({
 
   const showStop = playBusy || runLive || stopping;
 
-  return (
-    <div className="flex flex-col gap-4">
+  const body = (
+    <div className="flex min-w-0 flex-col gap-4">
       {probe ? (
         <div className="rounded-lg border border-border bg-card px-3 py-3 text-sm">
           <p className="font-mono text-xs text-muted-foreground">{probe.kapitel}</p>
@@ -1197,6 +1416,44 @@ export function CityLab({
                 Pfad
               </FlagBox>
             ) : null}
+            {freedrive ? (
+              <div className="flex items-center gap-1" role="group" aria-label="Farbe des Autos">
+                {TWIN_COLORS.map((swatch) => (
+                  <button
+                    key={swatch.id}
+                    type="button"
+                    aria-label={swatch.label}
+                    aria-pressed={bodyColor === swatch.value}
+                    title={swatch.label}
+                    onClick={() => {
+                      setBodyColor(swatch.value);
+                      try {
+                        window.localStorage.setItem(TWIN_COLOR_KEY, swatch.value);
+                      } catch {
+                        /* private mode */
+                      }
+                    }}
+                    className={`size-7 rounded-full border-2 ${bodyColor === swatch.value ? "border-heading" : "border-transparent"}`}
+                    style={{ background: swatch.value }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  aria-label="Eigene Farbe"
+                  value={bodyColor}
+                  onChange={(event) => {
+                    const next = event.target.value.toLowerCase();
+                    setBodyColor(next);
+                    try {
+                      window.localStorage.setItem(TWIN_COLOR_KEY, next);
+                    } catch {
+                      /* private mode */
+                    }
+                  }}
+                  className="size-7 cursor-pointer rounded-full border border-border bg-transparent p-0"
+                />
+              </div>
+            ) : null}
             <FlagBox
               on={camera}
               disabled={!rosUp}
@@ -1204,6 +1461,10 @@ export function CityLab({
               onToggle={() => {
                 const next = !camera;
                 setCamera(next);
+                if (!next) {
+                  cameraSrcRef.current = null;
+                  cameraGenRef.current += 1;
+                }
                 sendFlags(drift, next);
               }}
             >
@@ -1214,6 +1475,16 @@ export function CityLab({
             Zurücksetzen
           </Button>
         </div>
+        {freedrive ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <DriveKey label="Vorwärts" code="w" onDown={holdDrive} onUp={releaseDrive} />
+            <DriveKey label="Links" code="a" onDown={holdDrive} onUp={releaseDrive} />
+            <DriveKey label="Rückwärts" code="s" onDown={holdDrive} onUp={releaseDrive} />
+            <DriveKey label="Rechts" code="d" onDown={holdDrive} onUp={releaseDrive} />
+            <p className="text-sm text-muted-foreground">W A S D oder die Pfeiltasten fahren den Twin.</p>
+          </div>
+        ) : null}
+        {freedrive ? null : (
         <div className={`flex items-center gap-2 ${onPlay ? "w-[85%]" : ""}`}>
           {onPlay ? (
             <button
@@ -1288,8 +1559,25 @@ export function CityLab({
             {booting && !nodeLog.trim() ? <TwinOrbit /> : null}
           </div>
         </div>
+        )}
         {ghostNote ? <p className="text-sm leading-6 text-muted-foreground">{ghostNote}</p> : null}
       </div>
+    </div>
+  );
+
+  if (!cameraPane) return body;
+
+  return (
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      {body}
+      <CameraAside
+        camera={camera}
+        poseRef={poseRef}
+        motionRef={motionRef}
+        appliedRef={appliedRef}
+        cameraSrcRef={cameraSrcRef}
+        cameraGenRef={cameraGenRef}
+      />
     </div>
   );
 }

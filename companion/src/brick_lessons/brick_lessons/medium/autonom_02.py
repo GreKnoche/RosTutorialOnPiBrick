@@ -1,4 +1,4 @@
-"""Medium. Der Knoten steht. Ergänze den Aufruf der Aktion /drive.
+"""Cruise. Der Knoten steht. Ergänze den Aufruf der Aktion /drive.
 
 Ziele: brick_lessons.goals.GOALS["autonom_02"].medium
 Start: ros2 run brick_lessons autonom_02_medium
@@ -15,7 +15,7 @@ from brick_lessons.goals import GOALS
 
 KEY = "autonom_02"
 
-# Dieselben Größen wie die Slider auf Beginner.
+# Dieselben Größen wie die Slider im Modus Touring.
 # 0 hält das Rad an, ein negatives Vorzeichen fährt rückwärts.
 RADABSTAND_CM = 11.8
 LINKS_CM = 0.0

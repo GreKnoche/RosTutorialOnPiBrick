@@ -6,5 +6,5 @@ export default async function LaborPage({
   searchParams: Promise<{ kapitel?: string }>;
 }) {
   const { kapitel } = await searchParams;
-  redirect(kapitel ? `/nav2?kapitel=${encodeURIComponent(kapitel)}` : "/nav2");
+  redirect(kapitel ? `/nav2?kapitel=${encodeURIComponent(kapitel)}` : "/freedrive");
 }

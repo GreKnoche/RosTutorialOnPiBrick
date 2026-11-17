@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import { Button } from "@/components/ui/button";
 import { readNodeDraft, serverText, subscribeDrafts, writeNodeDraft } from "@/lib/browser-draft";
 import { lessonLevelKey, type LessonLevel } from "@/lib/lesson-levels";
@@ -9,10 +10,12 @@ export function NodeEditor({
   track,
   lessonId,
   level,
+  highlight = false,
 }: {
   track: string;
   lessonId: string;
   level: Extract<LessonLevel, "medium" | "hard">;
+  highlight?: boolean;
 }) {
   const key = lessonLevelKey(track, lessonId);
   const draftKey = `${track}:${lessonId}:${level}`;
@@ -94,21 +97,43 @@ export function NodeEditor({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium text-heading">Knoten</h3>
-        <Button type="button" onClick={save} disabled={busy || file === null || source === file}>
-          Speichern
-        </Button>
+        <div className="flex items-center gap-2">
+          {highlight ? (
+            <ResetCodeButton
+              disabled={file === null || source === file}
+              onClick={() => writeNodeDraft(track, lessonId, level, null)}
+            />
+          ) : null}
+          <Button type="button" onClick={save} disabled={busy || file === null || source === file}>
+            Speichern
+          </Button>
+        </div>
       </div>
-      <label className="sr-only" htmlFor={`node-${key}-${level}`}>
-        Knoten {key} {level}
-      </label>
-      <textarea
-        id={`node-${key}-${level}`}
-        value={source}
-        onChange={(event) => writeNodeDraft(track, lessonId, level, event.target.value === file ? null : event.target.value)}
-        onKeyDown={onKeyDown}
-        spellCheck={false}
-        className="min-h-[28rem] w-full resize-y rounded-lg border border-border bg-card p-3 font-mono text-[0.65rem] leading-5 text-foreground"
-      />
+      {highlight ? (
+        <CodeEditor
+          value={source}
+          onChange={(value) => writeNodeDraft(track, lessonId, level, value === file ? null : value)}
+          label={`Knoten ${key} ${level}`}
+          language="python"
+          height="h-[28rem]"
+        />
+      ) : (
+        <>
+          <label className="sr-only" htmlFor={`node-${key}-${level}`}>
+            Knoten {key} {level}
+          </label>
+          <textarea
+            id={`node-${key}-${level}`}
+            value={source}
+            onChange={(event) =>
+              writeNodeDraft(track, lessonId, level, event.target.value === file ? null : event.target.value)
+            }
+            onKeyDown={onKeyDown}
+            spellCheck={false}
+            className="min-h-[28rem] w-full resize-y rounded-lg border border-border bg-card p-3 font-mono text-[0.65rem] leading-5 text-foreground"
+          />
+        </>
+      )}
       {status ? <p className="text-sm leading-6">{status}</p> : null}
     </div>
   );

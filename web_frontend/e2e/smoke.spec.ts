@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loadCurriculum, lessonHref, trackHref } from "../lib/curriculum";
-import { lessonLevelKey, lessonLevels } from "../lib/lesson-levels";
+import { lessonLevelKey, lessonLevels, lessonUsesModes } from "../lib/lesson-levels";
 
 const curriculum = loadCurriculum();
-const fixedPages = ["/", "/auswahl", "/lernpfade", "/labor"];
+const fixedPages = ["/", "/auswahl", "/lernpfade", "/freedrive", "/labor"];
 
 function watchPage(page: Page) {
   const errors: string[] = [];
@@ -63,6 +63,12 @@ test.describe("lessons", () => {
     test(`beginner ${href}`, async ({ page }) => {
       const errors = await openPage(page, href);
       await expect(title(page)).toBeVisible();
+      if (lessonUsesModes(lesson.track, lesson.id)) {
+        await expect(page.getByRole("navigation", { name: "Modus" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Touring" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Cruise" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Hard" })).toHaveCount(0);
+      }
       expect(errors).toEqual([]);
     });
 
@@ -81,17 +87,19 @@ test.describe("lessons", () => {
       expect(errors).toEqual([]);
     });
 
-    test(`hard ${href}`, async ({ page }) => {
-      const errors = await openPage(page, `${href}?stufe=hard`);
-      await expect(title(page)).toBeVisible();
-      await expect(
-        page.getByRole("heading", { name: "Den Knoten selbst schreiben", exact: true }),
-      ).toBeVisible();
-      if (lessonLevels[`${lesson.track}:${lesson.id}`]) {
-        await expectEditor(page, lesson.track, lesson.id, "hard");
-      }
-      expect(errors).toEqual([]);
-    });
+    if (!lessonUsesModes(lesson.track, lesson.id)) {
+      test(`hard ${href}`, async ({ page }) => {
+        const errors = await openPage(page, `${href}?stufe=hard`);
+        await expect(title(page)).toBeVisible();
+        await expect(
+          page.getByRole("heading", { name: "Den Knoten selbst schreiben", exact: true }),
+        ).toBeVisible();
+        if (lessonLevels[`${lesson.track}:${lesson.id}`]) {
+          await expectEditor(page, lesson.track, lesson.id, "hard");
+        }
+        expect(errors).toEqual([]);
+      });
+    }
   }
 });
 

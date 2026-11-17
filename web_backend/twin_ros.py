@@ -7,10 +7,13 @@ The camera frame is the expensive one: it stays off until that page asks.
 
 from __future__ import annotations
 
+import base64
 import math
 import struct
+import threading
 import time
 from collections import deque
+from dataclasses import replace
 
 from brick_core.chassis import Chassis, load_chassis
 from brick_core.geometry import yaw_from_quaternion, yaw_to_quaternion
@@ -35,6 +38,7 @@ from city import (
     SCAN_COUNT,
     SCAN_INCREMENT,
     SCAN_MIN,
+    City,
 )
 from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message, pack_costmap, pack_path
 
@@ -67,6 +71,7 @@ class CanvasTwinNode(Node):
         super().__init__("canvas_twin")
         self.hub = hub
         self.plant = CanvasPlant(self._load_chassis())
+        self.free = CanvasPlant(replace(self.plant.chassis), world=City(), direct=True)
         self._dt = 1.0 / TICK_HZ
         self._echo: deque[tuple[float, float]] = deque()
         self._sent: tuple[float, float] | None = (0.0, 0.0)
@@ -112,6 +117,9 @@ class CanvasTwinNode(Node):
         self._publish_description()
         self.create_timer(2.0, self._publish_description)
         self._sensor_tick = 0
+        self._cam_stop = threading.Event()
+        self._cam_thread = threading.Thread(target=self._camera_loop, name="city_camera", daemon=True)
+        self._cam_thread.start()
         self._timer = self.create_timer(self._dt, self._tick)
         self.sync()
         self.get_logger().info(
@@ -157,6 +165,10 @@ class CanvasTwinNode(Node):
     def submit(self, payload: dict[str, object]) -> None:
         from twin import apply_message
 
+        if payload.get("lane") == "free":
+            apply_message(self.free, payload)
+            self._sync_free()
+            return
         result = apply_message(self.plant, payload)
         self._mirror_chassis()
         self.sync(result)
@@ -181,6 +193,9 @@ class CanvasTwinNode(Node):
         if done is not None:
             result = ApplyResult(done=done, seq=self.plant.drive_seq, client=self.plant.owner, jump=False)
         self.sync(result)
+        if self.free.city is not None:
+            self.free.step(self._dt)
+            self._sync_free()
 
     def _mirror_chassis(self) -> None:
         radius = float(self.plant.chassis.wheel_radius_m)
@@ -273,6 +288,53 @@ class CanvasTwinNode(Node):
         message = String()
         message.data = self._urdf
         self._description_pub.publish(message)
+
+    def _camera_loop(self) -> None:
+        """Freedrive camera only. The Nav2 city keeps its own render on the control tick."""
+        from city_camera import bmp_bytes
+
+        period = 0.1
+        while True:
+            plant = self.free
+            city = plant.city
+            if not plant.camera or city is None:
+                if self._cam_stop.wait(0.2):
+                    return
+                continue
+            started = time.monotonic()
+            pose = plant.odom.pose
+            try:
+                raw = city.render(float(pose.x), float(pose.y), float(pose.theta))
+            except Exception:
+                raw = None
+            if raw is not None:
+                self.hub.store_free_image(base64.b64encode(bmp_bytes(raw, IMAGE_W, IMAGE_H)).decode("ascii"))
+            if self._cam_stop.wait(max(0.0, period - (time.monotonic() - started))):
+                return
+
+    def _sync_free(self) -> None:
+        plant = self.free
+        self.hub.store_free(plant.sample())
+        city = plant.city
+        if city is None:
+            self.hub.clear_free()
+            return
+        pose = plant.odom.pose
+        ranges = city.scan(pose.x, pose.y, pose.theta)
+        self.hub.store_free_city(
+            [None if not math.isfinite(item) else float(item) for item in ranges],
+            float(plant.applied.linear),
+            float(plant.applied.angular),
+            city.clutter_dicts(),
+            {
+                "scene": city.scene,
+                "arch": city.arch_on,
+                "dock": city.dock_on,
+                "runner": city.runner_dict() if city.runner_on else None,
+                "lap": plant.lap_status(),
+                "bumps": plant.bumps,
+            },
+        )
 
     def _publish_sensors(self) -> None:
         city = self.plant.city

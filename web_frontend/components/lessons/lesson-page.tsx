@@ -7,7 +7,7 @@ import { lessonModule } from "@/components/lessons/registry";
 import { readCatalog } from "@/lib/catalog-file";
 import { lessonsForTrack, trackCrumbs, type Lesson } from "@/lib/curriculum";
 import { freshGlossaryTerms } from "@/lib/glossary";
-import type { LessonLevel } from "@/lib/lesson-levels";
+import { lessonLevelFor, type LessonLevel } from "@/lib/lesson-levels";
 import { loadLessonCopy } from "@/lib/load-lesson-copy";
 import { LevelSwitch } from "@/components/lessons/level-task";
 
@@ -19,6 +19,7 @@ export function LessonPage({
   level?: LessonLevel;
 }) {
   const catalog = readCatalog();
+  const shownLevel = lessonLevelFor(lesson.track, lesson.id, level);
   const lessons = lessonsForTrack(lesson.track, catalog);
   const active = lessonModule(lesson.track, lesson.slug);
   const copy = loadLessonCopy(lesson.track, lesson.id, lesson.slug);
@@ -41,12 +42,12 @@ export function LessonPage({
             <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">
               {lesson.summary}
             </p>
-            <LevelSwitch lesson={lesson} level={level} />
+            <LevelSwitch lesson={lesson} level={shownLevel} />
           </section>
           {active && copy ? (
-            <LessonActiveBody lesson={lesson} active={active} copy={copy} level={level} terms={terms} />
+            <LessonActiveBody lesson={lesson} active={active} copy={copy} level={shownLevel} terms={terms} />
           ) : (
-            <LessonTwinBody lesson={lesson} copy={copy} terms={terms} level={level} />
+            <LessonTwinBody lesson={lesson} copy={copy} terms={terms} level={shownLevel} />
           )}
         </div>
       </div>

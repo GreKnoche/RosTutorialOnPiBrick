@@ -17,7 +17,7 @@ from brick_core.controller import PosePursuitController
 from brick_core.geometry import Pose2D, Twist2D, wrap_angle
 from brick_core.odometry import UnicycleOdometry
 
-from city import CITY, Gate, foot_radius
+from city import CITY, City, Gate, foot_radius
 from city_geom import overlapping_obbs
 
 TICK_HZ = 20.0
@@ -95,8 +95,10 @@ def segments_from_paths(chassis: Chassis, paths_m: list[tuple[float, float]]) ->
 class CanvasPlant:
     """Integrates /cmd_vel. A scripted path and a goal are owners of that twist."""
 
-    def __init__(self, chassis: Chassis | None = None) -> None:
+    def __init__(self, chassis: Chassis | None = None, *, world: City | None = None, direct: bool = False) -> None:
         self.chassis = chassis or Chassis()
+        self._world = world
+        self.direct = direct
         self.odom = UnicycleOdometry(self.chassis)
         self.controller = PosePursuitController(self.chassis)
         self.left_rad = 0.0
@@ -161,13 +163,14 @@ class CanvasPlant:
 
         self.city_holder = client if isinstance(client, str) else None
         self.count_walls = False
-        self.city = CITY
-        self.lap = Lap(CITY.gates, CITY.on_asphalt)
+        world = self._world if self._world is not None else CITY
+        self.city = world
+        self.lap = Lap(world.gates, world.on_asphalt)
         self.drift = False
         self.camera = False
         self.probe = None
         self.city.set_scene("leer")
-        self.reset(CITY.start_x, CITY.start_y, CITY.start_theta)
+        self.reset(world.start_x, world.start_y, world.start_theta)
 
     def leave_city(self, client: str | None) -> None:
         if self.city is None:
@@ -213,7 +216,7 @@ class CanvasPlant:
         self.count_walls = walls
         self.bumps = 0
         self._wall_hits = set()
-        gates = CITY.gates
+        gates = self.city.gates
         if isinstance(checkpoints, list):
             parsed: list[Gate] = []
             for item in checkpoints:
@@ -578,6 +581,9 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
             plant.set_probe(payload.get("kapitel"))
         return ApplyResult()
     if plant.city is not None and kind in {"twist", "goal", "drive"}:
+        if plant.direct and kind == "twist" and client_id is not None and client_id == plant.city_holder:
+            plant.command_twist(_finite(payload.get("linear")), _finite(payload.get("angular")))
+            plant.owner = client_id
         return ApplyResult()
     if kind == "reset" and plant.city is not None and client_id != plant.city_holder:
         return ApplyResult()
@@ -621,6 +627,10 @@ class TwinHub:
         self._lock = threading.Lock()
         self._sample = sample_dict(TwinSample())
         self._city_view: dict[str, object] = {}
+        self._free_sample = sample_dict(TwinSample())
+        self._free_view: dict[str, object] = {}
+        self._free_image: str | None = None
+        self._free_image_gen = 0
         self._listeners: list[queue.Queue[dict[str, object]]] = []
 
     def store(self, sample: TwinSample) -> None:
@@ -670,6 +680,57 @@ class TwinHub:
             view = dict(self._city_view)
             view["path"] = points
             self._city_view = view
+
+    def store_free(self, sample: TwinSample) -> None:
+        payload = sample_dict(sample)
+        with self._lock:
+            self._free_sample = payload
+
+    def free_snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return dict(self._free_sample)
+
+    def store_free_city(
+        self,
+        ranges: list[float | None],
+        applied_linear: float,
+        applied_angular: float,
+        clutter: list[dict[str, object]] | None = None,
+        props: dict[str, object] | None = None,
+    ) -> None:
+        with self._lock:
+            view = dict(self._free_view)
+            view["ranges"] = list(ranges)
+            view["applied_linear"] = applied_linear
+            view["applied_angular"] = applied_angular
+            if clutter is not None:
+                view["clutter"] = clutter
+            view.pop("image", None)
+            if props:
+                view.update(props)
+            self._free_view = view
+
+    def store_free_image(self, image: str | None) -> None:
+        with self._lock:
+            self._free_image = image
+            self._free_image_gen += 1
+
+    def free_image(self) -> tuple[int, str | None]:
+        with self._lock:
+            return self._free_image_gen, self._free_image
+
+    def free_city_view(self) -> dict[str, object]:
+        with self._lock:
+            view = dict(self._free_view)
+        ranges = view.get("ranges")
+        if isinstance(ranges, list):
+            view["ranges"] = list(ranges)
+        return view
+
+    def clear_free(self) -> None:
+        with self._lock:
+            self._free_view = {}
+            self._free_image = None
 
     def clear_city(self) -> None:
         with self._lock:

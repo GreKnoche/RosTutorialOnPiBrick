@@ -501,6 +501,7 @@ export function draw(
   melonSpots: ReadonlyArray<readonly [number, number]> = MELONS,
   costmap: CostmapGrid | null = null,
   path: NavPath | null = null,
+  body = TRACK_CAR.nav2,
 ) {
   if (!canvas) return;
   const { width, height } = syncSize(canvas, frame);
@@ -551,7 +552,7 @@ export function draw(
     });
   }
   drawChassis(ctx, to, pose, ppm, minBody, dpr, {
-    body: TRACK_CAR.nav2,
+    body,
     line: "#fff7ed",
     wheel: "#111318",
     ausrichtung: "#fff7ed",
