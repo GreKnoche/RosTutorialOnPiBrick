@@ -65,8 +65,8 @@ const GUIDES: Guide[] = [
   {
     id: "code-graph",
     title: "Code Graph",
-    body: "Klappt die Knoten auf. Ein Klick auf einen Knoten öffnet den Code für dieses Kapitel.",
-    side: "right",
+    body: "Klappt die Knoten auf. Ein roter Rand markiert die Knoten, die du in diesem Kapitel anpassen sollst. Ein Klick öffnet den Code; der geöffnete Knoten ist gold umrandet.",
+    side: "bottom",
     align: "start",
   },
   {

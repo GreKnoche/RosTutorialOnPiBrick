@@ -382,7 +382,7 @@ export function NavGraph({
           </>
         ) : null}
       </div>
-      <div className="group flex flex-col gap-4">
+      <div className="group flex flex-col gap-4" data-tour="code-graph">
         <button
           type="button"
           aria-expanded={graphOpen}
@@ -390,7 +390,6 @@ export function NavGraph({
             setGraphOpen((open) => !open);
             setRing(false);
           }}
-          data-tour="code-graph"
           className="flex w-fit items-center gap-1.5 text-left"
         >
           <ChevronRight
