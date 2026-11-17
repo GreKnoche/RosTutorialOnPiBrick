@@ -1,3 +1,6 @@
+# Dev loop. Mounts the checkout and sets WEB_DEV so the entrypoint runs next dev.
+# The image is complete without this file:
+#   docker run --rm --network host pibrick-web:local
 services:
   web:
     build:
@@ -10,8 +13,9 @@ services:
     environment:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - NEXT_PUBLIC_ROBOT_API=http://127.0.0.1:8000
+      - WEB_DEV=1
     volumes:
-      - ../lab/brick_lessons/brick_lessons:/ws/lab/brick_lessons/brick_lessons
+      - ../lab/brick_lessons/brick_lessons:/ws/src/brick_lessons/brick_lessons
       - ../lab/brick_nav/behavior_trees:/ws/lab/brick_nav/behavior_trees:ro
       - ../web_frontend:/ws/web_frontend
       - web_frontend_modules:/ws/web_frontend/node_modules

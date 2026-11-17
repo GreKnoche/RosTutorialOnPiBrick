@@ -18,7 +18,14 @@
 
 # next.js
 /.next/
+/.next-root-cache/
 /out/
+
+# Student plugin workspaces are build trees, not frontend source. The repo-root
+# gitignore already excludes them, but this app is mounted alone in Docker, so
+# Tailwind would otherwise scan the binaries and emit invalid CSS.
+/.student/
+/.student-cache/
 
 # production
 /build

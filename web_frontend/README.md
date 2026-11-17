@@ -11,14 +11,24 @@ Die App liegt auf [http://localhost:61333](http://localhost:61333). Autonom-Lekt
 
 ## Docker
 
-Frontend und Backend laufen in einem Container. Das Backend startet Nav2 und die Action `/drive`. Der Twin veröffentlicht `/odom`. Der Container nutzt das Host-Netz, Port 61333 und Port 8000, und `ROS_DOMAIN_ID` aus `shared/ros.env`. Gazebo nicht gleichzeitig starten. Compose hängt `web_frontend/` in den Container, und der Startbefehl ist `next dev`. Eine gespeicherte Seite wird neu gebaut, ohne neues Image. Speichern im Editor schreibt weiter nach `lab/brick_lessons/brick_lessons/` auf dem Host.
+Frontend und Backend laufen in einem Container. Das Backend startet Nav2 und die Action `/drive`. Der Twin veröffentlicht `/odom`. Der Container nutzt das Host-Netz, Port 61333 und Port 8000, und `ROS_DOMAIN_ID` 71. Gazebo nicht gleichzeitig starten.
+
+Zwei Startwege:
 
 ```bash
 cd web
 docker compose up --build
 ```
 
-Ein neues Image braucht es, wenn `package.json`, das Dockerfile oder das Backend sich ändern. Die Smoke-Tests laufen auf dem Host, nicht im Container.
+Compose ist die Entwicklung. Es hängt `web_frontend/` und die Lektionen in den Container und setzt `WEB_DEV=1`, der Startbefehl ist dann `next dev`. Eine gespeicherte Seite wird neu gebaut, ohne neues Image. Speichern im Editor schreibt weiter nach `lab/brick_lessons/brick_lessons/` auf dem Host.
+
+Das Image selbst ist vollständig. Ohne Checkout, nach `docker pull` oder einem lokalen Build:
+
+```bash
+docker run --rm --network host pibrick-web:local
+```
+
+Dann startet `next start` mit der Oberfläche, die beim Image-Build erzeugt wurde. Ein neues Image braucht es, wenn sich Frontend, Lektionen, `package.json`, das Dockerfile oder das Backend ändern. Die Smoke-Tests laufen auf dem Host, nicht im Container.
 
 ## Smoke-Tests
 

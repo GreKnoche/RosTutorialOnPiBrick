@@ -18,5 +18,13 @@ pi-brick/install
 pi-brick/log
 web_frontend/node_modules
 web_frontend/.next
+web_frontend/.next-root-cache
+web_frontend/.next-preview
+web_frontend/.student
+web_frontend/.student-cache
+web_frontend/web_frontend
+web_frontend/test-results
+web_frontend/playwright-report
+web_frontend/tsconfig.tsbuildinfo
 **/.idea
 **/.vscode

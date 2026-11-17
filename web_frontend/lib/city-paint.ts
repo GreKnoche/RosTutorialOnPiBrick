@@ -446,7 +446,7 @@ function paintWorld(
     }
     const cones =
       probe?.scene === "kegel" && clutter.length === 0
-        ? city.cones.map((spot) => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#ffe060" }))
+        ? city.cones.map((spot): Rect => ({ x: spot.x - 0.11, y: spot.y - 0.11, w: 0.22, h: 0.22, color: "#ffe060" }))
         : [];
     const blocks = [...city.houses, ...clutter, ...cones];
     const axisBlocks = blocks.filter((house) => house.theta === undefined || Math.abs(house.theta) < 1e-6);

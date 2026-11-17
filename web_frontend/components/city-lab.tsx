@@ -162,7 +162,6 @@ function FlagBox({
       type="button"
       aria-pressed={on}
       disabled={disabled}
-      autoComplete="off"
       title={title}
       onClick={onToggle}
       className={`rounded-md border px-2.5 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -1609,7 +1608,7 @@ export function CityLab({
               Kamerabild
             </FlagBox>
           </div>
-          <Button type="button" autoComplete="off" onClick={reset} disabled={!rosUp}>
+          <Button type="button" onClick={reset} disabled={!rosUp}>
             Zurücksetzen
           </Button>
         </div>
@@ -1629,7 +1628,6 @@ export function CityLab({
               type="button"
               data-tour="play"
               aria-label={showStop ? "Nav2 stoppen" : "Code abspielen"}
-              autoComplete="off"
               onClick={() => {
                 if (showStop) {
                   if (stoppingRef.current) return;

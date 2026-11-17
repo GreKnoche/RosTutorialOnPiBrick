@@ -635,7 +635,6 @@ function NodeButton({
           ref={nodeRef}
           type="button"
           disabled={passed && !startSelectable}
-          autoComplete="off"
           aria-current={live || held ? "step" : undefined}
           aria-expanded={!passed && !live ? armed : undefined}
           aria-label={ariaLabel}

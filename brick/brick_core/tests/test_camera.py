@@ -1,4 +1,4 @@
-"""shared/camera.yaml drives the marked SDF and URDF blocks."""
+"""Default camera parameters drive the marked SDF and URDF blocks."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from brick_core.camera import (
     apply_camera_bridge,
     camera_sdf_fragment,
     camera_urdf_fragment,
-    load_camera,
     splice_marked_block,
     write_gazebo_runtime,
 )
@@ -17,15 +16,14 @@ from brick_core.camera import (
 
 def _repo() -> Path:
     for parent in Path(__file__).resolve().parents:
-        if (parent / "shared" / "camera.yaml").is_file():
+        if (parent / "gazebo" / "src" / "brick_gz_description").is_dir():
             return parent
-    raise RuntimeError("repo root with shared/camera.yaml not found")
+    raise RuntimeError("repo root not found")
 
 
-def test_repo_yaml_matches_checked_in_models() -> None:
+def test_default_camera_matches_checked_in_models() -> None:
     repo = _repo()
-    camera = load_camera(repo / "shared" / "camera.yaml")
-    assert camera == Camera()
+    camera = Camera()
     sdf = (repo / "gazebo/src/brick_gz_description/models/ev3/model.sdf").read_text(encoding="utf-8")
     urdf = (repo / "brick/brick_description/urdf/brick.urdf").read_text(encoding="utf-8")
     gz_urdf = (repo / "gazebo/src/brick_gz_description/urdf/brick.urdf").read_text(encoding="utf-8")
