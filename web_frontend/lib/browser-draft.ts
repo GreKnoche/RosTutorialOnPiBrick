@@ -319,25 +319,10 @@ function stripProgressLog(current: string): string {
     );
 }
 
-/** Replace a shipped default that still misses the Smac Hybrid goal. Edited text stays. */
+/** Replace a shipped plugin default. Edited text stays. */
 function liftStoredLesson(missionId: string, field: Nav2TextField, current: string, fallback: string | undefined): string {
   if (field === "through") current = stripProgressLog(current);
   if (!fallback) return current;
-  if (missionId === "planner" && field === "through" && current.includes("(11.79, 6.0842, NORTH)")) {
-    return current.replace("(11.79, 6.0842, NORTH)", "(8.48, 4.767, math.pi / 2)");
-  }
-  if (missionId === "planner" && field === "smac") {
-    const previous = fallback.replace('motion_model_for_search: "REEDS_SHEPP"', 'motion_model_for_search: "DUBIN"');
-    if (current === previous) return fallback;
-  }
-  if (missionId === "planner" && field === "controller") {
-    const previous = fallback
-      .replace("desired_linear_vel: 0.18", "desired_linear_vel: 0.5")
-      .replace("lookahead_dist: 0.16", "lookahead_dist: 0.22")
-      .replace("max_lookahead_dist: 0.22", "max_lookahead_dist: 0.35")
-      .replace("use_velocity_scaled_lookahead_dist: false", "use_velocity_scaled_lookahead_dist: true");
-    if (current === previous) return fallback;
-  }
   if (missionId === "plugin" && field === "smac") {
     const previous = fallback.replace("minimum_turning_radius: 0.18", "minimum_turning_radius: 0.40");
     if (current === previous) return fallback;

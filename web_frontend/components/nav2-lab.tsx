@@ -69,9 +69,7 @@ function Nav2Intro() {
         </p>
         <p className="max-w-2xl text-sm leading-7 text-foreground sm:text-base">
           Danach vergleichst du verschiedene <strong>Planner-Plugins</strong> (NavFn, Smac 2D,
-          Theta*, Smac Hybrid und Lattice) und nutzt kinematische Pfadplanung mit{" "}
-          <strong>Smac Hybrid</strong> für Wendemanöver in Sackgassen und rückwärtiges{" "}
-          <strong>Einparken</strong>. Zum Abschluss verknüpfst du Planung, Fahrt und
+          Theta*, Smac Hybrid und Lattice). Zum Abschluss verknüpfst du Planung, Fahrt und
           Recovery-Verhalten in einem <strong>Behavior Tree</strong> und schreibst einen eigenen
           C++-Überwachungsknoten (<strong>BT-Monitor</strong>), der per Laserscan rechtzeitig vor
           plötzlichen Hindernissen stoppt.

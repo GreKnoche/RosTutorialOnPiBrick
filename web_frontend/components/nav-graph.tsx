@@ -209,9 +209,31 @@ function nodeTone(id: string, state: "on" | "edit" | "idle") {
     state === "on"
       ? "ring-2 ring-[#a67c12] ring-offset-2 ring-offset-background"
       : state === "edit"
-        ? "ring-4 ring-[#fb923c] ring-offset-2 ring-offset-background"
+        ? "ring-4 ring-[#e11d2e] ring-offset-2 ring-offset-background"
         : "ring-1 ring-white/80";
   return `${fill} ${ring} text-[#3c3214] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_3px_0_rgba(60,50,20,0.16)]`;
+}
+
+function EditMarkLegend({ ids }: { ids: readonly GraphNodeId[] }) {
+  const names = ids.map((id) => NAMES.get(id) ?? id);
+  return (
+    <p className="text-sm leading-6 text-muted-foreground">
+      <span
+        aria-hidden
+        className="mr-2 inline-block size-3 translate-y-px rounded-full bg-[#f8e7b0] ring-2 ring-[#e11d2e] align-middle"
+      />
+      Rot umrandete Knoten im Code Graph sind in dieser Mission anzupassen
+      {names.length ? ": " : "."}
+      {names.map((name, index) => (
+        <span key={name}>
+          {index > 0 ? (index === names.length - 1 ? " und " : ", ") : null}
+          <strong className="font-mono font-semibold text-foreground">{name}</strong>
+        </span>
+      ))}
+      {names.length ? ". " : " "}
+      Der geöffnete Knoten ist gold umrandet.
+    </p>
+  );
 }
 
 function graphNodeState(id: GraphNodeId, current: GraphNodeId, edit: ReadonlySet<GraphNodeId>): "on" | "edit" | "idle" {
@@ -351,7 +373,10 @@ export function NavGraph({
         </button>
         {explainOpen ? (
           <>
-            <div className="flex flex-col gap-3">{renderExplain(graph.explain)}</div>
+            <div className="flex flex-col gap-3">
+              {renderExplain(graph.explain)}
+              <EditMarkLegend ids={graph.edit} />
+            </div>
             {graph.id === "bt-struktur" ? <BtTickAnimation mode="struktur" /> : null}
             {graph.id === "bt-monitor" ? <BtTickAnimation mode="monitor" /> : null}
           </>

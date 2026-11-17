@@ -32,7 +32,7 @@ import { ROBOT_API, openTwin, type CostmapGrid, type NavPath, type TwinLink, typ
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
 
-const MELON_SETTLE_MS = 1000;
+const MELON_SETTLE_MS = 200;
 
 function clockLabel(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));

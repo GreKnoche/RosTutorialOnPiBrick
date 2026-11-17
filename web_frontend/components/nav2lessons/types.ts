@@ -15,7 +15,7 @@ export type GraphNodeId =
 export type Nav2Station = {
   id: string;
   focus: GraphNodeId;
-  /** Orange outline on graph nodes the student should edit in this mission. */
+  /** Red outline on graph nodes the student should edit in this mission. */
   edit: readonly GraphNodeId[];
   /** Shown for this road step, whichever code node is open. */
   explain: string;

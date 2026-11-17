@@ -104,10 +104,6 @@ function take(section: string | null, name: string): string {
 }
 
 export const FOLLOW_PATH = take(followPathSection(PARAMS), "FollowPath");
-export const REVERSE_PATH = FOLLOW_PATH.replace("allow_reversing: false", "allow_reversing: true");
-if (REVERSE_PATH === FOLLOW_PATH || !REVERSE_PATH.includes("allow_reversing: true")) {
-  throw new Error("Rückwärtsfahrt fehlt");
-}
 export const PROGRESS = take(progressSection(PARAMS), "progress_checker");
 export const GOAL = take(goalSection(PARAMS), "general_goal_checker");
 export const FOLLOWER = take(followerSection(PARAMS), "waypoint_follower");
