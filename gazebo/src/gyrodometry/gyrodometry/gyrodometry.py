@@ -23,6 +23,7 @@ from gyrodometry.borenstein import (
     THRESHOLD_DEG_S,
     heading_increment,
     travel_from_pose_delta,
+    yaw_rate_from_heading,
 )
 
 
@@ -46,6 +47,8 @@ class Gyrodometry(Node):
         self._enc_yaw = 0.0
         self._omega_gyro = 0.0
         self._have_gyro = False
+        self._imu_yaw: float | None = None
+        self._last_imu_t: float | None = None
         self._vx_fused = 0.0
         self._omega_fused = 0.0
         self._last_t: float | None = None
@@ -60,8 +63,28 @@ class Gyrodometry(Node):
         )
 
     def _on_imu(self, msg: Imu) -> None:
-        self._omega_gyro = float(msg.angular_velocity.z)
-        self._have_gyro = True
+        # Gazebo's angular_velocity.z spikes on kerb contact (tens of rad/s).
+        # One accepted spike turns the fused heading by a large angle and the
+        # green arrow then drives off. Orientation yaw is the integrated
+        # heading and stays continuous; sensor_drift still adds bias there.
+        q = msg.orientation
+        now = _stamp_sec(msg.header.stamp)
+        norm = abs(q.x) + abs(q.y) + abs(q.z) + abs(q.w)
+        cov0 = float(msg.orientation_covariance[0])
+        if norm > 1e-6 and cov0 >= 0.0:
+            yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w)
+            if self._imu_yaw is not None and self._last_imu_t is not None:
+                rate = yaw_rate_from_heading(self._imu_yaw, yaw, now - self._last_imu_t)
+                if rate is not None:
+                    self._omega_gyro = rate
+                    self._have_gyro = True
+            self._imu_yaw = yaw
+            self._last_imu_t = now
+            return
+        wz = float(msg.angular_velocity.z)
+        if math.isfinite(wz) and abs(wz) <= 3.0:
+            self._omega_gyro = wz
+            self._have_gyro = True
 
     def _seed(self, msg: Odometry) -> None:
         pose = msg.pose.pose

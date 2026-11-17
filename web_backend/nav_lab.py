@@ -17,7 +17,7 @@ LOG_LIMIT = 4_000
 
 class NavLab:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._nav: subprocess.Popen[str] | None = None
         self._student: subprocess.Popen[str] | None = None
         self._nav_log = ""
@@ -70,7 +70,7 @@ class NavLab:
             self._starting = False
         return {"ok": True, "running": False, "starting": False, "log": "Nav2 gestoppt."}
 
-    def start(self, body: dict[str, object], stop_mark: int | None = None) -> dict[str, object]:
+    def start(self, body: dict[str, object], stop_mark: int | None = None, reset_pose=None) -> dict[str, object]:
         with self._lock:
             mark = self._stops if stop_mark is None else stop_mark
             if self._stops != mark:
@@ -113,6 +113,8 @@ class NavLab:
         if error:
             self._clear_starting()
             return {"ok": False, "error": error}
+        if reset_pose is not None:
+            reset_pose()
         child = _popen(["bash", "-lc", f"exec python3 -u {_sh(student)}"])
         with self._lock:
             if self._stops != mark:

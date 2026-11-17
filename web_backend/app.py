@@ -89,7 +89,17 @@ async def nav_start(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "Der Knoten ist leer."}, status_code=400)
     lab: NavLab = request.app.state.nav
     mark = lab.stop_mark()
-    result = await asyncio.to_thread(lab.start, body, mark)
+    spawn = body.get("spawn") if isinstance(body, dict) else None
+
+    def reset_pose() -> None:
+        if not isinstance(spawn, dict):
+            return
+        reset = getattr(request.app.state.bridge, "twin_reset", None)
+        if reset is None:
+            return
+        reset(spawn.get("x", 0.0), spawn.get("y", 0.0), spawn.get("theta", 0.0))
+
+    result = await asyncio.to_thread(lab.start, body, mark, reset_pose)
     if not result.get("ok"):
         status = 200 if result.get("aborted") else 500
         return JSONResponse(result, status_code=status)

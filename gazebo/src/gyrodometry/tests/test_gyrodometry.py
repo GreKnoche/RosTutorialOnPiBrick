@@ -9,6 +9,7 @@ from gyrodometry.borenstein import (
     THRESHOLD_DEG_S,
     heading_increment,
     travel_from_pose_delta,
+    yaw_rate_from_heading,
 )
 
 
@@ -36,6 +37,11 @@ def test_uses_gyro_when_rates_disagree() -> None:
 
 def test_zero_dt_is_noop() -> None:
     assert heading_increment(1.0, 0.0, 0.0, math.radians(THRESHOLD_DEG_S)) == 0.0
+
+
+def test_yaw_rate_rejects_contact_spike() -> None:
+    assert yaw_rate_from_heading(0.0, 0.02, 0.05) == pytest.approx(0.4)
+    assert yaw_rate_from_heading(0.0, 1.5, 0.05) is None
 
 
 def test_travel_uses_pose_step_not_twist() -> None:

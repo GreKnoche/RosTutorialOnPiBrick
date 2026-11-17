@@ -4,6 +4,7 @@ import { useCallback, useEffect, useSyncExternalStore, type RefObject } from "re
 import type { Nav2Station } from "@/components/nav2lessons";
 import { CodeEditor, ResetCodeButton } from "@/components/code-editor";
 import { readLessonText, serverText, subscribeDrafts, writeLessonText, type Nav2TextField } from "@/lib/browser-draft";
+import { isMissionId, missionById } from "@/lib/nav2-lessons";
 import { PLANNER_PARAM_FIELD, plannerChoice, plannerClass, plannerSection, type PlannerParamField } from "@/lib/planner-yaml";
 import { holdRunTerminal, setRunTerminal } from "@/lib/run-terminal";
 
@@ -64,6 +65,8 @@ export function WaypointNode({
           : "Starte Nav2.",
     );
     const body: Record<string, unknown> = { source };
+    const home = isMissionId(station.id) ? missionById(station.id)?.spawn : null;
+    if (home) body.spawn = { x: home.x, y: home.y, theta: home.theta };
     if (has("maneuver")) body.plugin = kept(maneuver, station.defaults.maneuver);
     if (has("pathClear")) body.btPlugin = kept(pathClear, station.defaults.pathClear);
     if (station.tree === "through") body.tree = kept(mission, station.defaults.mission);

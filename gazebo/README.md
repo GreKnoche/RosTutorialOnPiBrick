@@ -10,7 +10,7 @@ A grayscale lane camera sits on a Technic portal above the brick, looking forwar
 
 The GUI chase-cam sits 0.70 m behind the EV3 (`follow_pgain` 1.0, no lag). Disable with `follow_camera:=false`. DiffDrive clips at 0.35 m/s and 1.2 m/s² so `cmd_vel` 0 actually brakes; wheel joints have damping so the base does not coast after a revolution command. The ROS chassis contract is 0.30 m/s.
 
-There is no SLAM and no Nav2 in this container. `compare.launch.py` builds a static occupancy grid from the `world` argument (relief loop, oval road, or all-free for lab/ruler). RViz uses fixed frame `map`.
+There is no SLAM and no Nav2 in this container. `compare.launch.py` builds a static occupancy grid from the `world` argument. Relief is the park interior with walls, rails, trees, bushes, cones, and barriers occupied. Oval is the stadium road. Lab and ruler are empty. RViz uses fixed frame `map`.
 
 | Topic | Source |
 | --- | --- |

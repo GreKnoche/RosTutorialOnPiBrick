@@ -204,6 +204,24 @@ class RobotBridge:
         if self._hub is not None:
             self._hub.unlisten(box)
 
+    def twin_reset(self, x: float, y: float, theta: float) -> None:
+        """Park the plant at spawn on the twin thread and wait until that pose is published."""
+        twin = self._twin
+        if twin is None or not self._running:
+            return
+        done = threading.Event()
+
+        def job() -> None:
+            try:
+                twin.plant.reset(float(x), float(y), float(theta))
+                twin.hub.store_path(None)
+                twin.sync()
+            finally:
+                done.set()
+
+        self._jobs.put(job)
+        done.wait(timeout=2.0)
+
     def twin_submit(self, payload: dict[str, Any]) -> None:
         twin = self._twin
         if twin is None or not self._running:

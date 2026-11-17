@@ -234,6 +234,8 @@ class CanvasTwinNode(Node):
             self._sync_free()
             return
         result = apply_message(self.plant, payload)
+        if payload.get("type") == "reset":
+            self.hub.store_path(None)
         self._mirror_chassis()
         self.sync(result)
 

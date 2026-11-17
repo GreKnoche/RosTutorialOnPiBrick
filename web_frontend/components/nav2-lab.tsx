@@ -234,8 +234,8 @@ export function Nav2Lab({
               onPlay={() => {
                 if (stationId && runningId !== stationId) {
                   writeNav2Progress({ runningId: stationId, done });
-                  setRunKey((value) => value + 1);
                 }
+                setRunKey((value) => value + 1);
                 if (!started) retry();
                 driveRef.current();
               }}

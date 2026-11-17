@@ -295,7 +295,8 @@ export const PLUGIN_SMAC2D = SMAC2D.replace("  max_iterations: 1000", "  max_ite
   .replace("max_planning_time: 2.0", "max_planning_time: 5.0");
 export const PLUGIN_SMAC = SMAC.replace('motion_model_for_search: "DUBIN"', 'motion_model_for_search: "REEDS_SHEPP"')
   .replace("max_planning_time: 3.5", "max_planning_time: 5.0")
-  .replace("smooth_path: true", "smooth_path: false");
+  .replace("smooth_path: true", "smooth_path: false")
+  .replace("minimum_turning_radius: 0.40", "minimum_turning_radius: 0.18");
 export const PLUGIN_LATTICE = LATTICE.replace("smooth_path: true", "smooth_path: false");
 
 if (pluginParamsError(PLUGIN_THETA, "nav2_theta_star_planner::ThetaStarPlanner")) {
@@ -304,7 +305,7 @@ if (pluginParamsError(PLUGIN_THETA, "nav2_theta_star_planner::ThetaStarPlanner")
 if (pluginParamsError(PLUGIN_SMAC2D, "nav2_smac_planner::SmacPlanner2D")) {
   throw new Error("Plugin-Smac2D-Parameter");
 }
-if (pluginParamsError(PLUGIN_SMAC, "nav2_smac_planner::SmacPlannerHybrid")) {
+if (pluginParamsError(PLUGIN_SMAC, "nav2_smac_planner::SmacPlannerHybrid") || !PLUGIN_SMAC.includes("minimum_turning_radius: 0.18")) {
   throw new Error("Plugin-Smac-Parameter");
 }
 if (pluginParamsError(PLUGIN_LATTICE, "nav2_smac_planner::SmacPlannerLattice")) {
@@ -425,7 +426,6 @@ if __name__ == "__main__":
 export const THROUGH_SOURCE = `"""Ein Pfad durch alle Wegpunkte. Kein Halt an den Zwischenpunkten."""
 
 import math
-import time
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -461,21 +461,6 @@ class Waypoints(Node):
     def __init__(self):
         super().__init__("waypoint_lesson")
         self._client = ActionClient(self, NavigateThroughPoses, "navigate_through_poses")
-        self._last_feedback = 0.0
-
-    def feedback(self, message):
-        now = time.monotonic()
-        if now - self._last_feedback < 5.0:
-            return
-        self._last_feedback = now
-        feedback = message.feedback
-        position = feedback.current_pose.pose.position
-        self.get_logger().info(
-            f"Fortschritt: {feedback.distance_remaining:.2f} m, "
-            f"{feedback.number_of_poses_remaining} Wegpunkte übrig, "
-            f"Position ({position.x:.2f}, {position.y:.2f}), "
-            f"Recoveries {feedback.number_of_recoveries}"
-        )
 
     def run(self):
         self.get_logger().info("warte auf navigate_through_poses")
@@ -486,7 +471,7 @@ class Waypoints(Node):
         goal = NavigateThroughPoses.Goal()
         goal.poses = [pose(self, x, y, theta) for x, y, theta in POINTS]
         self.get_logger().info(f"{len(goal.poses)} Wegpunkte, ein Pfad")
-        send = self._client.send_goal_async(goal, feedback_callback=self.feedback)
+        send = self._client.send_goal_async(goal)
         rclpy.spin_until_future_complete(self, send)
         handle = send.result()
         if handle is None or not handle.accepted:

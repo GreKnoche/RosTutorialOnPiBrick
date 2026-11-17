@@ -283,6 +283,79 @@ function liftPluginInflation(stored: string, fallback: string | undefined): stri
   return stored.replaceAll("inflation_radius: 0.05", "inflation_radius: 0.08");
 }
 
+const PROGRESS_LOG = `        self._client = ActionClient(self, NavigateThroughPoses, "navigate_through_poses")
+        self._last_feedback = 0.0
+
+    def feedback(self, message):
+        now = time.monotonic()
+        if now - self._last_feedback < 5.0:
+            return
+        self._last_feedback = now
+        feedback = message.feedback
+        position = feedback.current_pose.pose.position
+        self.get_logger().info(
+            f"Fortschritt: {feedback.distance_remaining:.2f} m, "
+            f"{feedback.number_of_poses_remaining} Wegpunkte übrig, "
+            f"Position ({position.x:.2f}, {position.y:.2f}), "
+            f"Recoveries {feedback.number_of_recoveries}"
+        )
+
+    def run(self):`;
+
+/** Drop the periodic distance log. Waypoints the student already edited stay. */
+function stripProgressLog(current: string): string {
+  if (!current.includes(PROGRESS_LOG)) return current;
+  return current
+    .replace("import math\nimport time\n", "import math\n")
+    .replace(
+      PROGRESS_LOG,
+      `        self._client = ActionClient(self, NavigateThroughPoses, "navigate_through_poses")
+
+    def run(self):`,
+    )
+    .replace(
+      "send = self._client.send_goal_async(goal, feedback_callback=self.feedback)",
+      "send = self._client.send_goal_async(goal)",
+    );
+}
+
+/** Replace a shipped default that still misses the Smac Hybrid goal. Edited text stays. */
+function liftStoredLesson(missionId: string, field: Nav2TextField, current: string, fallback: string | undefined): string {
+  if (field === "through") current = stripProgressLog(current);
+  if (!fallback) return current;
+  if (missionId === "planner" && field === "through" && current.includes("(11.79, 6.0842, NORTH)")) {
+    return current.replace("(11.79, 6.0842, NORTH)", "(8.48, 4.767, math.pi / 2)");
+  }
+  if (missionId === "planner" && field === "smac") {
+    const previous = fallback.replace('motion_model_for_search: "REEDS_SHEPP"', 'motion_model_for_search: "DUBIN"');
+    if (current === previous) return fallback;
+  }
+  if (missionId === "planner" && field === "controller") {
+    const previous = fallback
+      .replace("desired_linear_vel: 0.18", "desired_linear_vel: 0.5")
+      .replace("lookahead_dist: 0.16", "lookahead_dist: 0.22")
+      .replace("max_lookahead_dist: 0.22", "max_lookahead_dist: 0.35")
+      .replace("use_velocity_scaled_lookahead_dist: false", "use_velocity_scaled_lookahead_dist: true");
+    if (current === previous) return fallback;
+  }
+  if (missionId === "plugin" && field === "smac") {
+    const previous = fallback.replace("minimum_turning_radius: 0.18", "minimum_turning_radius: 0.40");
+    if (current === previous) return fallback;
+  }
+  if (missionId === "plugin" && field === "through" && current.includes("(10.30, 5.40,WEST)")) {
+    return current.replace(
+      `(11.0, 5.40,EAST),
+    (10.30, 5.40,WEST),
+    (10.30, 4.97,SOUTH),
+    (10.70, 4.97,EAST),
+    (10.20, 4.97,WEST),
+    (10.20, 6.08,NORTH),`,
+      "(11.0, 5.03,EAST),",
+    );
+  }
+  return current;
+}
+
 /** Write this station's own start text into any field it does not have yet. */
 export function fillStationDefaults(missionId: string, defaults: Partial<Record<Nav2TextField, string>>) {
   const book = readBook();
@@ -292,8 +365,8 @@ export function fillStationDefaults(missionId: string, defaults: Partial<Record<
     const fallback = defaults[field];
     const current = lesson[field];
     if (current !== undefined) {
-      if (field !== "localCostmap" && field !== "globalCostmap") continue;
-      const lifted = liftPluginInflation(current, fallback);
+      const inflated = field === "localCostmap" || field === "globalCostmap" ? liftPluginInflation(current, fallback) : current;
+      const lifted = liftStoredLesson(missionId, field, inflated, fallback);
       if (lifted === current) continue;
       lesson[field] = lifted;
       changed = true;

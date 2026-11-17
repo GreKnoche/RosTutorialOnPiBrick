@@ -433,6 +433,7 @@ async function runStudent(
   localCostmap: string | null,
   globalCostmap: string | null,
   stopMark: number,
+  spawn: { x: number; y: number; theta: number } | null,
 ) {
   if (slot.stops !== stopMark) {
     return { ok: false as const, aborted: true as const, error: "Nav2 gestoppt." };
@@ -522,6 +523,7 @@ async function runStudent(
         plugin_setup: pluginSetup,
         plugin_libs: pluginLibs,
         with_follower: withFollower,
+        spawn,
       }),
     });
     payload = (await response.json()) as { ok?: boolean; aborted?: boolean; error?: string; running?: boolean; log?: string };
@@ -713,6 +715,19 @@ export async function POST(request: Request) {
     if (shape) return Response.json({ ok: false, error: shape }, { status: 400 });
   }
   const cityObstacles = Boolean(body && typeof body === "object" && (body as { cityObstacles?: unknown }).cityObstacles === true);
+  const rawSpawn = body && typeof body === "object" ? (body as { spawn?: unknown }).spawn : undefined;
+  const spawn =
+    rawSpawn &&
+    typeof rawSpawn === "object" &&
+    typeof (rawSpawn as { x?: unknown }).x === "number" &&
+    typeof (rawSpawn as { y?: unknown }).y === "number" &&
+    typeof (rawSpawn as { theta?: unknown }).theta === "number"
+      ? {
+          x: (rawSpawn as { x: number }).x,
+          y: (rawSpawn as { y: number }).y,
+          theta: (rawSpawn as { theta: number }).theta,
+        }
+      : null;
   const result = await enqueue(() =>
     runStudent(
       source,
@@ -731,6 +746,7 @@ export async function POST(request: Request) {
       localCostmap,
       globalCostmap,
       stopMark,
+      spawn,
     ),
   );
   if (!result.ok) {

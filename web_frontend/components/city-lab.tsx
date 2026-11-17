@@ -32,6 +32,8 @@ import { ROBOT_API, openTwin, type CostmapGrid, type NavPath, type TwinLink, typ
 
 type MapPin = { left: number; top: number; x: number; y: number; theta: number };
 
+const MELON_SETTLE_MS = 1000;
+
 function clockLabel(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(total / 60);
@@ -270,30 +272,42 @@ type MotionAnchor = {
   linear: number;
   angular: number;
   at: number;
+  ex: number;
+  ey: number;
+  eth: number;
 };
 
 function wrapTurn(delta: number) {
   return Math.atan2(Math.sin(delta), Math.cos(delta));
 }
 
-/** Unicycle step from the last server sample. Same arc as the plant. */
+/** Spread a pose correction across frames. An instant pull hitches at the 20 Hz sample rate. */
+const CORRECT_S = 0.045;
+
+/** Unicycle step from the last drawn pose, plus the leftover gap to the server sample. */
 function coast(anchor: MotionAnchor, now: number) {
   const dt = Math.min(0.25, Math.max(0, (now - anchor.at) / 1000));
-  const { x, y, theta, linear: v, angular: w } = anchor;
-  if (dt === 0 || (Math.abs(v) < 1e-4 && Math.abs(w) < 1e-4)) return { x, y, theta };
-  if (Math.abs(w) < 1e-3) {
-    return { x: x + v * Math.cos(theta) * dt, y: y + v * Math.sin(theta) * dt, theta };
+  const { x, y, theta, linear: v, angular: w, ex, ey, eth } = anchor;
+  let px = x;
+  let py = y;
+  let pth = theta;
+  if (dt > 0 && (Math.abs(v) >= 1e-4 || Math.abs(w) >= 1e-4)) {
+    if (Math.abs(w) < 1e-3) {
+      px = x + v * Math.cos(theta) * dt;
+      py = y + v * Math.sin(theta) * dt;
+    } else {
+      const next = theta + w * dt;
+      px = x + (v / w) * (Math.sin(next) - Math.sin(theta));
+      py = y - (v / w) * (Math.cos(next) - Math.cos(theta));
+      pth = next;
+    }
   }
-  const next = theta + w * dt;
-  return {
-    x: x + (v / w) * (Math.sin(next) - Math.sin(theta)),
-    y: y - (v / w) * (Math.cos(next) - Math.cos(theta)),
-    theta: next,
-  };
+  const blend = dt === 0 ? 0 : 1 - Math.exp(-dt / CORRECT_S);
+  return { x: px + ex * blend, y: py + ey * blend, theta: pth + eth * blend };
 }
 
 function parkAnchor(pose: { x: number; y: number; theta: number }, now = performance.now()): MotionAnchor {
-  return { x: pose.x, y: pose.y, theta: pose.theta, linear: 0, angular: 0, at: now };
+  return { x: pose.x, y: pose.y, theta: pose.theta, linear: 0, angular: 0, at: now, ex: 0, ey: 0, eth: 0 };
 }
 
 function CameraAside({
@@ -760,17 +774,25 @@ export function CityLab({
         const dy = sample.y - shown.y;
         const dth = wrapTurn(sample.theta - shown.theta);
         const jump = !havePose.current || Math.hypot(dx, dy) > 0.4 || Math.abs(dth) > 0.7;
-        const gain = jump ? 1 : 0.5;
         anchorRef.current = {
-          x: shown.x + dx * gain,
-          y: shown.y + dy * gain,
-          theta: shown.theta + dth * gain,
+          x: jump ? sample.x : shown.x,
+          y: jump ? sample.y : shown.y,
+          theta: jump ? sample.theta : shown.theta,
           linear: sample.appliedLinear ?? sample.linear,
           angular: sample.appliedAngular ?? sample.angular,
           at: now,
+          ex: jump ? 0 : dx,
+          ey: jump ? 0 : dy,
+          eth: jump ? 0 : dth,
         };
         havePose.current = true;
         poseRef.current = { x: sample.x, y: sample.y, theta: sample.theta };
+        if (holdMelons.current) {
+          const home = spawnRef.current ?? cityRef.current?.start;
+          const near = Boolean(home) && Math.hypot(sample.x - (home?.x ?? 0), sample.y - (home?.y ?? 0)) < 0.25;
+          if (!near) melonHomeSince.current = 0;
+          else if (melonHomeSince.current === 0) melonHomeSince.current = now;
+        }
         const nextLap = sample.lap ?? null;
         lapRef.current = nextLap;
         setLap((previous) =>
@@ -858,6 +880,12 @@ export function CityLab({
     });
   }, [gates]);
 
+  const settleMelonHold = () => {
+    if (!holdMelons.current || melonHomeSince.current === 0) return;
+    if (performance.now() - melonHomeSince.current < MELON_SETTLE_MS) return;
+    holdMelons.current = false;
+  };
+
   useEffect(() => {
     let painted = "";
     let frameId = 0;
@@ -867,7 +895,10 @@ export function CityLab({
       const view = look ?? pose;
       const runner = runnerRef.current ?? (probeRef.current?.scene === "dock" ? (cityRef.current?.runner ?? null) : null);
       const frame = frameRef.current;
-      const melonsNow = kapitelRef.current || !melonsOnRef.current ? "" : String(melonsRef.current.filter(Boolean).length);
+      const melonsNow =
+        kapitelRef.current || !melonsOnRef.current || holdMelons.current
+          ? ""
+          : String(melonsRef.current.filter(Boolean).length);
       const boxes = clutterRef.current.map((box) => `${box.x.toFixed(2)}:${box.y.toFixed(2)}`).join(",");
       const clock = ghostRunRef.current;
       const held = ghostHoldRef.current;
@@ -919,7 +950,7 @@ export function CityLab({
           probeRef.current,
           runner,
           look,
-          kapitelRef.current || !melonsOnRef.current ? null : melonsRef.current,
+          kapitelRef.current || !melonsOnRef.current || holdMelons.current ? null : melonsRef.current,
           minBodyRef.current,
           gatesOnRef.current ? lapRef.current : null,
           gatesOnRef.current,
@@ -986,10 +1017,7 @@ export function CityLab({
       }
       if (!kapitelRef.current && melonsOnRef.current && !needMonitorStopRef.current) {
         const pose = poseRef.current;
-        if (holdMelons.current) {
-          const home = spawnRef.current ?? cityRef.current?.start;
-          if (!home || Math.hypot(pose.x - home.x, pose.y - home.y) < 0.25) holdMelons.current = false;
-        }
+        settleMelonHold();
         const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y, spotsRef.current);
         if (next !== melonsRef.current) {
           melonsRef.current = next;
@@ -1002,10 +1030,7 @@ export function CityLab({
       }
       if (!kapitelRef.current && melonsOnRef.current && needMonitorStopRef.current) {
         const pose = poseRef.current;
-        if (holdMelons.current) {
-          const home = spawnRef.current ?? cityRef.current?.start;
-          if (!home || Math.hypot(pose.x - home.x, pose.y - home.y) < 0.25) holdMelons.current = false;
-        }
+        settleMelonHold();
         const next = holdMelons.current ? melonsRef.current : takeMelons(melonsRef.current, pose.x, pose.y, spotsRef.current);
         if (next !== melonsRef.current) {
           melonsRef.current = next;
@@ -1133,7 +1158,6 @@ export function CityLab({
   }, [courseKey, rosUp, round]);
 
   const roundSeen = useRef(round);
-  const holdMelons = useRef(false);
   const placeAt = (home: { x: number; y: number; theta: number }) => {
     const homePose = { x: home.x, y: home.y, theta: home.theta };
     poseRef.current = homePose;
@@ -1164,6 +1188,7 @@ export function CityLab({
     }
     if (melonsOnRef.current) {
       holdMelons.current = true;
+      melonHomeSince.current = 0;
       melonsRef.current = freshMelons(spotsRef.current);
       setMelonsLeft(spotsRef.current.length);
     }
@@ -1212,6 +1237,7 @@ export function CityLab({
     monitorStillRef.current = 0;
     monitorDoneRef.current = false;
     if (melonsOnRef.current) holdMelons.current = true;
+    melonHomeSince.current = 0;
     melonsRef.current = freshMelons(spotsRef.current);
     setMelonsLeft(spotsRef.current.length);
     const origin = probeRef.current?.start;
@@ -1321,9 +1347,11 @@ export function CityLab({
         setBooting(body.starting === true && log.trim() === "" && !readRunTerminal().trim());
         const serverLive = body.running === true || body.starting === true;
         setRunLive(serverLive);
+        setNavRunning(body.running === true && body.starting !== true && !playBusy);
         const active = playBusy || serverLive;
         if (body.running === true || body.starting === true) seenRunRef.current = true;
         if (!active) {
+          setNavRunning(false);
           if (seenRunRef.current) {
             seenRunRef.current = false;
             const gen = ghostGen.current;
@@ -1381,7 +1409,7 @@ export function CityLab({
           onPointerCancel={onPanEnd}
           onContextMenu={onMapMenu}
         />
-        <MapClock runKey={runKey} running={timing} />
+        <MapClock runKey={runKey} running={Boolean(timing && navRunning && !playBusy)} />
         <span
           role="status"
           title={phase === "up" ? "Verbunden" : phase === "connecting" ? "Verbinde" : "Nicht verbunden"}
@@ -1608,7 +1636,9 @@ export function CityLab({
                   stoppingRef.current = true;
                   setStopping(true);
                   holdRunTerminal("Stoppe Nav2.");
-                  void fetch("/api/waypoint-run", { method: "DELETE" })
+                  const control = new AbortController();
+                  const timer = window.setTimeout(() => control.abort(), 15000);
+                  void fetch("/api/waypoint-run", { method: "DELETE", signal: control.signal })
                     .then((response) => {
                       if (!response.ok) {
                         setRunTerminal("Nav2 ließ sich nicht stoppen.");
@@ -1618,34 +1648,48 @@ export function CityLab({
                     })
                     .catch(() => setRunTerminal("Nav2 ließ sich nicht stoppen."))
                     .finally(() => {
+                      window.clearTimeout(timer);
                       stoppingRef.current = false;
                       setStopping(false);
                     });
                   return;
                 }
-                reset();
-                if (ghost && takeGhostRef.current) {
-                  ghostGen.current += 1;
-                  seenRunRef.current = false;
-                  ghostRef.current = { on: true, settled: false, t0: 0, last: -1, points: [] };
-                  setGhostNote("Aufnahme läuft.");
-                }
-                const armGhost = ghost && ghostLapRef.current.length > 1;
-                if (raceNoteRef.current) {
-                  raceNoteRef.current = "";
-                  setRaceNote("");
-                }
-                if (armGhost) {
-                  const line = courseRef.current?.checkpoints.find((gate) => gate.id === "start");
-                  const x = line ? (line.x0 + line.x1) / 2 : 1.76;
-                  const race = ghostRace(ghostLapRef.current, x);
-                  ghostArmAt.current = performance.now();
-                  ghostSawStart.current = false;
-                  ghostRunRef.current = null;
-                  ghostHoldRef.current = race ? race.line : ghostCrossTime(ghostLapRef.current, x);
-                  ghostLimitRef.current = race?.lap ?? 0;
-                }
-                onPlay();
+                if (stoppingRef.current) return;
+                stoppingRef.current = true;
+                setStopping(true);
+                holdRunTerminal("Starte Nav2.");
+                const control = new AbortController();
+                const timer = window.setTimeout(() => control.abort(), 15000);
+                void fetch("/api/waypoint-run", { method: "DELETE", signal: control.signal })
+                  .catch(() => undefined)
+                  .finally(() => {
+                    window.clearTimeout(timer);
+                    stoppingRef.current = false;
+                    setStopping(false);
+                    reset();
+                    if (ghost && takeGhostRef.current) {
+                      ghostGen.current += 1;
+                      seenRunRef.current = false;
+                      ghostRef.current = { on: true, settled: false, t0: 0, last: -1, points: [] };
+                      setGhostNote("Aufnahme läuft.");
+                    }
+                    const armGhost = ghost && ghostLapRef.current.length > 1;
+                    if (raceNoteRef.current) {
+                      raceNoteRef.current = "";
+                      setRaceNote("");
+                    }
+                    if (armGhost) {
+                      const line = courseRef.current?.checkpoints.find((gate) => gate.id === "start");
+                      const x = line ? (line.x0 + line.x1) / 2 : 1.76;
+                      const race = ghostRace(ghostLapRef.current, x);
+                      ghostArmAt.current = performance.now();
+                      ghostSawStart.current = false;
+                      ghostRunRef.current = null;
+                      ghostHoldRef.current = race ? race.line : ghostCrossTime(ghostLapRef.current, x);
+                      ghostLimitRef.current = race?.lap ?? 0;
+                    }
+                    onPlay();
+                  });
               }}
               disabled={showStop ? stopping : !playReady}
               className={`flex size-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm disabled:opacity-60 ${showStop ? "bg-[#9d2c2c]" : "bg-[#2f6b4f]"}`}
