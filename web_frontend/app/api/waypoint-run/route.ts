@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { withCityObstacles } from "@/lib/city-costmap";
 import { costmapError, mergeCostmap, type CostmapRoot } from "@/lib/costmap-yaml";
@@ -323,6 +323,34 @@ function pluginWorkspace(): string {
   return path.join(cacheDir(), "plugin_ws");
 }
 
+async function readable(file: string): Promise<boolean> {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A host colcon build leaves absolute symlinks. Inside the container those targets are missing. */
+async function pluginInstalled(name: string, xml: boolean): Promise<boolean> {
+  const root = path.join(pluginWorkspace(), "install", name);
+  const lib = path.join(root, "lib", `lib${name}.so`);
+  if (!(await readable(lib))) return false;
+  if (!xml) return true;
+  return readable(path.join(root, "share", name, "plugins.xml"));
+}
+
+async function clearBuilt(name: string): Promise<void> {
+  const ws = pluginWorkspace();
+  await rm(path.join(ws, "build", name), { recursive: true, force: true });
+  await rm(path.join(ws, "install", name), { recursive: true, force: true });
+  await rm(path.join(ws, "log", "latest_build", name), { recursive: true, force: true });
+  const index = path.join(ws, "install", "share", "ament_index", "resource_index");
+  const groups = await readdir(index).catch(() => [] as string[]);
+  await Promise.all(groups.map((group) => rm(path.join(index, group, name), { force: true })));
+}
+
 function hardenPlugin(source: string): string {
   return source.replace(
     /std::make_shared<rclcpp::Node>\(\s*"maneuver_at_waypoint_cmd"\s*\)/g,
@@ -342,13 +370,15 @@ async function buildPlugin(source: string, hash: string): Promise<string | null>
   const builtCpp = path.join(pluginWorkspace(), "src", "maneuver_at_waypoint", "src", "maneuver_at_waypoint.cpp");
   source = hardenPlugin(source);
   const previous = await readFile(builtCpp, "utf8").catch(() => "");
-  if (previous === source) {
+  const installed = await pluginInstalled("maneuver_at_waypoint", true);
+  if (previous === source && installed) {
     const existing = await readFile(setup, "utf8").catch(() => "");
     if (existing) {
       slot.pluginHash = hash;
       return null;
     }
   }
+  if (!installed) await clearBuilt("maneuver_at_waypoint");
   const ws = pluginWorkspace();
   const pkg = path.join(ws, "src", "maneuver_at_waypoint");
   const skeleton = path.join(process.cwd(), "scripts", "maneuver_at_waypoint");
@@ -382,13 +412,15 @@ async function buildBtPlugin(source: string, hash: string): Promise<string | nul
   const previous = await readFile(builtCpp, "utf8").catch(() => "");
   const previousCmake = await readFile(builtCmake, "utf8").catch(() => "");
   const skeletonCmake = await readFile(path.join(skeleton, "CMakeLists.txt"), "utf8");
-  if (previous === source && previousCmake === skeletonCmake) {
+  const installed = await pluginInstalled("path_clear_bt_node", false);
+  if (previous === source && previousCmake === skeletonCmake && installed) {
     const existing = await readFile(setup, "utf8").catch(() => "");
     if (existing) {
       slot.btPluginHash = hash;
       return null;
     }
   }
+  if (!installed) await clearBuilt("path_clear_bt_node");
   const pkg = path.join(ws, "src", "path_clear_bt_node");
   await mkdir(path.join(pkg, "src"), { recursive: true });
   for (const name of ["package.xml", "CMakeLists.txt"]) {
