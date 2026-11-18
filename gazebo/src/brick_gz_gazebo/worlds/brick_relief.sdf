@@ -2,9 +2,10 @@
 <!--
   One-wheel kerbs for encoder vs gyrodometry.
 
-  Drive +X at ~0.08 m/s from the origin over the 3D bumps (infield grass).
-  A curvy painted loop sits around them. Encoder heading turns at each
-  kerb; gyro heading does not.
+  The figure-eight crosses this lane heading west. Four 6 mm ridges sit
+  under the left wheel only, each yawed so the tire is pushed sideways.
+  Encoder wheels keep the same speed, so /odom stays straight; the gyro
+  follows the real yaw. Peak stays under the 8 mm motor-box clearance.
 -->
 <sdf version="1.11">
   <world name="brick_relief">
@@ -74,29 +75,38 @@
     </include>
 
     <!--
-      One-wheel kerbs: 6 mm rounded cylinders. Motor boxes sit ~8 mm off the
-      ground; the old 6 mm *square* blocks caught their front faces. Same
-      peak, no vertical step, so the 56 mm wheels roll over.
+      One-wheel ridges, all under the westbound left wheel (world y = -0.059).
+      6 mm peak, 0.15 rad yaw. A square step caught the motor boxes; these
+      stay rounded and inside the 8 mm ground clearance. Grip matches the
+      tires so the wheel is steered instead of skating off.
     -->
-    <model name="kerb_left_0">
+    <model name="kerb_0">
       <static>true</static>
-      <pose>0.40 0.059 0 0 0 0</pose>
+      <pose>1.55 -0.059 0 0 0 0.15</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.2</mu>
+                <mu2>1.2</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
           <material>
@@ -106,25 +116,33 @@
         </visual>
       </link>
     </model>
-    <model name="kerb_left_1">
+    <model name="kerb_1">
       <static>true</static>
-      <pose>0.80 0.059 0 0 0 0</pose>
+      <pose>1.15 -0.059 0 0 0 0.15</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.2</mu>
+                <mu2>1.2</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
           <material>
@@ -134,58 +152,74 @@
         </visual>
       </link>
     </model>
-    <model name="kerb_right_0">
+    <model name="kerb_2">
       <static>true</static>
-      <pose>1.20 -0.059 0 0 0 0</pose>
+      <pose>0.75 -0.059 0 0 0 0.15</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.2</mu>
+                <mu2>1.2</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
           <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
-    <model name="kerb_right_1">
+    <model name="kerb_3">
       <static>true</static>
-      <pose>1.60 -0.059 0 0 0 0</pose>
+      <pose>0.40 -0.059 0 0 0 0.15</pose>
       <link name="link">
         <collision name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.2</mu>
+                <mu2>1.2</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="bump">
-          <pose>0 0 0.003 1.5708 0 0</pose>
+          <pose>0 0 0.003 0 1.5708 0</pose>
           <geometry>
             <cylinder>
               <radius>0.003</radius>
-              <length>0.042</length>
+              <length>0.16</length>
             </cylinder>
           </geometry>
           <material>
-            <ambient>0.10 0.48 0.52 1</ambient>
-            <diffuse>0.14 0.58 0.62 1</diffuse>
+            <ambient>0.82 0.38 0.12 1</ambient>
+            <diffuse>0.90 0.45 0.15 1</diffuse>
           </material>
         </visual>
       </link>

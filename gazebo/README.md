@@ -2,7 +2,7 @@
 
 ROS 2 Jazzy + Gazebo Harmonic. Gazebo is its own session: the sim, a static map for the selected world, and RViz arrows for `/odom/perfect`, `/odom/encoder`, and `/odom/gyro`. TF `odom → base_link` follows `/odom/perfect`. Do not run this beside the web lab. Both use `ROS_DOMAIN_ID` 71, and the web twin owns `/odom`.
 
-Default world `relief` is grass with a curvy painted loop around the 3D kerbs. Encoder heading turns at each kerb; gyrodometry (Borenstein: encoder yaw except while the gyro disagrees) stays closer to truth. The one-wheel kerbs are 6 mm **rounded** cylinders so the motor boxes (~8 mm ground clearance) do not snag on a square step.
+Default world `relief` is grass with a curvy painted loop around the 3D kerbs. Four 6 mm ridges sit under the westbound left wheel only, each yawed so that wheel is pushed sideways. Both drive wheels keep the same speed, so encoder heading stays straight while the gyro follows the real yaw. The ridges stay rounded and under the ~8 mm motor-box clearance.
 
 `world:=oval` is a stadium road on grass: 2.4 m straights, 1.05 m end radius, 0.72 m asphalt with white edges, a dirt shoulder, and a dashed yellow center (same paint as the relief loop). The EV3 spawns on the south straight, on the centerline, facing +X. `world:=lab` is a flat ground plane. `world:=ruler` is the same tabletop plus a 1.2 m tape whose 0 cm tick is world origin (axle midpoint, drive \(+X\) to the orange 1 m mark). `sensor_drift` only republishes `/imu/perfect` onto `/imu` (optional `gyro_drift:=true`). `scan_to_range` is the only ultrasonic path.
 
@@ -53,7 +53,7 @@ ros2 launch brick_gz_bringup compare.launch.py
 
 `/drive_wheels` needs `brick_core` and `brick_interfaces` on the colcon `src` path (Compose mounts them from `brick/`). `odom_node` and `gyrodometry` live in this image's `src/`. Docker Compose is the supported way to run this overlay.
 
-Relief (default; drive ~0.08 m/s straight \(+X\) on the kerb course):
+Relief (default; figure-eight, west through the one-wheel ridges):
 
 ```bash
 ros2 launch brick_gz_bringup compare.launch.py
