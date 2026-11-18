@@ -22,7 +22,7 @@ from city import (
     push_circle,
     ray_rect,
 )
-from twin import TICK_HZ, CanvasPlant, CanvasStreamBuffer, apply_message, pack_costmap, pack_path
+from twin import TICK_HZ, CanvasPhysics, CanvasStreamBuffer, apply_message, pack_costmap, pack_path
 
 
 def _pixel(bmp: bytes, x: int, y: int) -> tuple[int, int, int]:
@@ -41,7 +41,7 @@ def test_a_touch_counts_once_until_the_car_leaves() -> None:
 
     CITY.set_clutter(False)
     try:
-        plant = CanvasPlant()
+        plant = CanvasPhysics()
         apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
         home_x = plant.odom.pose.x
         home_y = plant.odom.pose.y
@@ -106,7 +106,7 @@ def test_the_forward_beam_ends_on_the_house() -> None:
 
 
 def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     house = CITY.house("mitte")
     radius = foot_radius()
@@ -141,7 +141,7 @@ def test_a_step_into_the_wall_stops_and_a_glance_keeps_the_slide() -> None:
 
 
 def test_imu_yaw_follows_the_pose_and_a_start_accelerates() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     plant.command_twist(0.2, 0.0)
     plant.step(0.05)
@@ -158,8 +158,8 @@ def test_imu_yaw_follows_the_pose_and_a_start_accelerates() -> None:
 def test_freedrive_drives_its_own_city_and_leaves_nav2_alone() -> None:
     from city import City
 
-    nav = CanvasPlant()
-    free = CanvasPlant(world=City(), direct=True)
+    nav = CanvasPhysics()
+    free = CanvasPhysics(world=City(), direct=True)
     apply_message(nav, {"type": "city", "enter": True, "client": "labor"})
     apply_message(free, {"type": "city", "enter": True, "client": "free"})
     nav_x = nav.odom.pose.x
@@ -180,7 +180,7 @@ def test_freedrive_drives_its_own_city_and_leaves_nav2_alone() -> None:
 
 
 def test_a_lesson_command_does_not_move_the_city() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     start_x = plant.odom.pose.x
     start_y = plant.odom.pose.y
@@ -209,7 +209,7 @@ def test_a_lesson_command_does_not_move_the_city() -> None:
 
 def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -> None:
     hub = CanvasStreamBuffer()
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     hub.store(plant.sample())
     plain = {
         "x",
@@ -425,7 +425,7 @@ def test_houses_stay_off_the_asphalt() -> None:
 
 
 def test_the_camera_stays_off_until_the_holder_asks() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     assert plant.camera is False
     apply_message(plant, {"type": "flags", "client": "other", "camera": True})
@@ -441,7 +441,7 @@ def test_the_camera_stays_off_until_the_holder_asks() -> None:
 
 
 def test_drift_bends_the_heading_only_for_the_holder() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     plant.command_twist(0.2, 0.0)
     for _ in range(40):
@@ -465,7 +465,7 @@ def test_clutter_is_a_lidar_hit_until_the_holder_clears_it() -> None:
     try:
         ahead = SCAN_COUNT // 2
         clear = CITY.scan(CITY.start_x, CITY.start_y, 0.0)[ahead]
-        plant = CanvasPlant()
+        plant = CanvasPhysics()
         apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
         apply_message(plant, {"type": "flags", "client": "labor", "clutter": True})
         spot_x = CITY.cones[0][0]
@@ -569,7 +569,7 @@ def test_the_arch_misses_the_scan_and_the_runner_moves() -> None:
 
 
 def test_a_probe_sets_the_scene_and_the_route_serves_it() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
     apply_message(plant, {"type": "probe", "client": "labor", "kapitel": "01"})
     assert CITY.scene == "kegel"
@@ -638,7 +638,7 @@ def test_a_halt_gate_counts_only_when_the_car_stops() -> None:
 def test_a_mission_spawns_its_cones_and_checkpoints() -> None:
     CITY.set_clutter(False)
     try:
-        plant = CanvasPlant()
+        plant = CanvasPhysics()
         apply_message(plant, {"type": "city", "enter": True, "client": "labor"})
         apply_message(
             plant,

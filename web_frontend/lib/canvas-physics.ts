@@ -17,7 +17,7 @@ type Mode = "idle" | "teleop" | "goal" | "drive";
 
 export type WheelPath = { leftM: number; rightM: number };
 
-export class CanvasPlant {
+export class CanvasPhysics {
   chassis: Chassis;
   odom: UnicycleOdometry;
   command: Twist2D = { linear: 0, angular: 0 };

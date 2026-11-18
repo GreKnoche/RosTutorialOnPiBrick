@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from bridge import RobotBridge, WheelGateway
+from bridge import WebRosGateway, WheelGateway
 from drive import mount as mount_drive
 from nav_run_manager import NavRunManager
 
@@ -21,7 +21,7 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        owned = RobotBridge() if owns_bridge else None
+        owned = WebRosGateway() if owns_bridge else None
         app.state.bridge = owned if owned is not None else bridge
         if owned is not None:
             owned.start()

@@ -10,7 +10,7 @@ from brick_core.geometry import Pose2D, wrap_angle
 from twin import (
     TICK_HZ,
     ApplyResult,
-    CanvasPlant,
+    CanvasPhysics,
     CanvasStreamBuffer,
     apply_message,
     done_message,
@@ -19,7 +19,7 @@ from twin import (
 )
 
 
-def _run(plant: CanvasPlant) -> None:
+def _run(plant: CanvasPhysics) -> None:
     for _ in range(20000):
         done = plant.step(1.0 / TICK_HZ)
         if done is not None:
@@ -30,7 +30,7 @@ def _run(plant: CanvasPlant) -> None:
 def test_one_revolution_lands_on_the_circumference() -> None:
     circumference = 0.174
     radius = circumference / (2.0 * math.pi)
-    plant = CanvasPlant(Chassis(wheel_radius_m=radius, wheel_separation_m=0.12))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=radius, wheel_separation_m=0.12))
     plant.reset(-0.55, 0.0, 0.0)
     assert plant.command_paths([(circumference, circumference)]) is None
     _run(plant)
@@ -41,7 +41,7 @@ def test_one_revolution_lands_on_the_circumference() -> None:
 
 def test_opposite_paths_match_the_heading() -> None:
     separation = 0.2
-    plant = CanvasPlant(Chassis(wheel_radius_m=0.03, wheel_separation_m=separation))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=0.03, wheel_separation_m=separation))
     plant.reset(0.0, 0.0, 0.0)
     assert plant.command_paths([(-0.1, 0.1)]) is None
     _run(plant)
@@ -52,14 +52,14 @@ def test_opposite_paths_match_the_heading() -> None:
 
 def test_fast_spin_still_reaches_the_angle_when_yaw_rate_is_capped() -> None:
     separation = 0.11
-    plant = CanvasPlant(Chassis(wheel_radius_m=0.028, wheel_separation_m=separation))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=0.028, wheel_separation_m=separation))
     plant.reset(0.0, 0.0, 0.0)
     plant.command_paths([(-0.2, 0.2)], jump=True)
     assert math.isclose(plant.odom.pose.theta, wrap_angle(0.4 / separation), abs_tol=1e-3)
 
 
 def test_browser_twist_keeps_the_client_ros_twist_clears_it() -> None:
-    plant = CanvasPlant(Chassis())
+    plant = CanvasPhysics(Chassis())
     apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
     assert plant.owner == "lab"
     assert plant._mode == "teleop"
@@ -68,7 +68,7 @@ def test_browser_twist_keeps_the_client_ros_twist_clears_it() -> None:
 
 
 def test_goal_twist_comes_from_the_controller_and_cmd_clears_it() -> None:
-    plant = CanvasPlant(Chassis())
+    plant = CanvasPhysics(Chassis())
     plant.reset(0.0, 0.0, 0.0)
     plant.command_goal(0.8, 0.0, 0.0)
     expected = plant.controller.compute_velocity(Pose2D(0.0, 0.0, 0.0), Pose2D(0.8, 0.0, 0.0))
@@ -84,7 +84,7 @@ def test_goal_twist_comes_from_the_controller_and_cmd_clears_it() -> None:
 
 
 def test_drive_message_uses_the_sent_chassis() -> None:
-    plant = CanvasPlant(Chassis(wheel_radius_m=0.05, wheel_separation_m=0.2))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=0.05, wheel_separation_m=0.2))
     circumference = 0.2
     result = apply_message(
         plant,
@@ -107,7 +107,7 @@ def test_drive_message_uses_the_sent_chassis() -> None:
 
 
 def test_jump_returns_each_segment_pose() -> None:
-    plant = CanvasPlant(Chassis(wheel_radius_m=0.03, wheel_separation_m=0.2))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=0.03, wheel_separation_m=0.2))
     result = apply_message(
         plant,
         {
@@ -215,7 +215,7 @@ def test_segments_skip_a_zero_path_and_a_dead_chassis() -> None:
 
 
 def test_set_chassis_rejects_a_non_positive_radius() -> None:
-    plant = CanvasPlant(Chassis(wheel_radius_m=0.03, wheel_separation_m=0.12))
+    plant = CanvasPhysics(Chassis(wheel_radius_m=0.03, wheel_separation_m=0.12))
     plant.set_chassis(0.0, 0.2)
     plant.set_chassis(-0.01, 0.2)
     plant.set_chassis(float("nan"), 0.2)
@@ -224,7 +224,7 @@ def test_set_chassis_rejects_a_non_positive_radius() -> None:
 
 
 def test_chassis_message_needs_both_sizes() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "chassis", "wheel_radius_m": 0.05})
     assert plant.chassis.wheel_radius_m == Chassis().wheel_radius_m
     apply_message(
@@ -236,14 +236,14 @@ def test_chassis_message_needs_both_sizes() -> None:
 
 
 def test_reset_message_moves_the_pose() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "reset", "x": 0.2, "y": -0.1, "theta": 0.3})
     assert math.isclose(plant.odom.pose.x, 0.2)
     assert math.isclose(plant.odom.pose.y, -0.1)
 
 
 def test_nearby_goal_is_reached_on_the_next_tick() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "goal", "x": 0.01, "y": 0.0, "theta": 0.0, "client": "lab"})
     assert plant.owner == "lab"
     assert plant.goal is not None
@@ -253,7 +253,7 @@ def test_nearby_goal_is_reached_on_the_next_tick() -> None:
 
 
 def test_twist_message_moves_forward() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
     assert plant.step(0.0) is None
     before = plant.odom.pose.x
@@ -262,7 +262,7 @@ def test_twist_message_moves_forward() -> None:
 
 
 def test_cancel_message_stops() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "twist", "linear": 0.1, "angular": 0.0, "client": "lab"})
     apply_message(plant, {"type": "cancel"})
     assert plant.owner is None
@@ -270,7 +270,7 @@ def test_cancel_message_stops() -> None:
 
 
 def test_unknown_message_leaves_the_pose() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "reset", "x": 0.2, "y": 0.0, "theta": 0.0})
     stayed = plant.odom.pose.x
     apply_message(plant, {"type": "nope", "x": 9.0})
@@ -278,7 +278,7 @@ def test_unknown_message_leaves_the_pose() -> None:
 
 
 def test_goal_sample_reports_the_target() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     apply_message(plant, {"type": "goal", "x": 1.0, "y": 0.0, "theta": 0.0, "client": "lab"})
     sample = plant.sample()
     assert sample.goal_x == 1.0
@@ -287,7 +287,7 @@ def test_goal_sample_reports_the_target() -> None:
 
 
 def test_bad_drive_finishes_in_place() -> None:
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     result = apply_message(
         plant,
         {
@@ -311,7 +311,7 @@ def test_hub_stores_the_latest_sample_and_forgets_a_listener() -> None:
     box = hub.listen()
     other = hub.listen()
     hub.unlisten(other)
-    plant = CanvasPlant()
+    plant = CanvasPhysics()
     plant.reset(0.4, 0.0, 0.0)
     hub.store(plant.sample())
     assert hub.snapshot()["x"] == 0.4

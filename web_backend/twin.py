@@ -93,7 +93,7 @@ def segments_from_paths(chassis: Chassis, paths_m: list[tuple[float, float]]) ->
     return segments
 
 
-class CanvasPlant:
+class CanvasPhysics:
     """Integrates /cmd_vel. A scripted path and a goal are owners of that twist."""
 
     def __init__(self, chassis: Chassis | None = None, *, world: City | None = None, direct: bool = False) -> None:
@@ -556,13 +556,13 @@ def _paths(payload: dict[str, object]) -> list[tuple[float, float]]:
     return paths
 
 
-def _apply_chassis(plant: CanvasPlant, payload: dict[str, object]) -> None:
+def _apply_chassis(plant: CanvasPhysics, payload: dict[str, object]) -> None:
     if "wheel_radius_m" not in payload or "wheel_separation_m" not in payload:
         return
     plant.set_chassis(_finite(payload.get("wheel_radius_m")), _finite(payload.get("wheel_separation_m")))
 
 
-def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult:
+def apply_message(plant: CanvasPhysics, payload: dict[str, object]) -> ApplyResult:
     kind = payload.get("type")
     client = payload.get("client")
     client_id = client if isinstance(client, str) else None

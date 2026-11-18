@@ -76,7 +76,7 @@ def joint_wheel_positions(names: list[str], positions: list[float]) -> tuple[flo
     return None
 
 
-class RobotBridge:
+class WebRosGateway:
     def __init__(self) -> None:
         self._robot_ready = False
         self._owns_rclpy = False

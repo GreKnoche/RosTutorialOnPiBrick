@@ -1,4 +1,4 @@
-"""ROS shell around CanvasPlant: /cmd_vel and /goal_pose in, /odom and TF out.
+"""ROS shell around CanvasPhysics: /cmd_vel and /goal_pose in, /odom and TF out.
 
 The city lab also publishes /scan, /camera/image_raw, and /imu. Those three
 stay quiet until a lab page holds the city, so a lesson keeps the old graph.
@@ -41,7 +41,7 @@ from city import (
     SCAN_MIN,
     City,
 )
-from twin import TICK_HZ, ApplyResult, CanvasPlant, CanvasStreamBuffer, done_message, pack_costmap, pack_path
+from twin import TICK_HZ, ApplyResult, CanvasPhysics, CanvasStreamBuffer, done_message, pack_costmap, pack_path
 
 
 def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointCloud2:
@@ -118,8 +118,8 @@ class TwinRosAdapter(Node):
     def __init__(self, hub: CanvasStreamBuffer) -> None:
         super().__init__("twin_ros_adapter")
         self.hub = hub
-        self.plant = CanvasPlant(self._load_chassis())
-        self.free = CanvasPlant(replace(self.plant.chassis), world=City(), direct=True)
+        self.plant = CanvasPhysics(self._load_chassis())
+        self.free = CanvasPhysics(replace(self.plant.chassis), world=City(), direct=True)
         self._dt = 1.0 / TICK_HZ
         self._echo: deque[tuple[float, float]] = deque()
         self._sent: tuple[float, float] | None = (0.0, 0.0)
@@ -281,7 +281,7 @@ class TwinRosAdapter(Node):
         if result is not None and result.done is not None:
             self.hub.emit_done(done_message(result))
 
-    def _live_props(self, plant: CanvasPlant) -> dict[str, object]:
+    def _live_props(self, plant: CanvasPhysics) -> dict[str, object]:
         city = plant.city
         if city is None:
             return {}

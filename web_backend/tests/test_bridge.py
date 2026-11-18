@@ -1,4 +1,4 @@
-"""RobotBridge without a ROS graph."""
+"""WebRosGateway without a ROS graph."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ from bridge import (
     STREAM_HZ,
     TIMED_OUT,
     UNAVAILABLE,
-    RobotBridge,
+    WebRosGateway,
     answered,
     joint_wheel_positions,
 )
 
 
 def test_call_before_start_is_unavailable() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     result = bridge.call(1.0, 1.0)
     assert result.status == UNAVAILABLE
     assert result.ok is False
@@ -56,7 +56,7 @@ def _alive_thread() -> tuple[threading.Thread, threading.Event]:
     return thread, hold
 
 
-def _pump(bridge: RobotBridge, stop: threading.Event, clock: dict[str, float]) -> None:
+def _pump(bridge: WebRosGateway, stop: threading.Event, clock: dict[str, float]) -> None:
     while not stop.is_set():
         try:
             job = bridge._jobs.get(timeout=0.05)
@@ -78,7 +78,7 @@ def test_joint_wheel_positions_prefer_names() -> None:
 
 
 def test_stream_publishes_speeds_then_three_zeros() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     pub = _Pub()
     bridge._pub = pub
     bridge._speed_type = _Speed
@@ -102,7 +102,7 @@ def test_stream_publishes_speeds_then_three_zeros() -> None:
 
 
 def test_second_stream_is_busy() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     bridge._pub = _Pub()
     bridge._speed_type = _Speed
     first: dict[str, object] = {}
@@ -117,7 +117,7 @@ def test_second_stream_is_busy() -> None:
 
 
 def test_joint_positions_follow_named_wheels_and_ignore_one_value() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     assert bridge.joint_positions is None
 
     class _Joints:
@@ -132,7 +132,7 @@ def test_joint_positions_follow_named_wheels_and_ignore_one_value() -> None:
 
 
 def test_publish_waits_until_the_next_slot() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     pub = _Pub()
     bridge._pub = pub
     bridge._speed_type = _Speed
@@ -143,7 +143,7 @@ def test_publish_waits_until_the_next_slot() -> None:
 
 
 def test_cancel_drops_only_the_stream_that_timed_out() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     bridge._pub = _Pub()
     bridge._speed_type = _Speed
     first_done = threading.Event()
@@ -156,7 +156,7 @@ def test_cancel_drops_only_the_stream_that_timed_out() -> None:
 
 
 def test_call_reports_the_publisher_never_started() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     bridge._running = True
     bridge._pub = _Pub()
     bridge._speed_type = _Speed
@@ -172,7 +172,7 @@ def test_call_reports_the_publisher_never_started() -> None:
 
 
 def test_call_times_out_and_the_cancel_job_drops_the_stream() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     bridge._running = True
     bridge._pub = _Pub()
     bridge._speed_type = _Speed
@@ -195,7 +195,7 @@ def test_call_times_out_and_the_cancel_job_drops_the_stream() -> None:
 
 
 def test_call_finishes_a_zero_revolution_as_three_stops(monkeypatch: pytest.MonkeyPatch) -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     pub = _Pub()
     bridge._pub = pub
     bridge._speed_type = _Speed
@@ -217,7 +217,7 @@ def test_call_finishes_a_zero_revolution_as_three_stops(monkeypatch: pytest.Monk
 
 
 def test_spin_runs_jobs_and_becomes_ready_once_someone_subscribes() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     bridge._pub = _CountingPub()
     bridge._speed_type = _Speed
 
@@ -259,7 +259,7 @@ def test_spin_runs_jobs_and_becomes_ready_once_someone_subscribes() -> None:
 
 def test_twin_stays_offline_when_canvas_twin_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CANVAS_TWIN", "0")
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
     assert bridge.twin_online() is False
     assert bridge.twin_snapshot() == {}
     box = bridge.twin_listen()
@@ -273,7 +273,7 @@ def test_twin_stays_offline_when_canvas_twin_is_disabled(monkeypatch: pytest.Mon
 
 
 def test_twin_submit_forwards_the_payload() -> None:
-    bridge = RobotBridge()
+    bridge = WebRosGateway()
 
     class _Twin:
         def __init__(self) -> None:
