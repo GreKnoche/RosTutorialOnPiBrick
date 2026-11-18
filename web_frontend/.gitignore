@@ -19,6 +19,7 @@
 # next.js
 /.next/
 /.next-root-cache/
+/tmp/
 /out/
 
 # Student plugin workspaces are build trees, not frontend source. The repo-root
@@ -33,6 +34,8 @@
 # misc
 .DS_Store
 *.pem
+AGENTS.md
+CLAUDE.md
 
 # debug
 npm-debug.log*

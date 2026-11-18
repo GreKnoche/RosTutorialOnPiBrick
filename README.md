@@ -26,7 +26,7 @@ Das System folgt einer klaren Trennung zwischen **I/O-Schicht** (Hardware oder S
 
 1. **Web-Labor (`web/`, `web_backend/`, `web_frontend/`, `lab/`)**:
    - Stellt eine Next.js-Weboberfläche (Port `61333`) und ein FastAPI-Backend (Port `8000`) bereit.
-   - Betreibt den **Canvas Twin** (`canvas_twin`), der `/cmd_vel` und `/goal_pose` entgegennimmt und `/odom`, TF (`odom → base_link`), `/joint_states` sowie im Stadt-Labor (`/city`) simulierte Sensorik (`/scan`, `/imu`, `/camera/image_raw`) publiziert.
+   - Betreibt den **Canvas Twin** (`TwinRosAdapter`, Knoten `twin_ros_adapter`), der `/cmd_vel` und `/goal_pose` entgegennimmt und `/odom`, TF (`odom → base_link`), `/joint_states` sowie im Stadt-Labor (`/city`) simulierte Sensorik (`/scan`, `/imu`, `/camera/image_raw`) publiziert.
    - Startet dynamisch Lektions-Nodes und den **Nav2-Stack** für einzelne Kapitel.
 2. **Pi-Hardware-Box (`pi-brick/`)**:
    - Reiner I/O-Knoten (`brick_hw_robot`) für den Raspberry Pi mit Dexter Industries BrickPi3.

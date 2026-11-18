@@ -629,8 +629,8 @@ def apply_message(plant: CanvasPlant, payload: dict[str, object]) -> ApplyResult
     return ApplyResult()
 
 
-class TwinHub:
-    """Latest pose for the websocket, plus one-shot done events."""
+class CanvasStreamBuffer:
+    """Latest canvas stream for the websocket: pose, city, overlays, plus one-shot done events."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

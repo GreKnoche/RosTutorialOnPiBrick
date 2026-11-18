@@ -15,7 +15,7 @@ from pathlib import Path
 LOG_LIMIT = 4_000
 
 
-class NavLab:
+class NavRunManager:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._nav: subprocess.Popen[str] | None = None

@@ -22,7 +22,7 @@ from city import (
     push_circle,
     ray_rect,
 )
-from twin import TICK_HZ, CanvasPlant, TwinHub, apply_message, pack_costmap, pack_path
+from twin import TICK_HZ, CanvasPlant, CanvasStreamBuffer, apply_message, pack_costmap, pack_path
 
 
 def _pixel(bmp: bytes, x: int, y: int) -> tuple[int, int, int]:
@@ -208,7 +208,7 @@ def test_a_lesson_command_does_not_move_the_city() -> None:
 
 
 def test_leaving_the_city_returns_to_the_origin_and_the_snapshot_stays_plain() -> None:
-    hub = TwinHub()
+    hub = CanvasStreamBuffer()
     plant = CanvasPlant()
     hub.store(plant.sample())
     plain = {
@@ -261,7 +261,7 @@ def test_costmap_keeps_origin_and_drops_free_cells() -> None:
     assert packet["width"] == 3
     assert packet["height"] == 2
     assert packet["cells"] == [[2, 0, 40], [1, 1, 100]]
-    hub = TwinHub()
+    hub = CanvasStreamBuffer()
     hub.store_costmap(packet)
     assert hub.city_view()["costmap"] == packet
     hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)
@@ -283,7 +283,7 @@ def test_path_keeps_points_and_clears_empty() -> None:
         ]
     )
     assert points == [{"x": 1.5, "y": 4.2}, {"x": 2.0, "y": 4.2}]
-    hub = TwinHub()
+    hub = CanvasStreamBuffer()
     hub.store_path(points)
     assert hub.city_view()["path"] == points
     hub.store_city([1.0], 0.0, 0.0, None, keep_image=False)

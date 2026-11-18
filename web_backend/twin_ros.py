@@ -41,7 +41,7 @@ from city import (
     SCAN_MIN,
     City,
 )
-from twin import TICK_HZ, ApplyResult, CanvasPlant, TwinHub, done_message, pack_costmap, pack_path
+from twin import TICK_HZ, ApplyResult, CanvasPlant, CanvasStreamBuffer, done_message, pack_costmap, pack_path
 
 
 def obstacle_cloud(points: list[tuple[float, float]], stamp: object) -> PointCloud2:
@@ -114,9 +114,9 @@ class _CitySense:
         self.points = points
 
 
-class CanvasTwinNode(Node):
-    def __init__(self, hub: TwinHub) -> None:
-        super().__init__("canvas_twin")
+class TwinRosAdapter(Node):
+    def __init__(self, hub: CanvasStreamBuffer) -> None:
+        super().__init__("twin_ros_adapter")
         self.hub = hub
         self.plant = CanvasPlant(self._load_chassis())
         self.free = CanvasPlant(replace(self.plant.chassis), world=City(), direct=True)
@@ -187,7 +187,7 @@ class CanvasTwinNode(Node):
         self.create_timer(self._dt, self._flush_sensors)
         self.sync()
         self.get_logger().info(
-            f"canvas twin up dt={self._dt:.3f}s "
+            f"twin ros adapter up dt={self._dt:.3f}s "
             f"wheel_radius={radius:.4f}m track={separation:.4f}m"
         )
 

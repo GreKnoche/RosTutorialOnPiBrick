@@ -42,3 +42,5 @@ brickpi.sh
 web_frontend/.next-root-cache/
 web_frontend/.student/
 web_frontend/.student-cache/
+web_frontend/tmp/
+**.venv-ssh/

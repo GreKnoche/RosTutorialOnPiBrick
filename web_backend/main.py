@@ -1,4 +1,13 @@
-"""Source the ROS overlay, then from this directory run: python3 main.py"""
+"""Run from this directory after sourcing ROS (local, ohne Docker):
+
+  set -a && source ../shared/ros.env && set +a
+  source /opt/ros/jazzy/setup.bash
+  source ../lab/install/setup.bash
+  python3 main.py
+
+Nutze ``lab/install``, nicht das Overlay im Repo-Wurzel ``install/`` —
+sonst fehlt ``brick_interfaces`` und der Twin bleibt offline (Browser: nicht verbunden).
+"""
 
 from __future__ import annotations
 

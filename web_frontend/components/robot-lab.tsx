@@ -719,7 +719,7 @@ export function RobotLab({
           <Inspector
             title="TF"
             rows={[
-              ["odom → base_link", "canvas_twin"],
+              ["odom → base_link", "twin_ros_adapter"],
               ["base_link → wheel_left_link", "URDF"],
               ["base_link → wheel_right_link", "URDF"],
               ["base_link → gyro_link", "URDF"],

@@ -25,8 +25,8 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 
 from app import create_app
-from twin import TwinHub
-from twin_ros import CanvasTwinNode
+from twin import CanvasStreamBuffer
+from twin_ros import TwinRosAdapter
 
 _LINEAR = 0.15
 _ANGULAR = -0.2
@@ -37,7 +37,7 @@ class _SocketBridge:
 
     robot_ready = False
 
-    def __init__(self, twin: CanvasTwinNode) -> None:
+    def __init__(self, twin: TwinRosAdapter) -> None:
         self._twin = twin
         self._jobs: queue.Queue[dict[str, object]] = queue.Queue()
 
@@ -92,11 +92,11 @@ def test_browser_twist_arrives_on_cmd_vel_and_odom(monkeypatch: pytest.MonkeyPat
         pytest.skip("rclpy is already running")
 
     rclpy.init()
-    twin: CanvasTwinNode | None = None
+    twin: TwinRosAdapter | None = None
     listener: Node | None = None
     executor: SingleThreadedExecutor | None = None
     try:
-        twin = CanvasTwinNode(TwinHub())
+        twin = TwinRosAdapter(CanvasStreamBuffer())
         listener = Node("hear_canvas_twin")
         twists: list[tuple[float, float]] = []
         poses: list[float] = []
@@ -154,11 +154,11 @@ def test_the_city_publishes_scan_imu_and_camera(monkeypatch: pytest.MonkeyPatch)
         pytest.skip("rclpy is already running")
 
     rclpy.init()
-    twin: CanvasTwinNode | None = None
+    twin: TwinRosAdapter | None = None
     listener: Node | None = None
     executor: SingleThreadedExecutor | None = None
     try:
-        twin = CanvasTwinNode(TwinHub())
+        twin = TwinRosAdapter(CanvasStreamBuffer())
         listener = Node("hear_city_sensors")
         scans: list[list[float]] = []
         scan_frames: list[str] = []
@@ -263,11 +263,11 @@ def test_a_slow_scan_does_not_stall_odom(monkeypatch: pytest.MonkeyPatch) -> Non
         pytest.skip("rclpy is already running")
 
     rclpy.init()
-    twin: CanvasTwinNode | None = None
+    twin: TwinRosAdapter | None = None
     listener: Node | None = None
     executor: SingleThreadedExecutor | None = None
     try:
-        twin = CanvasTwinNode(TwinHub())
+        twin = TwinRosAdapter(CanvasStreamBuffer())
         listener = Node("hear_odom_while_scanning")
         poses: list[float] = []
         listener.create_subscription(Odometry, "odom", lambda msg: poses.append(float(msg.pose.pose.position.x)), 10)

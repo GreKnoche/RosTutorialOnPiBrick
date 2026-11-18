@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from bridge import RobotBridge, WheelGateway
 from drive import mount as mount_drive
-from nav_lab import NavLab
+from nav_run_manager import NavRunManager
 
 
 def create_app(bridge: WheelGateway | None = None) -> FastAPI:
@@ -42,7 +42,7 @@ def create_app(bridge: WheelGateway | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.add_exception_handler(RequestValidationError, invalid_body)
-    app.state.nav = NavLab()
+    app.state.nav = NavRunManager()
     app.add_api_route("/health", health, methods=["GET"])
     app.add_api_route("/nav/run", nav_status, methods=["GET"])
     app.add_api_route("/nav/run", nav_stop, methods=["DELETE"])
@@ -87,7 +87,7 @@ async def nav_start(request: Request) -> JSONResponse:
     body = await request.json()
     if not isinstance(body, dict):
         return JSONResponse({"ok": False, "error": "Der Knoten ist leer."}, status_code=400)
-    lab: NavLab = request.app.state.nav
+    lab: NavRunManager = request.app.state.nav
     mark = lab.stop_mark()
     spawn = body.get("spawn") if isinstance(body, dict) else None
 

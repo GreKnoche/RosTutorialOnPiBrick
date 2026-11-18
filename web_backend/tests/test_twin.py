@@ -11,7 +11,7 @@ from twin import (
     TICK_HZ,
     ApplyResult,
     CanvasPlant,
-    TwinHub,
+    CanvasStreamBuffer,
     apply_message,
     done_message,
     sample_dict,
@@ -306,7 +306,7 @@ def test_bad_drive_finishes_in_place() -> None:
 
 
 def test_hub_stores_the_latest_sample_and_forgets_a_listener() -> None:
-    hub = TwinHub()
+    hub = CanvasStreamBuffer()
     assert hub.snapshot()["x"] == 0.0
     box = hub.listen()
     other = hub.listen()

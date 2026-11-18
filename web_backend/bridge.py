@@ -195,9 +195,9 @@ class RobotBridge:
 
     def twin_listen(self) -> queue.Queue[Any]:
         if self._hub is None:
-            from twin import TwinHub
+            from twin import CanvasStreamBuffer
 
-            self._hub = TwinHub()
+            self._hub = CanvasStreamBuffer()
         return self._hub.listen()
 
     def twin_unlisten(self, box: queue.Queue[Any]) -> None:
@@ -234,18 +234,18 @@ class RobotBridge:
 
     def _attach_twin(self) -> None:
         if os.environ.get("CANVAS_TWIN", "1").strip().lower() in {"0", "false", "off", "no"}:
-            print("canvas twin off (CANVAS_TWIN=0)", flush=True)
+            print("twin ros adapter off (CANVAS_TWIN=0)", flush=True)
             return
         try:
-            from twin import TwinHub
-            from twin_ros import CanvasTwinNode
+            from twin import CanvasStreamBuffer
+            from twin_ros import TwinRosAdapter
 
-            self._hub = TwinHub()
-            self._twin = CanvasTwinNode(self._hub)
+            self._hub = CanvasStreamBuffer()
+            self._twin = TwinRosAdapter(self._hub)
             if self._executor is not None:
                 self._executor.add_node(self._twin)
         except Exception as exc:
-            print(f"canvas twin off ({exc})", flush=True)
+            print(f"twin ros adapter off ({exc})", flush=True)
             twin = self._twin
             self._twin = None
             if twin is not None:
