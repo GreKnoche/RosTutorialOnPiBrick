@@ -127,6 +127,71 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /odom/gyro
       Value: true
+    - Class: rviz_default_plugins/Path
+      Color: 40; 140; 255
+      Enabled: true
+      Head Diameter: 0.08
+      Head Length: 0.08
+      Length: 0.3
+      Line Style:
+        Line Width: 0.04
+        Value: Billboards
+      Name: Figure eight
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0.02
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Alpha: 1
+      Buffer Length: 1
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /figure_eight/path
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Color: 255; 170; 30
+      Enabled: true
+      Head Diameter: 0.06
+      Head Length: 0.06
+      Length: 0.25
+      Line Style:
+        Line Width: 0.03
+        Value: Billboards
+      Name: NavFn plan
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0.04
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Alpha: 0.9
+      Buffer Length: 1
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Waypoints
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /figure_eight/waypoints
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -134,9 +199,11 @@ Visualization Manager:
     Frame Rate: 30
   Name: root
   Tools:
-    - Class: rviz_default_plugins/Interact
-      Hide Inactive Objects: true
     - Class: rviz_default_plugins/MoveCamera
+    - Class: brick_gz_bringup/Start
+    - Class: brick_gz_bringup/Stop
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: false
     - Class: rviz_default_plugins/Measure
   Transformation:
     Current:
@@ -145,14 +212,14 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 8
+      Distance: 10
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
+        X: 1.15
         Y: 0
         Z: 0
       Focal Shape Fixed Size: true

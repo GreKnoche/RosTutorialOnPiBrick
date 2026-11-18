@@ -1,4 +1,7 @@
-"""Gazebo plus a static world map and three odometry arrows. No SLAM, no Nav2.
+"""Gazebo plus a static world map and three odometry arrows. No SLAM.
+
+Relief also starts Nav2 (NavFn + waypoint follower) for a figure-eight.
+The pose it drives from is /odom/perfect. Encoder and gyro stay on screen only.
 
 Run this on its own. The web lab also publishes /odom on ROS_DOMAIN_ID 71.
 """
@@ -6,11 +9,12 @@ Run this on its own. The web lab also publishes /odom on ROS_DOMAIN_ID 71.
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -74,85 +78,21 @@ def _write_oval_map(directory: Path) -> str:
     return _write_map_grid(directory, "oval", _grid_from_distance(dist))
 
 
-def _in_box(x: float, y: float, cx: float, cy: float, yaw: float, hx: float, hy: float) -> bool:
-    dx = x - cx
-    dy = y - cy
-    c = math.cos(yaw)
-    s = math.sin(yaw)
-    lx = c * dx + s * dy
-    ly = -s * dx + c * dy
-    return abs(lx) <= hx and abs(ly) <= hy
+def _relief_pixels() -> bytearray:
+    lib = Path(get_package_prefix("brick_gz_bringup")) / "lib" / "brick_gz_bringup"
+    if str(lib) not in sys.path:
+        sys.path.insert(0, str(lib))
+    import relief_course
 
-
-def _stamp_obstacles(pixels: bytearray) -> None:
-    """Walls, rails, trees, bushes, cones, and barriers from brick_relief.sdf.
-
-    Painted on top of the road mask so a footprint that sits on asphalt stays occupied.
-    """
-    inflate = 0.04
-    boxes = [
-        (1.175, -2.35, 0.0, 5.82, 0.06),
-        (1.175, 2.10, 0.0, 5.82, 0.06),
-        (-1.70, -0.125, 0.0, 0.06, 4.51),
-        (4.05, -0.125, 0.0, 0.06, 4.51),
-        (1.125, 0.20, 0.0, 2.55, 0.03),
-        (1.125, -0.20, 0.0, 2.55, 0.03),
-        (1.15, 2.00, 0.0, 0.42, 0.08),
-        (1.15, -2.25, 0.0, 0.42, 0.08),
-        (3.96, -0.20, 1.5708, 0.42, 0.08),
-        (-1.61, 0.15, 1.5708, 0.42, 0.08),
-    ]
-    disks = [
-        (-1.45, 1.90, 0.08),
-        (0.35, 1.95, 0.08),
-        (3.70, 1.85, 0.08),
-        (3.90, 0.20, 0.08),
-        (3.80, -2.05, 0.08),
-        (1.80, -2.15, 0.08),
-        (-1.40, -2.10, 0.08),
-        (-1.55, 1.30, 0.08),
-        (0.15, 1.72, 0.11),
-        (2.55, 1.78, 0.11),
-        (3.88, 0.85, 0.11),
-        (3.88, -0.95, 0.11),
-        (2.45, -2.12, 0.11),
-        (0.05, -2.12, 0.11),
-        (-1.48, -0.75, 0.11),
-        (1.15, 0.70, 0.11),
-        (1.15, -0.55, 0.11),
-        (-1.58, 0.28, 0.055),
-        (3.90, -0.18, 0.055),
-        (2.15, 1.70, 0.055),
-        (0.55, -2.02, 0.055),
-        (2.75, -1.50, 0.055),
-    ]
-    for row in range(_MAP_SIZE):
-        for col in range(_MAP_SIZE):
-            x, y = _cell_xy(row, col)
-            hit = False
-            for cx, cy, yaw, sx, sy in boxes:
-                if _in_box(x, y, cx, cy, yaw, sx * 0.5 + inflate, sy * 0.5 + inflate):
-                    hit = True
-                    break
-            if not hit:
-                for cx, cy, radius in disks:
-                    if math.hypot(x - cx, y - cy) <= radius + inflate:
-                        hit = True
-                        break
-            if hit:
-                pixels[row * _MAP_SIZE + col] = 0
+    pixels = relief_course.navigation_pixels()
+    if len(pixels) != _MAP_SIZE * _MAP_SIZE:
+        raise RuntimeError("relief navigation mask does not match the map grid")
+    return pixels
 
 
 def _write_relief_map(directory: Path) -> str:
-    """Free park interior. Occupied cells are the relief obstacles and the outside."""
-    pixels = bytearray([254] * (_MAP_SIZE * _MAP_SIZE))
-    for row in range(_MAP_SIZE):
-        for col in range(_MAP_SIZE):
-            x, y = _cell_xy(row, col)
-            if x < -1.73 or x > 4.08 or y < -2.38 or y > 2.13:
-                pixels[row * _MAP_SIZE + col] = 0
-    _stamp_obstacles(pixels)
-    return _write_map_grid(directory, "relief", pixels)
+    """Free cells are the painted road and the lane between the rails."""
+    return _write_map_grid(directory, "relief", _relief_pixels())
 
 
 def _write_open_map(directory: Path, stem: str) -> str:
@@ -170,13 +110,59 @@ def _write_map_for_world(world: str, directory: Path) -> str:
     return _write_open_map(world_dir, world if world in ("lab", "ruler") else "open")
 
 
+def _enabled(context, name: str) -> bool:
+    value = context.perform_substitution(LaunchConfiguration(name)).strip().lower()
+    return value in ("1", "true", "yes")
+
+
+def _nav_nodes(share: str) -> list[Node]:
+    params = str(Path(share) / "config" / "nav2_relief.yaml")
+    tree = str(Path(share) / "behavior_trees" / "navigate_to_pose.xml")
+    common = [params, {"use_sim_time": True}]
+    remaps = [("/tf", "tf"), ("/tf_static", "tf_static")]
+
+    def server(package: str, executable: str, name: str, extra: dict | None = None) -> Node:
+        parameters = common if extra is None else [*common, extra]
+        return Node(
+            package=package,
+            executable=executable,
+            name=name,
+            output="screen",
+            parameters=parameters,
+            remappings=remaps,
+        )
+
+    return [
+        server("nav2_controller", "controller_server", "controller_server"),
+        server("nav2_planner", "planner_server", "planner_server"),
+        server(
+            "nav2_bt_navigator",
+            "bt_navigator",
+            "bt_navigator",
+            {
+                "default_nav_to_pose_bt_xml": tree,
+                "default_nav_through_poses_bt_xml": tree,
+            },
+        ),
+        server("nav2_waypoint_follower", "waypoint_follower", "waypoint_follower"),
+        Node(
+            package="brick_gz_bringup",
+            executable="figure_eight.py",
+            name="figure_eight",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        ),
+    ]
+
+
 def _compare(context, *args, **kwargs):
     share = get_package_share_directory("brick_gz_bringup")
     world = context.perform_substitution(LaunchConfiguration("world"))
+    eight = world == "relief" and _enabled(context, "figure_eight")
     yaml_path = _write_map_for_world(world, Path("/tmp/brick_compare_map"))
     sim = Path(share) / "launch" / "sim.launch.py"
     use_sim = {"use_sim_time": True}
-    return [
+    actions = [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(sim)),
             launch_arguments={"world": world}.items(),
@@ -234,12 +220,45 @@ def _compare(context, *args, **kwargs):
             parameters=[use_sim],
         ),
     ]
+    if eight:
+        actions.extend(_nav_nodes(share))
+        actions.append(
+            TimerAction(
+                period=15.0,
+                actions=[
+                    Node(
+                        package="nav2_lifecycle_manager",
+                        executable="lifecycle_manager",
+                        name="lifecycle_manager_navigation",
+                        output="screen",
+                        parameters=[
+                            {
+                                "use_sim_time": True,
+                                "autostart": True,
+                                "node_names": [
+                                    "controller_server",
+                                    "planner_server",
+                                    "bt_navigator",
+                                    "waypoint_follower",
+                                ],
+                            }
+                        ],
+                    )
+                ],
+            )
+        )
+    return actions
 
 
 def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             DeclareLaunchArgument("world", default_value="relief"),
+            DeclareLaunchArgument(
+                "figure_eight",
+                default_value="true",
+                description="Relief only: NavFn waypoint figure-eight, started from the RViz Start button.",
+            ),
             OpaqueFunction(function=_compare),
         ]
     )

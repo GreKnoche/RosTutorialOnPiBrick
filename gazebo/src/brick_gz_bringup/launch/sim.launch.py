@@ -113,23 +113,6 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("teleop")),
     )
 
-    camera_lidar = Node(
-        package="camera_lidar",
-        executable="camera_lidar",
-        name="camera_lidar",
-        output="screen",
-        parameters=[
-            os.path.join(
-                get_package_share_directory("camera_lidar"),
-                "config",
-                "camera_lidar.yaml",
-            ),
-            os.path.join(pkg_bringup, "config", "camera_lidar.yaml"),
-            {"use_sim_time": True},
-        ],
-        condition=IfCondition(LaunchConfiguration("camera_lidar")),
-    )
-
     follow_camera = ExecuteProcess(
         cmd=[
             "bash",
@@ -175,16 +158,10 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="true",
                 description="Snap GUI camera behind the EV3 (no laggy follow).",
             ),
-            DeclareLaunchArgument(
-                "camera_lidar",
-                default_value="true",
-                description="Publish a ground-plane LaserScan from /camera/image_raw.",
-            ),
             OpaqueFunction(function=_start_gazebo),
             scan_to_range,
             drive_wheels,
             sensor_drift,
-            camera_lidar,
             teleop,
             TimerAction(period=4.5, actions=[follow_camera]),
         ]

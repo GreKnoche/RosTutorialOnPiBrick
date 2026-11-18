@@ -32,10 +32,8 @@ Das System folgt einer klaren Trennung zwischen **I/O-Schicht** (Hardware oder S
    - Reiner I/O-Knoten (`brick_hw_robot`) für den Raspberry Pi mit Dexter Industries BrickPi3.
    - Nimmt `/cmd_vel` oder `/wheel_speeds` entgegen und liefert Rohdaten (`/joint_states`, `/imu`, `/ultrasonic`), publiziert jedoch **kein** eigenes `/odom`.
 3. **Gazebo-Overlay (`gazebo/`)**:
-   - Eigenständige Sitzung in **Gazebo Harmonic** mit RViz-Visualisierung und statischen Karten (ohne SLAM/Nav2).
+   - Eigenständige Sitzung in **Gazebo Harmonic** mit RViz-Visualisierung und statischen Karten (ohne SLAM). In der Relief-Welt fährt Nav2 (NavFn und Waypoint Follower) eine Acht; die Pose kommt aus der Ground Truth.
    - Vergleicht drei Odometrie-Quellen parallel: Ground Truth (`/odom/perfect`), reine Rad-Odometrie (`/odom/encoder`) und **Borenstein-Gyrodometrie** (`/odom/gyro`).
-4. **Camera-LiDAR (`camera_lidar/`)**:
-   - Eigenständiges ROS 2-Paket, das Kanten aus dem Vorwärtskamerabild (`/camera/image_raw`) geometrisch auf die Bodenebene projiziert und als `sensor_msgs/LaserScan` (`/camera_lidar/scan`) ausgibt – ohne Inverse Perspective Mapping (IPM) oder Tiefenkamera.
 
 > **Wichtiger Hinweis:** Starten Sie das **Web-Labor** und **Gazebo** niemals gleichzeitig auf derselben `ROS_DOMAIN_ID` (Standard: `71`), da beide eigene Odometrie- und TF-Daten publizieren. Führen Sie außerdem kein `colcon build` direkt im Wurzelverzeichnis aus – nutzen Sie die jeweiligen Docker-Compose-Setups oder Overlays.
 
@@ -52,7 +50,6 @@ Das System folgt einer klaren Trennung zwischen **I/O-Schicht** (Hardware oder S
 | `web_frontend/` | Next.js-Benutzeroberfläche für die interaktiven Lektionen und das Navigationslabor. |
 | `pi-brick/` | Docker-Umgebung und ROS 2-Paket `brick_hw` für die BrickPi3-Hardware (inkl. `MockHal` für Tests ohne Hardware). |
 | `gazebo/` | Gazebo Harmonic Welten (`relief`, `oval`, `lab`, `ruler`), `ros_gz_bridge`-Konfiguration, `gyrodometry` und RViz-Vergleichsansicht. |
-| `camera_lidar/` | ROS 2-Paket zur Berechnung eines Bodenebenen-`LaserScan` aus Monokular-Kamerabildern. |
 | `scripts/` | Hilfs- und Testskripte (z. B. `./scripts/test-python.sh`). |
 
 ---

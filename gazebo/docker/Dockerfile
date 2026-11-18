@@ -12,6 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-teleop-twist-keyboard \
     ros-jazzy-nav2-map-server \
     ros-jazzy-nav2-lifecycle-manager \
+    ros-jazzy-nav2-bt-navigator \
+    ros-jazzy-nav2-controller \
+    ros-jazzy-nav2-planner \
+    ros-jazzy-nav2-navfn-planner \
+    ros-jazzy-nav2-regulated-pure-pursuit-controller \
+    ros-jazzy-nav2-waypoint-follower \
+    ros-jazzy-nav2-msgs \
+    ros-jazzy-rviz-common \
+    qtbase5-dev \
     python3-colcon-common-extensions \
     python3-opencv \
     python3-yaml \
@@ -22,7 +31,6 @@ COPY gazebo/src /ws/src
 COPY shared/brick_math /ws/src/brick_math
 COPY brick/brick_core /ws/src/brick_core
 COPY brick/brick_interfaces /ws/src/brick_interfaces
-COPY camera_lidar /ws/src/camera_lidar
 
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/ros/jazzy/setup.bash && colcon build --symlink-install

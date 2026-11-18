@@ -1,0 +1,8 @@
+<library path="brick_gz_rviz_tools">
+  <class name="brick_gz_bringup/Start" type="brick_gz_bringup::StartEightTool" base_class_type="rviz_common::Tool">
+    <description>Start the relief figure-eight.</description>
+  </class>
+  <class name="brick_gz_bringup/Stop" type="brick_gz_bringup::StopEightTool" base_class_type="rviz_common::Tool">
+    <description>Stop the relief figure-eight.</description>
+  </class>
+</library>
