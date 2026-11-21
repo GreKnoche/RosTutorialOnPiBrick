@@ -344,7 +344,7 @@ export function Nav2ControlsTour({
       ))}
       <div className="fixed top-20 right-4 z-50 flex items-center gap-3 rounded-full border border-[#e6d7a2] bg-[#fffaf0] px-3 py-2 shadow-lg">
         <p id="nav2-tour-title" className="text-sm font-semibold text-heading">
-          So bedienst du Nav2
+          So bedienst du den Nav2-Pfad
         </p>
         <button
           ref={closeRef}

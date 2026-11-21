@@ -1,26 +1,26 @@
 import type { LessonCopy } from "@/lib/lesson-copy";
 
 export const copy = {
-  "intro": "In den ersten beiden Kapiteln hast du bestimmt, wie aus Radumfang und Radabstand einzelne Strecken und Drehwinkel entstehen. In der Odometrie setzt du beides zu einer fortlaufenden Posenschätzung zusammen: Über mehrere Teilfahrten hinweg rechnet der Roboter mit, an welcher Position `(x, y)` und in welcher Richtung `θ` er zu sein glaubt.\n\nIm Labor liegen die Zielscheiben fest auf der Fläche. Du gibst im Pseudocode `Radumfang` und `Radabstand` vor und steuerst den Digital Twin über aufeinanderfolgende `fahrt(links, rechts)`-Befehle in Zentimetern – mit `U = 24 cm` und `L = 48/π cm` entspricht eine 90°-Drehung genau `24 cm` Wegdifferenz.",
-  "animationTitle": "Wie aus Radwegen eine Pose entsteht",
+  "intro": "In den ersten beiden Kapiteln hast du bestimmt, wie aus Radumfang und Radabstand einzelne Strecken und Drehwinkel entstehen. In der Odometrie setzt du beides zu einer fortlaufenden Posenschätzung zusammen: Über mehrere Teilfahrten hinweg rechnet der Roboter mit, an welcher Position `(x, y)` und in welcher Richtung `θ` er zu sein glaubt.",
+  "animationTitle": "Wie aus Radstrecken eine Pose entsteht",
   "sections": {
     "odometry-formula": {
       "id": "odometry-formula",
-      "eyebrow": "Posenschätzung",
-      "title": "Von einzelnen Segmenten zur Bahn",
-      "body": "Jedes `fahrt(links, rechts)`-Segment verschiebt und dreht die geschätzte Pose weiter: Der Mittelweg beider Räder gibt die zurückgelegte Strecke, die Wegdifferenz dreht die Fahrtrichtung. Weil jeder Schritt auf der vorherigen Pose aufbaut, ergeben viele kleine Befehle einen zusammenhängenden Pfad."
+      "eyebrow": "Standort",
+      "title": "Wo steht der Roboter?",
+      "body": "Der Roboter hat kein GPS. Er zählt nur, wie weit sich seine Räder drehen. Mit vier Formeln rechnet er daraus aus, wo er gerade steht und wohin er schaut."
     },
     "odometry-path": {
       "id": "odometry-path",
       "eyebrow": "Twin am Pfad",
-      "title": "Feste Zielpunkte, Radwege im Pseudocode",
+      "title": "Feste Zielpunkte, Radstrecken im Pseudocode",
       "body": ""
     },
     "angle": {
       "id": "angle",
       "eyebrow": "Orientierung & Winkel",
       "title": "",
-      "body": "Am Start blickt der Roboter entlang `+x`. Nach jeder Scheibe behält er seine Ankunftsrichtung bei; die Liste zeigt die nötige Drehung bis zum nächsten Zielpunkt (positiv nach links)."
+      "body": "Am Start schaut der Roboter entlang `+x`. Die Liste zeigt, wie weit er sich bis zur nächsten Scheibe drehen muss. Plus heißt nach links."
     }
   },
   "sectionOrder": [
@@ -59,8 +59,8 @@ export const copy = {
   },
   "texts": {
     "idle": "Lege Radumfang und Radabstand fest und plane die Fahrt anschließend mit fahrt(links, rechts) in Zentimetern.",
-    "missed": "Die Fahrt ist beendet, aber die Zielscheiben wurden noch nicht in der richtigen Reihenfolge getroffen.",
-    "missing-measures": "Setze zuerst Radumfang und Radabstand, damit die Werte für eine 90°-Drehung berechnet werden können.",
+    "missed": "Die Fahrt ist beendet, aber die Zielpunkte wurden noch nicht in der richtigen Reihenfolge getroffen.",
+    "missing-measures": "Setze zuerst den Radumfang und den Radabstand, damit die Werte für eine 90°-Drehung berechnet werden können.",
     "turn-revs": "90°-Wegdifferenz bei aktuellem Maß: {cm} cm ({revs} Umdrehungen).",
     "pseudocode": "Pseudocode",
     "straight": "geradeaus",

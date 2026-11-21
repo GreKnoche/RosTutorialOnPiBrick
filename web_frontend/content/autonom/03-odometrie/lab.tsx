@@ -26,15 +26,12 @@ import type { Pose2D } from "@/lib/ev3-core";
 const DEFAULT_U = 24;
 const DEFAULT_L = 48 / Math.PI;
 
-const DEFAULT_PROGRAM = `# Radumfang 24 cm, Radabstand 48/π cm (≈ 15,28 cm)
+const DEFAULT_PROGRAM = `# Radumfang 24 cm, Radabstand etwa 15,28 cm
 Radumfang 24
 Radabstand 15.279
 
-# +90° auf der Stelle: Differenz s_r - s_l = 24 cm (-12 cm links, +12 cm rechts)
-# (Mit stehendem linken Rad wäre es fahrt(0, 24) – dann wandert der Mittelpunkt mit.)
+# erst 90° auf der Stelle, dann 24 cm geradeaus
 fahrt(-12, 12)
-
-# 24 cm geradeaus zur Scheibe
 fahrt(24, 24)`;
 
 const ORIGIN: Pose2D = { x: 0, y: 0, theta: 0 };
@@ -81,15 +78,70 @@ export function OdometrieLab({
   return (
     <>
       <CopySection copy={copy} id="odometry-formula">
+        <p className="max-w-2xl text-sm leading-6">
+          Δs ist der Durchschnitt beider Räder: so weit fährt die Mitte des Roboters. Δθ entsteht, wenn ein Rad weiter rollt als das andere – dann macht der Roboter eine Kurve.
+        </p>
         <p className="font-mono text-lg text-heading">
           Δs = (s<sub>l</sub> + s<sub>r</sub>) / 2
         </p>
         <p className="font-mono text-lg text-heading">
+          Δθ = (s<sub>r</sub> − s<sub>l</sub>) / L
+        </p>
+        <p className="max-w-2xl text-sm leading-6">
+          Die neue Position rechnest du wie an einem rechtwinkligen Dreieck. Der Kosinus ist der Schritt auf der x-Achse, der Sinus der Schritt auf der y-Achse. Weil sich der Roboter während der Fahrt schon dreht, rechnet man mit der Richtung genau in der Mitte der Kurve.
+        </p>
+        <p className="font-mono text-lg text-heading">
           x<sub>neu</sub> = x + Δs · cos(θ + Δθ / 2), &nbsp; y<sub>neu</sub> = y + Δs · sin(θ + Δθ / 2)
+        </p>
+        <p className="max-w-2xl text-sm leading-6">
+          Die neue Blickrichtung ist einfach der alte Winkel plus die Drehung. In der Rechnung steht der Winkel im Bogenmaß (rad), weil Sinus und Kosinus das erwarten. Unter dem Roboter siehst du denselben Winkel in Grad (°).
         </p>
         <p className="font-mono text-lg text-heading">
           θ<sub>neu</sub> = θ + Δθ
         </p>
+        <div className="max-w-2xl overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm leading-6">
+            <thead>
+              <tr className="text-heading">
+                <th className="border-b border-foreground/20 px-2 py-1.5 font-medium">Buchstabe</th>
+                <th className="border-b border-foreground/20 px-2 py-1.5 font-medium">Bedeutung</th>
+                <th className="border-b border-foreground/20 px-2 py-1.5 font-medium">Einheit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">s<sub>l</sub>, s<sub>r</sub></td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Radweg links, rechts</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">cm</td>
+              </tr>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Δs</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Weg der Mitte</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">cm</td>
+              </tr>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Δθ</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Drehung in diesem Schritt</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">rad</td>
+              </tr>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">L</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Abstand der Räder</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">cm</td>
+              </tr>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">x, y</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Position</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">cm</td>
+              </tr>
+              <tr>
+                <td className="border-b border-foreground/10 px-2 py-1.5">θ</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">Blickrichtung</td>
+                <td className="border-b border-foreground/10 px-2 py-1.5">rad, Anzeige in °</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </CopySection>
 
       <LessonStudio

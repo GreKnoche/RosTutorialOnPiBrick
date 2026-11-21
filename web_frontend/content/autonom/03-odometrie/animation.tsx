@@ -69,8 +69,8 @@ function OdometryDemo({ run }: { run: number }) {
         />
       </div>
       <p className="px-4 py-3 text-sm leading-6 text-muted-foreground sm:px-5">
-        Die Sequenz steuert alle fünf Zielpunkte der Reihe nach an. Gegensätzliche Radwege drehen
-        den Roboter auf der Stelle in Richtung der nächsten Scheibe, gleiche Radwege führen ihn
+        Die Sequenz steuert alle fünf Zielpunkte der Reihe nach an. Gegensätzliche Radbewegungen drehen
+        den Roboter auf der Stelle in Richtung des nächsten Zielpunkts, gleiche Radbewegungen führen ihn
         anschließend geradeaus dorthin.
       </p>
     </>

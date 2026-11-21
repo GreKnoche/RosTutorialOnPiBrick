@@ -1,4 +1,4 @@
-# Gazebo overlay
+# Gazebo
 
 ROS 2 Jazzy + Gazebo Harmonic. Gazebo is its own session: the sim, a static map for the selected world, and RViz arrows for `/odom/perfect`, `/odom/encoder`, and `/odom/gyro`. TF `odom → base_link` follows `/odom/perfect`. Do not run this beside the web lab. Both use `ROS_DOMAIN_ID` 71, and the web twin owns `/odom`.
 
